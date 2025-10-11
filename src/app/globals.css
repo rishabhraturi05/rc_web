@@ -22,3 +22,13 @@
 .destruct-font {
   font-family: 'destruct', sans-serif;
 }
+
+body{
+  background-color: black;
+
+}
+
+html {
+  overflow-x: hidden;
+}
+
