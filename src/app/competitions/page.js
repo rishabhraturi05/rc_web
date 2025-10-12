@@ -1,54 +1,109 @@
-"use client"
-import React from 'react';
-import Spline from '@splinetool/react-spline';
-import AOS from 'aos';
-import 'aos/dist/aos.css';
-import { useEffect } from 'react';
+'use client'
 
-const Page = () => {
+import React, { useRef, useState, useEffect } from 'react'
+import AOS from 'aos'
+import 'aos/dist/aos.css'
+import RoboconTimeline from '../components/Robocon'
+import EyantraTimeline from '../components/Eyantra'
+
+
+const CompeteTab = () => {
+  const ref = useRef(null);
+  const [currtab, setCurrtab] = useState('');
+
   useEffect(() => {
     AOS.init({
       duration: 1500,
       once: true,
     })
-  })
+  }, [])
+
+  const scrollToOut = () => {
+    ref.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+  const renderContent = () => {
+    if (!currtab) return null;
+
+    if (currtab === 'Robocon') {
+      return <RoboconTimeline />;
+    } else if (currtab === 'EYantra') {
+      return <EyantraTimeline />;
+    }
+
+    return (
+      <div className="text-center text-white py-10">
+        <p>Content for {currtab} would be displayed here.</p>
+      </div>
+    );
+  };
+
   return (
-    <div className="relative min-h-screen bg-black">
-
-      <img
-        className='absolute top-0 right-0 opacity-60 -z-10 w-full max-w-4xl'
-        src="/gradient.png"
-        alt="gradient"
-      />
-
-      <div className='hidden md:block h-0 w-[40rem] absolute top-[20%] right-0 translate-x-1/2 shadow-[0_0_900px_50px_#e99b63] -rotate-[30deg]'></div>
-
-      {/* <Spline 
-        className='absolute top-[200] -translate-y-1/2 w-full md:w-[70%] lg:w-[50%] right-[-200] md:-mr-32 lg:-mr-48'
-        scene="https://prod.spline.design/al2kfe4tU-6AQZYs/scene.splinecode" 
-      /> */}
-      <Spline data-aos="fade-zoom-in"
-        data-aos-easing="ease-in-back"
-        data-aos-delay="300"
-        data-aos-offset="0"
-        data-aos-duration="3000" 
-        className='important absolute top-[200] -translate-y-1/2 w-full md:w-[70%] lg:w-[50%] right-[-500] md:-mr-32 lg:-mr-48' scene="https://prod.spline.design/12P53t-4DXT3O2sb/scene.splinecode" />
-
-
-      <div data-aos="fade-right"
-        data-aos-offset="300"
-        data-aos-easing="ease-in-sine" className="relative z-10 p-8 md:p-12 lg:p-24 max-w-3xl">
-        <h1 className="text-4xl md:text-6xl text-white mb-4 batman-font">
-          NIT WARANGAL ROBOTICS CLUB
-        </h1>
-        <p className='text-xl  text-gray-300 destruct-font'>Our Mission</p>
-        <p className="text-sm text-gray-300 destruct-font">
-          The Robotics Club was founded in the academic year 2019–20 with the sole purpose of Introducing the field of Robotics to NITW, encourage and guide Robotics enthusiasts to pursue it as a career option and create it into a haven for all budding Roboticist looking for a community of like minded enthusiasts. We attempt to do this by conducting workshops and training sessions and applying the learned skills by competing in Robotics contests held across India each year.
+    <>
+      <div className="bg-black text-white text-center py-16" data-aos="fade-up"
+        data-aos-duration="3000">
+        <h1 className=" batman-font text-5xl font-bold mb-4">Competitions</h1>
+        <p className="destruct-font text-xl text-gray-300 max-w-2xl mx-auto">
+          Explore our journey through various robotics competitions and achievements
         </p>
       </div>
 
-    </div>
-  );
-};
+      <div className="bg-black text-white " data-aos="fade-up"
+        data-aos-duration="3000">
+        <div className="p-5 flex flex-wrap justify-center">
+          <div
+            onClick={() => { scrollToOut(); setCurrtab('Robocon') }}
+            className="group cursor-pointer m-4 w-full max-w-[300px] h-[300px] flex justify-center items-center relative transition duration-300 hover:scale-105"
+          >
+            <div
+              className="rounded-2xl bg-cover bg-center absolute inset-0 opacity-50"
+              style={{ backgroundImage: "url('./robocon.jpg')" }}
+            ></div>
+            <p className="z-10 text-2xl font-bold transition-all duration-300 group-hover:text-3xl batman-font">Robocon</p>
+          </div>
 
-export default Page;
+          <div
+            onClick={() => { scrollToOut(); setCurrtab('EYantra') }}
+            className="group cursor-pointer m-4 w-full max-w-[300px] h-[300px] flex justify-center items-center relative transition duration-300 hover:scale-105 batman-font"
+          >
+            <div
+              className="rounded-2xl bg-cover bg-center absolute inset-0 opacity-50"
+              style={{ backgroundImage: "url('https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRbibab7EdP2fmKweDXfC_SjeVo6uJNLM_A1w&usqp=CAU')" }}
+            ></div>
+            <p className="z-10 text-2xl font-bold transition-all duration-300 group-hover:text-3xl">EYantra</p>
+          </div>
+
+          {/* <div
+            onClick={() => { scrollToOut(); setCurrtab('Other') }}
+            className="group cursor-pointer m-4 w-full max-w-[300px] h-[300px] flex justify-center items-center relative transition duration-300 hover:scale-105"
+          >
+            <div
+              className="rounded-2xl bg-cover bg-center absolute inset-0 opacity-50"
+              style={{ backgroundImage: "url('https://images.unsplash.com/photo-1554224154-260325c05c0a?q=80&w=2070&auto=format&fit=crop')" }}
+            ></div>
+            <p className="z-10 text-2xl font-bold transition-all duration-300 group-hover:text-3xl">Others</p>
+          </div> */}
+
+        </div>
+      </div>
+
+      <div ref={ref} className="bg-black text-white text-center pt-[90px] pb-4 batman-font">
+        <h2 className="text-4xl font-bold">{currtab} {currtab === '' ? 'Select a Competition' : 'Timeline'}</h2>
+      </div>
+
+      <div className="bg-black">
+        {renderContent()}
+      </div>
+    </>
+  )
+}
+
+export default CompeteTab;
+
+// import CompeteTab from "@/components/CompeteTab";
+// export default function CompetePage() {
+//     return (
+//         <main>
+//             <CompeteTab />
+//         </main>
+//     )
+// }
