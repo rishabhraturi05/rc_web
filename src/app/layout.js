@@ -2,7 +2,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "./components/Navbar";
 import Footer from "./components/footer";
-  
+import ConnectingDotsBackground from "./components/bg";
+
 
 export const metadata = {
   title: "Create Next App",
@@ -13,9 +14,10 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body className="bg-black">
-        <Navbar/>
+        <Navbar />
+        <ConnectingDotsBackground />
         {children}
-        <Footer/>
+        <Footer />
       </body>
     </html>
   );
