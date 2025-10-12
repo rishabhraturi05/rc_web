@@ -66,14 +66,14 @@ const Alumni = () => {
   }, []);
 
   return (
-    <div className="relative min-h-screen ">
+    <div className="relative min-h-screen">
       {/* Alumni Section */}
-      <div className="z-50 p-8 md:p-12 lg:p-24">
-        <div className="text-center mb-16" data-aos="fade-up" data-aos-duration="1000">
-          <h2 className="text-4xl md:text-5xl text-white batman-font mb-4">Our Alumni</h2>
-          <p className="text-lg text-gray-300 destruct-font">Meet the brilliant minds who shaped our journey</p>
+      <div className="z-50 p-4 sm:p-8 md:p-12 lg:p-24">
+        <div className="text-center mb-8 sm:mb-16" data-aos="fade-up" data-aos-duration="1000">
+          <h2 className="text-2xl sm:text-4xl md:text-5xl text-white batman-font mb-4">Our Alumni</h2>
+          <p className="text-base sm:text-lg text-gray-300 destruct-font px-4">Meet the brilliant minds who shaped our journey</p>
         </div>
-        <div className="flex flex-col gap-8">
+        <div className="flex flex-col gap-4 sm:gap-8">
           {/* Map over the data array to render cards dynamically */}
           {alumniData.map((alumnus, index) => (
             <div key={index}>
@@ -83,9 +83,9 @@ const Alumni = () => {
                 data-aos-delay={`${100 + index * 100}`}
                 data-aos-duration="1000"
               >
-                <div className="flex flex-row items-center gap-8 p-8 bg-gray-900/50 rounded-2xl hover:bg-gray-800/70 transition-all duration-500 hover:scale-105 hover:shadow-2xl min-h-70 max-w-4xl mx-auto">
+                <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8 p-4 sm:p-8 bg-gray-900/50 rounded-2xl hover:bg-gray-800/70 transition-all duration-500 hover:scale-105 hover:shadow-2xl min-h-70 max-w-4xl mx-auto">
                   <div className="relative">
-                    <div className="w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden border-4 border-blue-500 group-hover:border-red-500 transition-colors duration-500">
+                    <div className="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-full overflow-hidden border-4 border-blue-500 group-hover:border-red-500 transition-colors duration-500">
                       <Image
                         src={alumnus.imageUrl}
                         alt={alumnus.name}
@@ -94,42 +94,42 @@ const Alumni = () => {
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                       />
                     </div>
-                    {/* Social Media Icons - Visible on Hover */}
-                    <div className="absolute right-9 -bottom-8 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex space-x-1">
+                    {/* Social Media Icons - Always Visible */}
+                    <div className="absolute -bottom-1 -right-1 sm:right-2 sm:-bottom-2 flex space-x-1 z-10">
                       <Link
                         href={alumnus.linkedin}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center hover:bg-blue-700 transition-colors duration-200"
+                        className="w-6 h-6 sm:w-7 sm:h-7 bg-blue-600 rounded-full flex items-center justify-center hover:bg-blue-700 transition-colors duration-200 shadow-lg"
                         title="LinkedIn"
                       >
-                        <FaLinkedin className="w-3 h-3 text-white" />
+                        <FaLinkedin className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
                       </Link>
                        <div
-                         className="w-6 h-6 bg-pink-600 rounded-full flex items-center justify-center hover:bg-pink-700 transition-colors duration-200 cursor-pointer"
+                         className="w-6 h-6 sm:w-7 sm:h-7 bg-pink-600 rounded-full flex items-center justify-center hover:bg-pink-700 transition-colors duration-200 cursor-pointer shadow-lg"
                          title={alumnus.instagram}
                          onClick={() => {
                            navigator.clipboard.writeText(alumnus.instagram);
                            alert(`Instagram handle copied: ${alumnus.instagram}`);
                          }}
                        >
-                         <FaInstagram className="w-3 h-3 text-white" />
+                         <FaInstagram className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
                        </div>
                        <div
-                         className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center hover:bg-green-700 transition-colors duration-200 cursor-pointer"
+                         className="w-6 h-6 sm:w-7 sm:h-7 bg-green-600 rounded-full flex items-center justify-center hover:bg-green-700 transition-colors duration-200 cursor-pointer shadow-lg"
                          title={alumnus.email}
                          onClick={() => {
                            navigator.clipboard.writeText(alumnus.email);
                            alert(`Email copied: ${alumnus.email}`);
                          }}
                        >
-                         <FaEnvelope className="w-3 h-3 text-white" />
+                         <FaEnvelope className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
                        </div>
                     </div>
                   </div>
-                  <div className="text-left flex-1">
-                    <h3 className="text-xl font-bold text-white mb-2">{alumnus.name}</h3>
-                    <p className="text-gray-300 text-sm leading-relaxed">{alumnus.description}</p>
+                  <div className="text-center sm:text-left flex-1">
+                    <h3 className="text-lg sm:text-xl font-bold text-white mb-2">{alumnus.name}</h3>
+                    <p className="text-gray-300 text-sm sm:text-base leading-relaxed">{alumnus.description}</p>
                   </div>
                 </div>
               </div>
