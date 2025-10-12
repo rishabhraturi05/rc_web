@@ -3,23 +3,21 @@ import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 
-
 const Navbar = () => {
     const navLinks = [
         { name: 'Home', href: '/', active: false, sum: 1000 },
         { name: 'Members', href: '/members', active: false, sum: 1200 },
         { name: 'Competitions', href: '/competitions', active: false, sum: 1500 },
-        { name: 'Events', href: '/events_page', active: false, sum: 1700 },
+        { name: 'Events', href: '/events', active: false, sum: 1700 },
         { name: 'Projects', href: '/projects', active: false, sum: 2000 },
         { name: 'Alumni', href: '/alumni', active: false, sum: 2200 }
     ];
 
     return (
-        <nav className="relative w-full h-18 flex items-center justify-between px-8 pt-3 overflow-hidden destruct-font ">
+        <nav className="relative w-full h-18 flex items-center justify-between px-8 pt-3 overflow-hidden destruct-font">
             {/* Logo Section */}
             <div className="relative z-10 flex items-center space-x-4">
                 <div className="flex items-center space-x-3">
-                    {/* Logo Image */}
                     <Image data-aos="fade-down"
                         data-aos-easing="linear"
                         data-aos-duration="1000"
@@ -29,8 +27,6 @@ const Navbar = () => {
                         height={60}
                         className="object-contain"
                     />
-
-                    {/* Club Name */}
                     <div className="text-white" data-aos="fade-down"
                         data-aos-easing="linear"
                         data-aos-duration="1500">
@@ -65,7 +61,7 @@ const Navbar = () => {
                         )}
 
                         {/* Text content */}
-                        <span className="relative z-10 " data-aos="fade-down"
+                        <span className="relative z-10" data-aos="fade-down"
                             data-aos-easing="linear"
                             data-aos-duration={link.sum}>{link.name}</span>
                     </Link>
