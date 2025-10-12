@@ -31,3 +31,95 @@ html {
   overflow-x: hidden;
 }
 
+/* Custom animations */
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 3s linear infinite;
+}
+
+/* Car movement animation */
+@keyframes car-drive {
+  0% {
+    transform: translateX(-20px) translateY(0px);
+  }
+  25% {
+    transform: translateX(10px) translateY(-5px);
+  }
+  50% {
+    transform: translateX(20px) translateY(0px);
+  }
+  75% {
+    transform: translateX(10px) translateY(5px);
+  }
+  100% {
+    transform: translateX(-20px) translateY(0px);
+  }
+}
+
+.animate-car-drive {
+  animation: car-drive 2s ease-in-out infinite;
+}
+
+/* Floating particles */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(180deg);
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* 3D Tilt Effects */
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.tilt-3d-center {
+  transform: rotateX(0deg) rotateY(0deg);
+}
+
+.tilt-3d-top-left {
+  transform: rotateX(-15deg) rotateY(-15deg);
+}
+
+.tilt-3d-top {
+  transform: rotateX(-20deg) rotateY(0deg);
+}
+
+.tilt-3d-top-right {
+  transform: rotateX(-15deg) rotateY(15deg);
+}
+
+.tilt-3d-left {
+  transform: rotateX(0deg) rotateY(-20deg);
+}
+
+.tilt-3d-right {
+  transform: rotateX(0deg) rotateY(20deg);
+}
+
+.tilt-3d-bottom-left {
+  transform: rotateX(15deg) rotateY(-15deg);
+}
+
+.tilt-3d-bottom {
+  transform: rotateX(20deg) rotateY(0deg);
+}
+
+.tilt-3d-bottom-right {
+  transform: rotateX(15deg) rotateY(15deg);
+}
+

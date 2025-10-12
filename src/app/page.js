@@ -47,6 +47,33 @@ const Page = () => {
         </p>
       </div>
 
+      <div className="z-50 flex flex-col lg:flex-row items-center justify-between p-8 md:p-12 lg:p-24 gap-8">
+        {/* Left side - Robotics Club PNG with cool transitions */}
+        <div className="flex-1 flex justify-center lg:justify-start" data-aos="fade-right" data-aos-duration="1000">
+          <div className="relative group">
+            <div className="relative w-48 h-48 md:w-56 md:h-56 lg:w-64 lg:h-64 overflow-hidden rounded-full left-50">
+              <img
+                src="/Robotics Club, NITW.png"
+                alt="Robotics Club Logo"
+                className="w-full h-full object-contain inline-block transform hover:animate-spin group-hover:drop-shadow-2xl"
+                data-aos="zoom-in"
+                data-aos-delay="200"
+                data-aos-duration="1200"
+              />
+
+            </div>
+          </div>
+        </div>
+
+        {/* Right side - Our Vision */}
+        <div className="flex-1" data-aos="fade-left" data-aos-duration="1000">
+          <p className="text-2xl text-gray-300 destruct-font mb-4">Our Vision</p>
+          <p className="text-xl text-gray-300 destruct-font leading-relaxed">
+            To establish a vibrant and innovative robotics culture at NIT Warangal — one that inspires creativity, collaboration, and technical excellence. We aim to nurture future innovators who push the boundaries of technology, driving advancements in robotics that impact society and shape a smarter, more automated world.
+          </p>
+        </div>
+      </div>
+
     </div>
   );
 };

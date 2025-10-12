@@ -49,19 +49,19 @@ const Navbar = () => {
                         data-aos-duration={link.sum}
                         key={link.name}
                         href={link.href}
-                        className={`relative px-4 py-2 rounded-b-xl text-white uppercase font-extralight tracking-wide transition-all duration-500 ease-in-out hover:text-gray-300 group overflow-hidden ${link.active
+                        className={`relative px-4 py-2 rounded-b-xl rounded-t-md text-white uppercase font-extralight tracking-wide transition-all duration-500 ease-in-out hover:text-gray-300 group overflow-hidden ${link.active
                             ? 'bg-gray-800'
                             : 'hover:bg-gray-800'
                             }`}
                     >
                         {/* Active link - static borders */}
                         {link.active && (
-                            <div className="absolute inset-0 rounded-b-xl border-l-2 border-t-2 border-b-2 border-r-2 border-l-blue-500 border-t-blue-500 border-b-red-500 border-r-red-500"></div>
+                            <div className="absolute inset-0 rounded-b-xl rounded-t-md border-l-2 border-t-2 border-b-2 border-r-2 border-l-blue-500 border-t-blue-500 border-b-red-500 border-r-red-500"></div>
                         )}
 
                         {/* Hover animation - only for non-active links */}
                         {!link.active && (
-                            <div className="absolute inset-0 rounded-b-xl border-l-2 border-t-2 border-b-2 border-r-2 border-l-blue-500 border-t-blue-500 border-b-red-500 border-r-red-500 transform translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-in-out"></div>
+                            <div className="absolute inset-0 rounded-b-xl rounded-t-md border-l-2 border-t-2 border-b-2 border-r-2 border-l-blue-500 border-t-blue-500 border-b-red-500 border-r-red-500 transform translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-in-out"></div>
                         )}
 
                         {/* Text content */}
