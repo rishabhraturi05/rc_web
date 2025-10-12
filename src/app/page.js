@@ -4,6 +4,7 @@ import Spline from '@splinetool/react-spline';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
 import { useEffect } from 'react';
+// import ConnectingDotsBackground from './components/bg';
 
 const Page = () => {
   useEffect(() => {
@@ -13,7 +14,13 @@ const Page = () => {
     })
   })
   return (
-    <div className="relative min-h-screen">
+    <div className="relative min-h-screen ">
+      {/* <img
+        className='absolute top-0 right-0 opacity-60 -z-10 w-full max-w-4xl'
+        src="/gradient.png"
+        alt="gradient"
+      /> */}
+
       <div className='hidden md:block h-0 w-[40rem] absolute top-[20%] right-0 translate-x-1/2 shadow-[0_0_900px_50px_#e99b63] -rotate-[30deg]'></div>
 
       {/* <Spline 

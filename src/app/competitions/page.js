@@ -39,7 +39,7 @@ const CompeteTab = () => {
 
   return (
     <>
-      <div className="bg-black text-white text-center py-16" data-aos="fade-up"
+      <div className=" text-white text-center py-16" data-aos="fade-up"
         data-aos-duration="3000">
         <h1 className=" batman-font text-5xl font-bold mb-4">Competitions</h1>
         <p className="destruct-font text-xl text-gray-300 max-w-2xl mx-auto">
@@ -47,7 +47,7 @@ const CompeteTab = () => {
         </p>
       </div>
 
-      <div className="bg-black text-white " data-aos="fade-up"
+      <div className=" text-white " data-aos="fade-up"
         data-aos-duration="3000">
         <div className="p-5 flex flex-wrap justify-center">
           <div
@@ -86,11 +86,11 @@ const CompeteTab = () => {
         </div>
       </div>
 
-      <div ref={ref} className="bg-black text-white text-center pt-[90px] pb-4 batman-font">
+      <div ref={ref} className=" text-white text-center pt-[90px] pb-4 batman-font">
         <h2 className="text-4xl font-bold">{currtab} {currtab === '' ? 'Select a Competition' : 'Timeline'}</h2>
       </div>
 
-      <div className="bg-black">
+      <div className="">
         {renderContent()}
       </div>
     </>

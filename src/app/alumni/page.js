@@ -66,7 +66,7 @@ const Alumni = () => {
   }, []);
 
   return (
-    <div className="relative min-h-screen bg-black">
+    <div className="relative min-h-screen ">
       {/* Alumni Section */}
       <div className="z-50 p-8 md:p-12 lg:p-24">
         <div className="text-center mb-16" data-aos="fade-up" data-aos-duration="1000">

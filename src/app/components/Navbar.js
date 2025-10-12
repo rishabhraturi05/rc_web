@@ -9,7 +9,7 @@ const Navbar = () => {
         { name: 'Home', href: '/', active: false, sum: 1000 },
         { name: 'Members', href: '/members', active: false, sum: 1200 },
         { name: 'Competitions', href: '/competitions', active: false, sum: 1500 },
-        { name: 'Events', href: '/events', active: false, sum: 1700 },
+        { name: 'Events', href: '/events_page', active: false, sum: 1700 },
         { name: 'Projects', href: '/projects', active: false, sum: 2000 },
         { name: 'Alumni', href: '/alumni', active: false, sum: 2200 }
     ];
