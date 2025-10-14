@@ -44,7 +44,7 @@ const EventCard = ({ event, onClick }) => {
       data-aos-duration="1000"
     >
       <div
-        className="rounded-2xl bg-cover bg-center absolute inset-0 opacity-70 group-hover:opacity-90 transition-opacity duration-300"
+        className="rounded-2xl bg-cover bg-center absolute inset-0 opacity-70 group-hover:opacity-100 ease-in-out transition-opacity duration-300"
         style={{ backgroundImage: `url('${event.image}')` }}
       ></div>
       <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent rounded-2xl"></div>
@@ -55,7 +55,7 @@ const EventCard = ({ event, onClick }) => {
       <div className="relative z-10 p-6 text-center">
         <h3 className="text-2xl font-bold mb-2 batman-font">{event.title}</h3>
         <p className="text-sm mb-2 destruct-font">{event.date}</p>
-        <p className="text-xs opacity-90">{event.shortDescription}</p>
+        <p className="text-xs opacity-90 destruct-font">{event.shortDescription}</p>
       </div>
     </div>
   )
@@ -65,14 +65,14 @@ const EventModal = ({ event, isOpen, onClose }) => {
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-900 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto custom-scrollbar">
+    <div className="fixed inset-0 bg-opacity-75 flex items-center justify-center z-50 p-4 transition-all duration-300 backdrop-blur-lg ">
+      <div className="bg-gray-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto custom-scrollbar transition-all duration-300 ease-in-out">
         {/* Modal Header */}
         <div className="relative">
-          <div
-            className="h-48 bg-cover bg-center rounded-t-2xl"
-            style={{ backgroundImage: `url('${event.image}')` }}
-          ></div>
+          {/* <div
+            className="h-48 bg-cover bg-no-repeat bg-center rounded-t-2xl"
+            style={{ backgroundImage: `url('${event.image}')` }}  
+          ></div> */}
           <div className="absolute inset-0 bg-gradient-to-t from-black to-transparent rounded-t-2xl"></div>
           <button
             onClick={onClose}
@@ -88,31 +88,23 @@ const EventModal = ({ event, isOpen, onClose }) => {
 
         {/* Modal Content */}
         <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="flex flex-col gap-6">
             {/* Event Details */}
             <div>
               <h3 className="text-xl font-bold mb-4 batman-font text-blue-400">Event Details</h3>
-              <div className="space-y-3">
-                <div>
-                  <span className="font-semibold text-gray-300">Date:</span>
+              <div className="space-y-3 destruct-font">
+                <div className='flex gap-2'>
+                  <span className="font-semibold text-gray-300">Date :</span>
                   <p className="text-white">{event.date}</p>
                 </div>
-                <div>
-                  <span className="font-semibold text-gray-300">Time:</span>
+                <div className='flex gap-2'>
+                  <span className="font-semibold text-gray-300">Time :</span>
                   <p className="text-white">{event.time}</p>
                 </div>
-                <div>
-                  <span className="font-semibold text-gray-300">Venue:</span>
+                <div className='flex gap-2'>
+                  <span className="font-semibold text-gray-300">Venue :</span>
                   <p className="text-white">{event.venue}</p>
                 </div>
-                {/* <div>
-                  <span className="font-semibold text-gray-300">Duration:</span>
-                  <p className="text-white">{event.duration}</p>
-                </div> */}
-                {/* <div>
-                  <span className="font-semibold text-gray-300">Registration Fee:</span>
-                  <p className="text-white">{event.fee}</p>
-                </div> */}
               </div>
             </div>
 
@@ -123,27 +115,10 @@ const EventModal = ({ event, isOpen, onClose }) => {
             </div>
           </div>
 
-          {/* Requirements */}
-          <div className="mt-6">
-            <h3 className="text-xl font-bold mb-4 batman-font text-blue-400">Requirements</h3>
-            <ul className="list-disc list-inside text-gray-300 space-y-2">
-              {event.requirements.map((req, index) => (
-                <li key={index} className="destruct-font">{req}</li>
-              ))}
-            </ul>
-          </div>
-
           {/* Contact Info */}
           <div className="mt-6 p-4 bg-gray-800 rounded-lg">
             <h3 className="text-lg font-bold mb-2 batman-font text-blue-400">Contact</h3>
             <p className="text-gray-300 destruct-font">{event.contact}</p>
-          </div>
-
-          {/* Register Button */}
-          <div className="mt-6 text-center">
-            <button className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-bold transition-colors duration-300 batman-font">
-              Register Now
-            </button>
           </div>
         </div>
       </div>
@@ -166,120 +141,85 @@ const EventsPage = () => {
     {
       id: 1,
       title: "Fresher's Event",
-      date: "Oct 18, 2025",
+      date: "Oct 17, 2025",
       time: "5:00 PM",
       venue: "MME Seminar Hall",
-      duration: "8 hours",
-      fee: "₹500",
+      duration: "3 hours",
+      fee: "-",
       status: "upcoming",
       image: "/events/freshers.jpg",
-      shortDescription: "Learn the fundamentals of robotics and automation",
-      description: "Join us for an intensive hands-on robotics workshop where you'll learn about robot design, programming, and control systems. This workshop is perfect for beginners and intermediate students who want to dive deep into the world of robotics.",
-      requirements: [
-        "Basic knowledge of programming (Python/C++)",
-        "Laptop with Arduino IDE installed",
-        "Enthusiasm to learn and build",
-        "Team of 2-3 members (optional)"
-      ],
+      shortDescription: "Exclusive event for freshers",
+      description: "The wait is finally OVER.\nThe heist of creativity is about to begin…\n🎭 LA CASA DE ROBOT\nHere’s the Masterplan, Crew:\n🔹 Rendezvous Point: MME Seminar Hall\n🔹 Mission: Crack codes, conquer challenges, outsmart the clock\n🔹 Goal: Unleash your inner innovator 🤖\n\nAnd the spoils of this heist ? 🏆\nRobotic Kits, Refreshments, Glory, and Bragging Rights! ⚙\nThis time, we’re not after gold or banks…\nWe’re after something bigger —\n⚡ Innovation.Imagination.The Future of Robotics! ⚡\n",
       contact: "Contact: robotics@nitw.ac.in | Phone: +91-7661991859"
     },
     {
       id: 2,
-      title: "AI & Machine Learning Seminar",
-      date: "March 22, 2025",
-      time: "2:00 PM - 6:00 PM",
-      venue: "Computer Science Department",
+      title: "Sumo War",
+      date: "October 24-25, 2025",
+      time: "-",
+      venue: "-",
       duration: "4 hours",
-      fee: "Free",
+      fee: "N/A",
       status: "upcoming",
       image: "/events/Sumo Wars Event Poster.png",
-      shortDescription: "Explore the latest trends in AI and ML",
-      description: "An interactive seminar featuring industry experts and researchers discussing the latest developments in Artificial Intelligence and Machine Learning. Learn about practical applications and career opportunities in AI.",
-      requirements: [
-        "Basic understanding of mathematics",
-        "Interest in AI/ML concepts",
-        "Laptop (optional for hands-on sessions)"
-      ],
-      contact: "Contact: roboticsclub@nitw.ac.in | Phone: +91-7661991859"
+      shortDescription: "Robotics Battle",
+      description: "Where strategy meets strength! Step into the arena with your battle-ready sumobot and take control in an adrenaline-fueled showdown. Outsmart your rival, push them out of the warzone, and rack up points by landing hits and keeping them trapped in the danger zone. Skill decides the champion!",
+      contact: "Contact: Srijoy | Phone: +91-75694 98783"
     },
     {
       id: 3,
-      title: "Robocon Preparation Bootcamp",
-      date: "April 5-7, 2025",
-      time: "9:00 AM - 6:00 PM",
+      title: "Bombs Away",
+      date: "October 24-25, 2025",
+      time: "-",
       venue: "Robotics Lab, NIT Warangal",
-      duration: "3 days",
-      fee: "₹1000",
+      duration: "-",
+      fee: "N/A",
       status: "upcoming",
       image: "/events/Bombs_Away_EventPoster.png",
-      shortDescription: "Intensive preparation for Robocon competition",
-      description: "A comprehensive 3-day bootcamp designed to prepare teams for the upcoming Robocon competition. Learn advanced robotics concepts, team management, and competition strategies from experienced mentors.",
-      requirements: [
-        "Team of 4-6 members",
-        "Basic robotics knowledge",
-        "Commitment to attend all sessions",
-        "Laptop with required software"
-      ],
-      contact: "Contact: roboticsclub@nitw.ac.in | Phone: +91-7661991859"
+      shortDescription: "Fly the Plane",
+      description: "Bomb's Away is a skill-based challenge testing your timing and judgment. As a 'Bombardier,' you will control a single trigger to release an inert payload from a pilot-operated RC aircraft. Your mission is to account for speed and altitude to land the payload closest to the target's center.",
+      contact: "Contact: Dhanvanth | Phone: 74180 56603"
     },
     {
       id: 4,
-      title: "Innovation Challenge",
-      date: "April 20, 2025",
-      time: "10:00 AM - 4:00 PM",
-      venue: "Innovation Center",
-      duration: "6 hours",
-      fee: "₹300",
+      title: "BLAZE",
+      date: "October 24-25, 2025",
+      time: "-",
+      venue: "-",
+      duration: "-",
+      fee: "N/A",
       status: "upcoming",
       image: "/events/RC_BLAZE_POSTER.png",
       shortDescription: "Showcase your innovative robotics solutions",
-      description: "A day-long innovation challenge where participants will work in teams to solve real-world problems using robotics. The challenge includes problem identification, solution design, and prototype development.",
-      requirements: [
-        "Team of 3-4 members",
-        "Creative thinking skills",
-        "Basic electronics knowledge",
-        "Presentation skills"
-      ],
-      contact: "Contact: roboticsclub@nitw.ac.in | Phone: +91-7661991859"
+      description: "BLAZE is your high-octane laser challenge by the Robotics Club. Enter the custom 'Alice in Borderland' arena for intense 4v4 combat. The map is loaded with secrets, and every day brings a new game mode! Play smart, hit hard, and fight your way to the top of the live leaderboard.",
+      contact: "Contact: Soumilya | Phone: 84486 44855"
     },
     {
       id: 5,
-      title: "Innovation Challenge",
+      title: "Robotics Workshop",
       date: "Sept 14, 2025",
       time: "10:00 AM - 4:00 PM",
-      venue: "Innovation Center",
+      venue: "ALC",
       duration: "6 hours",
-      fee: "₹300",
+      fee: "-",
       status: "completed",
       image: "/events/workshop.jpg",
-      shortDescription: "Showcase your innovative robotics solutions",
-      description: "A day-long innovation challenge where participants will work in teams to solve real-world problems using robotics. The challenge includes problem identification, solution design, and prototype development.",
-      requirements: [
-        "Team of 3-4 members",
-        "Creative thinking skills",
-        "Basic electronics knowledge",
-        "Presentation skills"
-      ],
+      shortDescription: "Learn the basics of robotics",
+      description: "Join this interactive, hands-on session to explore Arduino, Robot Design, and take on thrilling challenges like Cozmo Clench and Meshmerize—the perfect launchpad for Techfest IIT Bombay.This is not just a lecture—you will build, create, and compete with like-minded robotics enthusiasts.",
       contact: "Contact: roboticsclub@nitw.ac.in | Phone: +91-7661991859"
     },
     {
       id: 6,
-      title: "Innovation Challenge",
-      date: "Sept 14, 2025",
-      time: "10:00 AM - 4:00 PM",
-      venue: "Innovation Center",
-      duration: "6 hours",
-      fee: "₹300",
+      title: "Global Trends in Robotics",
+      date: "March 19, 2025",
+      time: "6:30 PM",
+      venue: "ALC",
+      duration: "3 hours",
+      fee: "-",
       status: "completed",
-      image: "/events/workshop.jpg",
-      shortDescription: "Showcase your innovative robotics solutions",
-      description: "A day-long innovation challenge where participants will work in teams to solve real-world problems using robotics. The challenge includes problem identification, solution design, and prototype development.",
-      requirements: [
-        "Team of 3-4 members",
-        "Creative thinking skills",
-        "Basic electronics knowledge",
-        "Presentation skills"
-      ],
+      image: "/events/onlinewebinar25.png",
+      shortDescription: "Global Trends in Robotics",
+      description: "The field of robotics is evolving rapidly, opening up exciting opportunities across the globe in research, industry, and entrepreneurship. From AI-driven automation to space exploration and healthcare innovations, robotics is transforming the way we work and live.Join us for an insightful speaker session where our expert Nallamilli Venkata Reddy garu will discuss about global trends in robotics, career pathways, international research collaborations, and the skills needed to thrive in this dynamic field.Don't miss this opportunity to gain valuable knowledge and explore how you can be part of the global robotics revolution!",
       contact: "Contact: roboticsclub@nitw.ac.in | Phone: +91-7661991859"
     }
   ]

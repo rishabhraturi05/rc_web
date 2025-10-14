@@ -86,69 +86,67 @@ html {
 .perspective-1000 {
   perspective: 1000px;
 }
-
 .tilt-3d-center {
   transform: rotateX(0deg) rotateY(0deg);
 }
-
 .tilt-3d-top-left {
   transform: rotateX(-15deg) rotateY(-15deg);
 }
-
 .tilt-3d-top {
   transform: rotateX(-20deg) rotateY(0deg);
 }
-
 .tilt-3d-top-right {
   transform: rotateX(-15deg) rotateY(15deg);
 }
-
 .tilt-3d-left {
   transform: rotateX(0deg) rotateY(-20deg);
 }
-
 .tilt-3d-right {
   transform: rotateX(0deg) rotateY(20deg);
 }
-
 .tilt-3d-bottom-left {
   transform: rotateX(15deg) rotateY(-15deg);
 }
-
 .tilt-3d-bottom {
   transform: rotateX(20deg) rotateY(0deg);
 }
-
 .tilt-3d-bottom-right {
   transform: rotateX(15deg) rotateY(15deg);
 }
 
-/* Custom Scrollbar Styles */
-.custom-scrollbar {
+/* Global Custom Scrollbar Styles */
+* {
   scrollbar-width: thin;
-  scrollbar-color: #3b82f6 #1f2937;
+  scrollbar-color: rgba(255, 255, 255, 0.208) transparent;
 }
 
-.custom-scrollbar::-webkit-scrollbar {
+*::-webkit-scrollbar {
   width: 8px;
+  height: 8px;
 }
 
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: #1f2937;
+*::-webkit-scrollbar-track {
+  background: transparent;
   border-radius: 10px;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #3b82f6, #1d4ed8);
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.8);
   border-radius: 10px;
-  border: 2px solid #1f2937;
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #2563eb, #1e40af);
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.9);
 }
 
-.custom-scrollbar::-webkit-scrollbar-corner {
-  background: #1f2937;
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }
+
+/* For Firefox
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.8) transparent;
+} */
 
