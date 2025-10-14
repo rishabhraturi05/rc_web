@@ -37,7 +37,7 @@ const EventCard = ({ event, onClick }) => {
   }
 
   return (
-    <div 
+    <div
       className="group cursor-pointer m-4 w-full max-w-[350px] h-[400px] flex flex-col justify-end items-center relative transition duration-300 hover:scale-105"
       onClick={onClick}
       data-aos="fade-up"
@@ -48,10 +48,10 @@ const EventCard = ({ event, onClick }) => {
         style={{ backgroundImage: `url('${event.image}')` }}
       ></div>
       <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent rounded-2xl"></div>
-      
+
       {/* Status Badge */}
       {getStatusBadge(event.status)}
-      
+
       <div className="relative z-10 p-6 text-center">
         <h3 className="text-2xl font-bold mb-2 batman-font">{event.title}</h3>
         <p className="text-sm mb-2 destruct-font">{event.date}</p>
@@ -105,14 +105,14 @@ const EventModal = ({ event, isOpen, onClose }) => {
                   <span className="font-semibold text-gray-300">Venue:</span>
                   <p className="text-white">{event.venue}</p>
                 </div>
-                <div>
+                {/* <div>
                   <span className="font-semibold text-gray-300">Duration:</span>
                   <p className="text-white">{event.duration}</p>
-                </div>
-                <div>
+                </div> */}
+                {/* <div>
                   <span className="font-semibold text-gray-300">Registration Fee:</span>
                   <p className="text-white">{event.fee}</p>
-                </div>
+                </div> */}
               </div>
             </div>
 
@@ -165,14 +165,14 @@ const EventsPage = () => {
   const events = [
     {
       id: 1,
-      title: "Robotics Workshop",
-      date: "March 15, 2024",
-      time: "9:00 AM - 5:00 PM",
-      venue: "Main Auditorium, NIT Warangal",
+      title: "Fresher's Event",
+      date: "Oct 18, 2025",
+      time: "5:00 PM",
+      venue: "MME Seminar Hall",
       duration: "8 hours",
       fee: "₹500",
-      status: "completed",
-      image: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?q=80&w=2070&auto=format&fit=crop",
+      status: "upcoming",
+      image: "/events/freshers.jpg",
       shortDescription: "Learn the fundamentals of robotics and automation",
       description: "Join us for an intensive hands-on robotics workshop where you'll learn about robot design, programming, and control systems. This workshop is perfect for beginners and intermediate students who want to dive deep into the world of robotics.",
       requirements: [
@@ -181,18 +181,18 @@ const EventsPage = () => {
         "Enthusiasm to learn and build",
         "Team of 2-3 members (optional)"
       ],
-      contact: "Contact: robotics@nitw.ac.in | Phone: +91-9876543210"
+      contact: "Contact: robotics@nitw.ac.in | Phone: +91-7661991859"
     },
     {
       id: 2,
       title: "AI & Machine Learning Seminar",
-      date: "March 22, 2024",
+      date: "March 22, 2025",
       time: "2:00 PM - 6:00 PM",
       venue: "Computer Science Department",
       duration: "4 hours",
       fee: "Free",
-      status: "active",
-      image: "https://images.unsplash.com/photo-1677442136019-21780ecad995?q=80&w=2070&auto=format&fit=crop",
+      status: "upcoming",
+      image: "/events/Sumo Wars Event Poster.png",
       shortDescription: "Explore the latest trends in AI and ML",
       description: "An interactive seminar featuring industry experts and researchers discussing the latest developments in Artificial Intelligence and Machine Learning. Learn about practical applications and career opportunities in AI.",
       requirements: [
@@ -200,18 +200,18 @@ const EventsPage = () => {
         "Interest in AI/ML concepts",
         "Laptop (optional for hands-on sessions)"
       ],
-      contact: "Contact: ai@nitw.ac.in | Phone: +91-9876543211"
+      contact: "Contact: roboticsclub@nitw.ac.in | Phone: +91-7661991859"
     },
     {
       id: 3,
       title: "Robocon Preparation Bootcamp",
-      date: "April 5-7, 2024",
+      date: "April 5-7, 2025",
       time: "9:00 AM - 6:00 PM",
       venue: "Robotics Lab, NIT Warangal",
       duration: "3 days",
       fee: "₹1000",
       status: "upcoming",
-      image: "https://images.unsplash.com/photo-1581092160562-40aa08e78837?q=80&w=2070&auto=format&fit=crop",
+      image: "/events/Bombs_Away_EventPoster.png",
       shortDescription: "Intensive preparation for Robocon competition",
       description: "A comprehensive 3-day bootcamp designed to prepare teams for the upcoming Robocon competition. Learn advanced robotics concepts, team management, and competition strategies from experienced mentors.",
       requirements: [
@@ -220,18 +220,18 @@ const EventsPage = () => {
         "Commitment to attend all sessions",
         "Laptop with required software"
       ],
-      contact: "Contact: robocon@nitw.ac.in | Phone: +91-9876543212"
+      contact: "Contact: roboticsclub@nitw.ac.in | Phone: +91-7661991859"
     },
     {
       id: 4,
       title: "Innovation Challenge",
-      date: "April 20, 2024",
+      date: "April 20, 2025",
       time: "10:00 AM - 4:00 PM",
       venue: "Innovation Center",
       duration: "6 hours",
       fee: "₹300",
       status: "upcoming",
-      image: "https://images.unsplash.com/photo-1552664730-d307ca884978?q=80&w=2070&auto=format&fit=crop",
+      image: "/events/RC_BLAZE_POSTER.png",
       shortDescription: "Showcase your innovative robotics solutions",
       description: "A day-long innovation challenge where participants will work in teams to solve real-world problems using robotics. The challenge includes problem identification, solution design, and prototype development.",
       requirements: [
@@ -240,7 +240,47 @@ const EventsPage = () => {
         "Basic electronics knowledge",
         "Presentation skills"
       ],
-      contact: "Contact: innovation@nitw.ac.in | Phone: +91-9876543213"
+      contact: "Contact: roboticsclub@nitw.ac.in | Phone: +91-7661991859"
+    },
+    {
+      id: 5,
+      title: "Innovation Challenge",
+      date: "Sept 14, 2025",
+      time: "10:00 AM - 4:00 PM",
+      venue: "Innovation Center",
+      duration: "6 hours",
+      fee: "₹300",
+      status: "completed",
+      image: "/events/workshop.jpg",
+      shortDescription: "Showcase your innovative robotics solutions",
+      description: "A day-long innovation challenge where participants will work in teams to solve real-world problems using robotics. The challenge includes problem identification, solution design, and prototype development.",
+      requirements: [
+        "Team of 3-4 members",
+        "Creative thinking skills",
+        "Basic electronics knowledge",
+        "Presentation skills"
+      ],
+      contact: "Contact: roboticsclub@nitw.ac.in | Phone: +91-7661991859"
+    },
+    {
+      id: 6,
+      title: "Innovation Challenge",
+      date: "Sept 14, 2025",
+      time: "10:00 AM - 4:00 PM",
+      venue: "Innovation Center",
+      duration: "6 hours",
+      fee: "₹300",
+      status: "completed",
+      image: "/events/workshop.jpg",
+      shortDescription: "Showcase your innovative robotics solutions",
+      description: "A day-long innovation challenge where participants will work in teams to solve real-world problems using robotics. The challenge includes problem identification, solution design, and prototype development.",
+      requirements: [
+        "Team of 3-4 members",
+        "Creative thinking skills",
+        "Basic electronics knowledge",
+        "Presentation skills"
+      ],
+      contact: "Contact: roboticsclub@nitw.ac.in | Phone: +91-7661991859"
     }
   ]
 
