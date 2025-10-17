@@ -8,7 +8,7 @@ const EyantraTimeline = () => {
     return (
         <div className="comptime">
 
-            <VerticalTimeline className='comptimeline destruct-font' layout='1-column-left'>
+            <VerticalTimeline className='comptimeline batman-font' layout='1-column-left'>
                 <VerticalTimelineElement
                     className="vertical-timeline-element--work "
                     contentStyle={{ background: 'rgb(33, 150, 243)', color: '#fff' }}
