@@ -38,7 +38,7 @@ const EventCard = ({ event, onClick }) => {
 
   return (
     <div
-      className="group cursor-pointer m-4 w-full max-w-[350px] h-[400px] flex flex-col justify-end items-center relative transition duration-300 hover:scale-105"
+      className="group cu.rsor-pointer m-4 w-full max-w-[350px] h-[400px] flex flex-col justify-end items-center relative transition duration-300 hover:scale-105"
       onClick={onClick}
       data-aos="fade-up"
       data-aos-duration="1000"
@@ -80,10 +80,10 @@ const EventModal = ({ event, isOpen, onClose }) => {
           >
             ×
           </button>
-          <div className="absolute bottom-4 left-4 text-white">
+          {/* <div className="absolute bottom-4 left-4 text-white">
             <h2 className="text-3xl font-bold batman-font">{event.title}</h2>
             <p className="text-lg batman-font">{event.date}</p>
-          </div>
+          </div> */}
         </div>
 
         {/* Modal Content */}
