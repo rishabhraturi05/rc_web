@@ -22,6 +22,9 @@ This repository hosts the source code for our club’s website — built to show
 - ▲ Vercel — Frontend hosting for seamless CI/CD.
 - 🐙 GitHub — Version control and team collaboration.
 
+## 📁 Folder Structure
+
+```text
 rc_official_website/
 │
 ├── .next/ # Next.js build output (auto-generated)
@@ -48,7 +51,7 @@ rc_official_website/
 ├── layout.js # Root layout file for Next.js App Router
 ├── page.js # Main page (entry point)
 └── README.md # Project documentation
-
+```
 
 🧑‍💻 Contributors
 Maintained by the Robotics Club, NIT Warangal.
