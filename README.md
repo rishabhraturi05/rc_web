@@ -16,17 +16,9 @@ This repository hosts the source code for our club’s website — built to show
 - ⚛️ **React.js** — Component-based UI library for building an interactive user interface.
 - 🎨 **Tailwind CSS** — Utility-first CSS framework for responsive and modern design.
 - 🌊 **Spline** — For 3D web experiences and interactive visual elements.
-- 🌀 **Framer Motion** — Smooth animations and transitions.
-- 📜 **React Router DOM** — For navigation and page routing.
-
-### ⚙️ Backend (if applicable)
-- 🧩 **Node.js** & **Express.js** — Backend for API handling and dynamic content (optional, if used).
-- 💾 **MongoDB / Firebase** — For storing club data, project details, and member information (optional).
+- 📜 **Next Js** — For navigation and page routing.
+- 🧩 **Node.js**
 
 ### ☁️ Deployment
-- ▲ **Vercel** — Frontend hosting for seamless CI/CD.
-- 🐙 **GitHub** — Version control and team collaboration.
-
----
-
-## 📁 Folder Structure
+- ▲ Vercel — Frontend hosting for seamless CI/CD.
+- 🐙 GitHub — Version control and team collaboration.
