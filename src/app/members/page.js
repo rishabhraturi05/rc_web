@@ -2,8 +2,8 @@
 import Link from 'next/link';
 import React, { useState } from 'react'
 // import Image from 'next/image' // Replaced with standard <img> tag
-import { FaLinkedin, FaInstagram, FaEnvelope } from 'react-icons/fa' // Replaced with inline SVGs
-
+import { FaLinkedin, FaInstagram } from 'react-icons/fa' // Replaced with inline SVGs
+import { allmembers } from '../components/Membersarray';
 const profiles = {
   professor: [
     {
@@ -60,39 +60,46 @@ const profiles = {
       instagram: '#'
     },
   ],
-  embedded: Array.from({ length: 20 }).map((_, i) =>
-  ({
-    name: `Embedded ${i + 1}`,
-    email: `embedded${i + 1}@nitw.ac.in`,
-    img: `/members/embedded${i + 1}.png`,
-    linkedin: '#',
-    instagram: '#'
-  })),
-  software: Array.from({ length: 13 }).map((_, i) =>
-  ({
-    name: `Software ${i + 1}`,
-    email: `software${i + 1}@nitw.ac.in`,
-    img: '/events/workshop.jpg',
-    linkedin: '#',
-    instagram: '#'
-  })),
-  mechanical: Array.from({ length: 19 }).map((_, i) =>
-  ({
-    name: `Mechanical ${i + 1}`,
-    email: `mechanical${i + 1}@nitw.ac.in`,
-    img: '/events/Sumo Wars Event Poster.png',
-    linkedin: '#',
-    instagram: '#'
-  })),
-  pr: Array.from({ length: 7 }).map((_, i) =>
-  ({
-    name: `PR ${i + 1}`,
-    email: `pr${i + 1}@nitw.ac.in`,
-    img: '/events/RC_BLAZE_POSTER.png',
-    linkedin: '#',
-    instagram: '#'
-  })),
 }
+const allofthemembers = allmembers;
+// const allmembers={
+//   embedded: [
+//     {
+//       name: `Embedded `,
+//       email: `embedded@nitw.ac.in`,
+//       img: `/members/embedded.png`,
+//       linkedin: '#',
+//       instagram: '#'
+//     }
+//   ],
+//   software: [
+//     {
+//       name: `Embedded `,
+//       email: `embedded@nitw.ac.in`,
+//       img: `/members/embedded.png`,
+//       linkedin: '#',
+//       instagram: '#'
+//     }
+//   ],
+//   mechanical: [
+//     {
+//       name: `Embedded `,
+//       email: `embedded@nitw.ac.in`,
+//       img: `/members/embedded.png`,
+//       linkedin: '#',
+//       instagram: '#'
+//     }
+//   ],
+//   pr: [
+//     {
+//       name: `Embedded `,
+//       email: `embedded@nitw.ac.in`,
+//       img: `/members/embedded.png`,
+//       linkedin: '#',
+//       instagram: '#'
+//     }
+//   ],
+// }
 
 const ProfileCard = ({ person, size = 'md' }) => {
   const isSmall = size === 'sm' || size === 'xs'
@@ -111,9 +118,9 @@ const ProfileCard = ({ person, size = 'md' }) => {
 
   return (
     <div className="group relative overflow-hidden rounded-xl shadow-lg bg-gray-900">
-      <div className={`relative ${isExtraSmall ? 'h-40' : isSmall ? 'h-48' : 'h-64'} w-full`}>
+      <div className={`relative ${isExtraSmall ? 'h-50' : isSmall ? 'h-74' : 'h-68'} w-full`}>
         {/* Replaced Next.js Image with standard <img> tag */}
-        <img src={person.img} alt={person.name} className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-300 group-hover:scale-105" />
+        <img src={person.img} alt={person.name} className="absolute inset-0 w-full h-full object-contain transition-transform duration-300 group-hover:scale-105" />
       </div>
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
       <div className="absolute inset-x-0 bottom-0 translate-y-full p-4 text-white opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
@@ -185,10 +192,10 @@ const Page = () => {
       </section>
 
       <Section title="Additional Secretaries" people={profiles.addlSecretaries} cols="grid-cols-2 sm:grid-cols-2 md:grid-cols-4" />
-      <Section title={`Embedded Systems Team (${profiles.embedded.length})`} people={profiles.embedded} cardSize="sm" />
-      <Section title={`Software Team (${profiles.software.length})`} people={profiles.software} cardSize="sm" />
-      <Section title={`Mechanical Team (${profiles.mechanical.length})`} people={profiles.mechanical} cardSize="sm" />
-      <Section title={`Public Relations (${profiles.pr.length})`} people={profiles.pr} cols="grid-cols-1 sm:grid-cols-2 md:grid-cols-3" />
+      <Section title={`Embedded Systems Team `} people={allofthemembers.embedded} cardSize="sm" />
+      <Section title={`Software Team `} people={allofthemembers.software} cardSize="sm" />
+      <Section title={`Mechanical Team `} people={allofthemembers.mechanical} cardSize="sm" />
+      <Section title={`Public Relations`} people={allofthemembers.pr} cols="grid-cols-1 sm:grid-cols-2 md:grid-cols-3" />
     </main >
   )
 }

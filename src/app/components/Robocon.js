@@ -8,7 +8,7 @@ const RoboconTimeline = () => {
     return (
         <div className="comptime">
 
-            <VerticalTimeline className='comptimeline destruct-font' >
+            <VerticalTimeline className='comptimeline batman-font' >
                 <VerticalTimelineElement
                     className="vertical-timeline-element--work"
                     contentStyle={{ background: 'rgb(33, 150, 243)', color: '#fff' }}

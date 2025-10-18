@@ -24,7 +24,7 @@ const Page = () => {
           data-aos-easing="ease-in-back"
           data-aos-delay="300"
           data-aos-offset="0"
-          data-aos-duration="3000"
+          data-aos-duration="2000"
           className='important absolute top-[150px] sm:top-[200px] -translate-y-1/2 w-full sm:w-[80%] md:w-[70%] lg:w-[50%] right-[-300px] sm:right-[-400px] md:right-[-500px] md:-mr-32 lg:-mr-48' 
           scene="https://prod.spline.design/12P53t-4DXT3O2sb/scene.splinecode" />
       </div>

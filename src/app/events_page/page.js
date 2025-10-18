@@ -54,8 +54,8 @@ const EventCard = ({ event, onClick }) => {
 
       <div className="relative z-10 p-6 text-center">
         <h3 className="text-2xl font-bold mb-2 batman-font">{event.title}</h3>
-        <p className="text-sm mb-2 destruct-font">{event.date}</p>
-        <p className="text-xs opacity-90 destruct-font">{event.shortDescription}</p>
+        <p className="text-sm mb-2 batman-font">{event.date}</p>
+        <p className="text-xs opacity-90 batman-font">{event.shortDescription}</p>
       </div>
     </div>
   )
@@ -82,7 +82,7 @@ const EventModal = ({ event, isOpen, onClose }) => {
           </button>
           {/* <div className="absolute bottom-4 left-4 text-white">
             <h2 className="text-3xl font-bold batman-font">{event.title}</h2>
-            <p className="text-lg destruct-font">{event.date}</p>
+            <p className="text-lg batman-font">{event.date}</p>
           </div> */}
         </div>
 
@@ -92,7 +92,7 @@ const EventModal = ({ event, isOpen, onClose }) => {
             {/* Event Details */}
             <div>
               <h3 className="text-xl font-bold mb-4 batman-font text-blue-400">Event Details</h3>
-              <div className="space-y-3 destruct-font">
+              <div className="space-y-3 batman-font">
                 <div className='flex gap-2'>
                   <span className="font-semibold text-gray-300">Date :</span>
                   <p className="text-white">{event.date}</p>
@@ -111,14 +111,14 @@ const EventModal = ({ event, isOpen, onClose }) => {
             {/* Event Description */}
             <div>
               <h3 className="text-xl font-bold mb-4 batman-font text-blue-400">Description</h3>
-              <p className="text-gray-300 leading-relaxed destruct-font">{event.description}</p>
+              <p className="text-gray-300 leading-relaxed batman-font">{event.description}</p>
             </div>
           </div>
 
           {/* Contact Info */}
           <div className="mt-6 p-4 bg-gray-800 rounded-lg">
             <h3 className="text-lg font-bold mb-2 batman-font text-blue-400">Contact</h3>
-            <p className="text-gray-300 destruct-font">{event.contact}</p>
+            <p className="text-gray-300 batman-font">{event.contact}</p>
           </div>
         </div>
       </div>
@@ -239,7 +239,7 @@ const EventsPage = () => {
       {/* Header Section */}
       <div className=" text-white text-center py-16" data-aos="fade-up" data-aos-duration="3000">
         <h1 className="batman-font text-5xl font-bold mb-4">Events</h1>
-        <p className="destruct-font text-xl text-gray-300 max-w-2xl mx-auto">
+        <p className="batman-font text-xl text-gray-300 max-w-2xl mx-auto">
           Join our exciting robotics events and workshops
         </p>
       </div>
