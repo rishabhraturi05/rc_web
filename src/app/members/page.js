@@ -137,7 +137,7 @@ const page = () => {
       <section className="mx-auto max-w-6xl px-4 py-10">
         <h2 className="mb-6 text-2xl font-bold text-white">Faculty Advisor</h2>
         <div className="grid grid-cols-1 place-items-center">
-          <ProfileCard person={profiles.professor[0]} />
+          <ProfileCard person={profiles.professor} />
         </div>
       </section>
 
