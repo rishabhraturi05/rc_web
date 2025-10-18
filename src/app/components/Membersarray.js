@@ -187,7 +187,7 @@ export const allmembers = {
         {
             name: `Aryan Roy`,
             email: `aryan.roy.w@gmail.com`,
-            img: `/members/software/Aryan Roy.jpg`,
+            img: `/members/addsecs/Aryan Roy.jpg`,
             linkedin: 'https://www.linkedin.com/oopsie doopsie',
             instagram: '#'
         },
@@ -329,7 +329,7 @@ export const allmembers = {
         {
             name: `Sudhakar Kumar`,
             email: `krsudhakar1103@gmail.`,
-            img: `/members/mech/Sudhakar Kumar.jpg`,
+            img: `/members/gensecs/_Sudhakar_photo - Sudhakar Kumar.jpg`,
             linkedin: 'https://www.linkedin.com/',
             instagram: 'https://www.instagram.com'
         },

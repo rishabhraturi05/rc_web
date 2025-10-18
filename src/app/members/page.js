@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import React, { useState } from 'react'
 // import Image from 'next/image' // Replaced with standard <img> tag
-import { FaLinkedin, FaInstagram } from 'react-icons/fa' // Replaced with inline SVGs
+import { FaLinkedin, FaInstagram, FaEnvelope } from 'react-icons/fa' // Replaced with inline SVGs
 import { allmembers } from '../components/Membersarray';
 const profiles = {
   professor: [
@@ -62,44 +62,6 @@ const profiles = {
   ],
 }
 const allofthemembers = allmembers;
-// const allmembers={
-//   embedded: [
-//     {
-//       name: `Embedded `,
-//       email: `embedded@nitw.ac.in`,
-//       img: `/members/embedded.png`,
-//       linkedin: '#',
-//       instagram: '#'
-//     }
-//   ],
-//   software: [
-//     {
-//       name: `Embedded `,
-//       email: `embedded@nitw.ac.in`,
-//       img: `/members/embedded.png`,
-//       linkedin: '#',
-//       instagram: '#'
-//     }
-//   ],
-//   mechanical: [
-//     {
-//       name: `Embedded `,
-//       email: `embedded@nitw.ac.in`,
-//       img: `/members/embedded.png`,
-//       linkedin: '#',
-//       instagram: '#'
-//     }
-//   ],
-//   pr: [
-//     {
-//       name: `Embedded `,
-//       email: `embedded@nitw.ac.in`,
-//       img: `/members/embedded.png`,
-//       linkedin: '#',
-//       instagram: '#'
-//     }
-//   ],
-// }
 
 const ProfileCard = ({ person, size = 'md' }) => {
   const isSmall = size === 'sm' || size === 'xs'
