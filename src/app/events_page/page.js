@@ -13,12 +13,6 @@ const EventCard = ({ event, onClick }) => {
             LIVE
           </div>
         )
-      case 'upcoming':
-        return (
-          <div className="absolute top-4 right-4 bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-bold batman-font">
-            UPCOMING
-          </div>
-        )
       case 'completed':
         return (
           <div className="absolute top-4 right-4 bg-gray-500 text-white px-3 py-1 rounded-full text-xs font-bold batman-font">
@@ -146,7 +140,7 @@ const EventsPage = () => {
       venue: "MME Seminar Hall",
       duration: "3 hours",
       fee: "-",
-      status: "upcoming",
+      status: "completed",
       image: "/events/freshers.jpg",
       shortDescription: "Exclusive event for freshers",
       description: "The wait is finally OVER.\nThe heist of creativity is about to begin…\n🎭 LA CASA DE ROBOT\nHere’s the Masterplan, Crew:\n🔹 Rendezvous Point: MME Seminar Hall\n🔹 Mission: Crack codes, conquer challenges, outsmart the clock\n🔹 Goal: Unleash your inner innovator 🤖\n\nAnd the spoils of this heist ? 🏆\nRobotic Kits, Refreshments, Glory, and Bragging Rights! ⚙\nThis time, we’re not after gold or banks…\nWe’re after something bigger —\n⚡ Innovation.Imagination.The Future of Robotics! ⚡\n",
@@ -160,7 +154,7 @@ const EventsPage = () => {
       venue: "-",
       duration: "4 hours",
       fee: "N/A",
-      status: "upcoming",
+      status: "completed",
       image: "/events/Sumo Wars Event Poster.png",
       shortDescription: "Robotics Battle",
       description: "Where strategy meets strength! Step into the arena with your battle-ready sumobot and take control in an adrenaline-fueled showdown. Outsmart your rival, push them out of the warzone, and rack up points by landing hits and keeping them trapped in the danger zone. Skill decides the champion!",
@@ -174,7 +168,7 @@ const EventsPage = () => {
       venue: "Robotics Lab, NIT Warangal",
       duration: "-",
       fee: "N/A",
-      status: "upcoming",
+      status: "completed",
       image: "/events/Bombs_Away_EventPoster.png",
       shortDescription: "Fly the Plane",
       description: "Bomb's Away is a skill-based challenge testing your timing and judgment. As a 'Bombardier,' you will control a single trigger to release an inert payload from a pilot-operated RC aircraft. Your mission is to account for speed and altitude to land the payload closest to the target's center.",
@@ -188,7 +182,7 @@ const EventsPage = () => {
       venue: "-",
       duration: "-",
       fee: "N/A",
-      status: "upcoming",
+      status: "completed",
       image: "/events/RC_BLAZE_POSTER.png",
       shortDescription: "Showcase your innovative robotics solutions",
       description: "BLAZE is your high-octane laser challenge by the Robotics Club. Enter the custom 'Alice in Borderland' arena for intense 4v4 combat. The map is loaded with secrets, and every day brings a new game mode! Play smart, hit hard, and fight your way to the top of the live leaderboard.",

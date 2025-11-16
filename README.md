@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# 🤖 Robotics Club, NIT Warangal — Official Website
 
-## Getting Started
+Welcome to the official GitHub repository of the **Robotics Club, NIT Warangal**!  
+This repository hosts the source code for our club’s website — built to showcase our projects, events, achievements, and the spirit of robotics at NITW. 🚀
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## 🌐 Live Website
+[🔗 Visit Website](https://rc-nitw.vercel.app/) *(replace with your deployed link if different)*
+
+---
+
+## 🧠 Tech Stack
+
+- ⚛️ **React.js** — Component-based UI library for building an interactive user interface.
+- 🎨 **Tailwind CSS** — Utility-first CSS framework for responsive and modern design.
+- 🌊 **Spline** — For 3D web experiences and interactive visual elements.
+- 📜 **Next Js** — For navigation and page routing.
+- 🧩 **Node.js**
+
+### ☁️ Deployment
+- ▲ Vercel — Frontend hosting for seamless CI/CD.
+- 🐙 GitHub — Version control and team collaboration.
+
+## 📁 Folder Structure
+
+```text
+rc_official_website/
+│
+├── .next/ # Next.js build output (auto-generated)
+├── node_modules/ # Installed npm dependencies
+├── public/ # Static assets (images, icons, models, etc.)
+│
+├── src/
+│ └── app/ # Core application folder (Next.js App Router)
+│ ├── alumni/ # Alumni page components and content
+│ ├── competitions/ # Competition-related pages and assets
+│ ├── components/ # Reusable React components
+│ ├── events_page/ # Events and activities section
+│ ├── members/ # Team and member profiles
+│ └── projects/ # Robotics Club projects showcase
+│
+├── .gitignore # Ignored files and folders for Git
+├── eslint.config.mjs # ESLint configuration
+├── jsconfig.json # JS module resolution configuration
+├── next.config.mjs # Next.js configuration file
+├── package.json # Project dependencies and scripts
+├── package-lock.json # Dependency lock file
+├── postcss.config.mjs # PostCSS configuration
+├── globals.css # Global styles for the project
+├── layout.js # Root layout file for Next.js App Router
+├── page.js # Main page (entry point)
+└── README.md # Project documentation
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+🧑‍💻 Contributors
+Maintained by the Robotics Club, NIT Warangal.
+Special thanks to all contributors and developers who help keep this project evolving!
