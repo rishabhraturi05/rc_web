@@ -61,7 +61,7 @@ const CompeteTab = () => {
             <p className="z-10 text-2xl font-bold transition-all duration-300 group-hover:text-3xl batman-font">Robocon</p>
           </div>
 
-          <div
+          {/* <div
             onClick={() => { scrollToOut(); setCurrtab('EYantra') }}
             className="group cursor-pointer m-4 w-full max-w-[300px] h-[300px] flex justify-center items-center relative transition duration-300 hover:scale-105 batman-font"
           >
@@ -70,7 +70,7 @@ const CompeteTab = () => {
               style={{ backgroundImage: "url('https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRbibab7EdP2fmKweDXfC_SjeVo6uJNLM_A1w&usqp=CAU')" }}
             ></div>
             <p className="z-10 text-2xl font-bold transition-all duration-300 group-hover:text-3xl">EYantra</p>
-          </div>
+          </div> */}
 
           {/* <div
             onClick={() => { scrollToOut(); setCurrtab('Other') }}
