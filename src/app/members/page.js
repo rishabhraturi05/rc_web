@@ -53,10 +53,10 @@ const profiles = {
       instagram: '#'
     },
     {
-      name: 'Addl Sec 4',
-      email: 'addl4@nitw.ac.in',
-      img: '/members/addsecs/Varakala Varshith.jpg',
-      linkedin: '#',
+      name: 'Dhanvanth Chandrasekaran ',
+      email: 'dhanvanth.chandrasekaran@gmail.com',
+      img: 'members/addsecs/DhanvanthChandrasekaran - Dhanvanth Chandrasekaran.jpg',
+      linkedin: 'https://www.linkedin.com/in/dhanvanth-chandrasekaran-271a29342?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app',
       instagram: '#'
     },
   ],

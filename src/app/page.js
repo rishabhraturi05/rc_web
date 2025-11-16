@@ -42,7 +42,7 @@ const Page = () => {
       <div data-aos="fade-right"
         data-aos-offset="300"
         data-aos-easing="ease-in-sine"
-        data-aos-easing="ease-in-sine"
+        // data-aos-easing="ease-in-sine"
         className="relative z-10 p-4 sm:p-8 md:p-12 lg:p-24 max-w-3xl">
         <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-6xl text-white mb-4 batman-font leading-tight">
           NIT WARANGAL ROBOTICS CLUB
