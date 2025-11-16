@@ -90,6 +90,15 @@ const Navbar = () => {
             {/* Mobile Menu Overlay */}
             {isMobileMenuOpen && (
                 <div className="lg:hidden fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center">
+                    {/* Close Button */}
+                    <button
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="absolute top-4 right-4 text-white p-2 hover:text-gray-300 transition-colors duration-300 z-60"
+                        aria-label="Close mobile menu"
+                    >
+                        <FaTimes size={28} />
+                    </button>
+
                     <div className="text-center">
                         <div className="space-y-8">
                             {navLinks.map((link, index) => (

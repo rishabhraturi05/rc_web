@@ -25,14 +25,14 @@ const Page = () => {
           data-aos-delay="300"
           data-aos-offset="0"
           data-aos-duration="2000"
-          className='important absolute top-[150px] sm:top-[200px] -translate-y-1/2 w-full sm:w-[80%] md:w-[70%] lg:w-[50%] right-[-300px] sm:right-[-400px] md:right-[-500px] md:-mr-32 lg:-mr-48' 
+          className='important absolute top-[150px] sm:top-[200px] -translate-y-1/2 w-full sm:w-[80%] md:w-[70%] lg:w-[50%] right-[-300px] sm:right-[-400px] md:right-[-500px] md:-mr-32 lg:-mr-48'
           scene="https://prod.spline.design/12P53t-4DXT3O2sb/scene.splinecode" />
       </div>
 
       {/* Hero Section */}
       <div data-aos="fade-right"
         data-aos-offset="300"
-        data-aos-easing="ease-in-sine" 
+        data-aos-easing="ease-in-sine"
         className="relative z-10 p-4 sm:p-8 md:p-12 lg:p-24 max-w-3xl">
         <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-6xl text-white mb-4 batman-font leading-tight">
           NIT WARANGAL ROBOTICS CLUB
@@ -48,11 +48,11 @@ const Page = () => {
         {/* Left side - Robotics Club Logo */}
         <div className="flex-1 flex justify-center lg:justify-start" data-aos="fade-right" data-aos-duration="1000">
           <div className="relative group">
-            <div className="relative ml-30 w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 lg:w-56 lg:h-56 xl:w-64 xl:h-64 overflow-hidden rounded-full">
+            <div className="relative w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 lg:w-56 lg:h-56 lg:ml-30 xl:w-64 xl:h-64 overflow-hidden rounded-full">
               <img
                 src="/Robotics Club, NITW.png"
                 alt="Robotics Club Logo"
-                className="absolute w-full h-full object-contain inline-block transform hover:animate-spin group-hover:drop-shadow-2xl transition-all duration-300"
+                className="absolute w-full h-full object-contain transform hover:animate-spin group-hover:drop-shadow-2xl transition-all duration-300"
                 data-aos="zoom-in"
                 data-aos-delay="200"
                 data-aos-duration="1200"
