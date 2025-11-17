@@ -8,22 +8,6 @@ import Image from 'next/image';
 
 const alumniData = [
   {
-    name: 'VSK Kumar',
-    description: 'Hi team! This is VSK, I served as the General Secretary of the Robotics Club from 2023-2024. I am currently working as a Data Scientist at AT&T. My rule in life is to always do what you like!',
-    imageUrl: '/alumini/KaushikVempati.jpg',
-    linkedin: 'https://www.linkedin.com/in/kaushik-vempati/',
-    instagram: '@vsk.kumar_',
-    email: 'kaushik.vempati@gmail.com'
-  },
-  {
-    name: 'Varun Gupta Tallam',
-    description: 'I am currently doing a masters in Chemical Engineering at TU Delft. I am a former Joint secretary at RC 2023-24. I was a member of the club for 4 years starting in 2020. I have seen the club grow from very humble beginnings and wish success to all the ones who come after me.',
-    imageUrl: '/alumini/VarunTallam.jpg',
-    linkedin: 'https://www.linkedin.com/in/varun-tallam/',
-    instagram: 'https://instagram.com/varun_tallam',
-    email: 'varungupta.tallam@gmail.com'
-  },
-  {
     name: 'Raj Kumar Darshanala',
     description: 'Currently a software engineer. I was part of club from its start to 2022. Will be happy to collaborate for robotics advancements.',
     imageUrl: '/alumini/KumarDarshanala.jpeg',
@@ -40,20 +24,36 @@ const alumniData = [
     email: 'abdullah.sk203@gmail.com'
   },
   {
-    name: 'Sarvepalli Mahathi',
-    description: "I am a graduate of ECE'25 batch. Interested in analog electronics, RF and wireless comm. systems. Also a waste management enthusiast!",
-    imageUrl: '/alumini/S.Mahathi.jpg',
-    linkedin: 'https://in.linkedin.com/in/mahathi-sarvepalli',
-    instagram: '/',
-    email: 's.mahathi1319@gmail.com'
-  },
-  {
     name: 'Aaditya Prakash Kattekola',
     description: 'I am a Ph.D student in the Mostofi Lab at University of California, Santa Barbara. I am interested in creating robust communication frameworks for robots as well as utilizing robots in enhancing communication networks. I obtained my Bachelor of Technology from the National Institute of Technology, Warangal (NITW) in the Department of Electronics & Communication Engineering.',
     imageUrl: '/alumini/Aaditya.jpeg',
     linkedin: 'https://www.linkedin.com/in/kapi2910/',
     instagram: '@aham.kapi',
     email: 'aadityapra2910@gmail.com'
+  },
+  {
+    name: 'VSK Kumar',
+    description: 'Hi team! This is VSK, I served as the General Secretary of the Robotics Club from 2023-2024. I am currently working as a Data Scientist at AT&T. My rule in life is to always do what you like!',
+    imageUrl: '/alumini/KaushikVempati.jpg',
+    linkedin: 'https://www.linkedin.com/in/kaushik-vempati/',
+    instagram: '@vsk.kumar_',
+    email: 'kaushik.vempati@gmail.com'
+  },
+  {
+    name: 'Varun Gupta Tallam',
+    description: 'I am currently doing a masters in Chemical Engineering at TU Delft. I am a former Joint secretary at RC 2023-24. I was a member of the club for 4 years starting in 2020. I have seen the club grow from very humble beginnings and wish success to all the ones who come after me.',
+    imageUrl: '/alumini/VarunTallam.jpg',
+    linkedin: 'https://www.linkedin.com/in/varun-tallam/',
+    instagram: 'https://instagram.com/varun_tallam',
+    email: 'varungupta.tallam@gmail.com'
+  },
+  {
+    name: 'Sarvepalli Mahathi',
+    description: "I am a graduate of ECE'25 batch. Interested in analog electronics, RF and wireless comm. systems. Also a waste management enthusiast!",
+    imageUrl: '/alumini/S.Mahathi.jpg',
+    linkedin: 'https://in.linkedin.com/in/mahathi-sarvepalli',
+    instagram: '/',
+    email: 's.mahathi1319@gmail.com'
   },
 ];
 
