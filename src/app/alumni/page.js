@@ -12,7 +12,7 @@ const alumniData = [
     description: 'Currently a software engineer. I was part of club from its start to 2022. Will be happy to collaborate for robotics advancements.',
     imageUrl: '/alumini/KumarDarshanala.jpeg',
     linkedin: 'http://linkedin.com/in/rajkumar-darshanala',
-    instagram: 'https://www.instagram.com/irajkumar._?igsh=YmNoeTZpdHo1ZGZj&utm_source=qr',
+    instagram: 'https://www.instagram.com/raj.kumar.darshanala',
     email: 'rkdarshanala@gmail.com'
   },
   {
