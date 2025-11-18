@@ -47,7 +47,7 @@ const Page = () => {
         <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-6xl text-white mb-4 batman-font leading-tight">
           NIT WARANGAL ROBOTICS CLUB
         </h1>
-        <p className='text-lg sm:text-xl text-gray-300 destruct-font mb-2'>Our Mission</p>
+        <p className='text-lg sm:text-xl text-gray-300 destruct-font mb-2'><u>Our Mission</u></p>
         <p className="text-sm sm:text-base text-gray-300 destruct-font leading-relaxed">
           Founded in 2019–20, the Robotics Club aims to introduce and promote the field of robotics at NIT Warangal. We strive to guide enthusiasts, build a community of like-minded innovators, and provide hands-on learning through workshops, training sessions, and participation in robotics competitions across India.
         </p>
@@ -73,7 +73,7 @@ const Page = () => {
 
         {/* Right side - Our Vision */}
         <div className="flex-1 text-center lg:text-left" data-aos="fade-left" data-aos-duration="1000">
-          <p className="text-lg sm:text-xl lg:text-2xl text-gray-300 destruct-font mb-3 sm:mb-4">Our Vision</p>
+          <p className="text-lg sm:text-xl lg:text-2xl text-gray-300 destruct-font mb-3 sm:mb-4"><u>Our Vision</u></p>
           <p className="text-sm sm:text-base lg:text-xl text-gray-300 destruct-font leading-relaxed">
             To establish a vibrant and innovative robotics culture at NIT Warangal — one that inspires creativity, collaboration, and technical excellence. We aim to nurture future innovators who push the boundaries of technology, driving advancements in robotics that impact society and shape a smarter, more automated world.
           </p>
