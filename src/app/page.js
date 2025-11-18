@@ -3,6 +3,7 @@ import React from 'react';
 import Spline from '@splinetool/react-spline';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
+import { Analytics } from "@vercel/analytics/react";
 import { useEffect } from 'react';
 // import ConnectingDotsBackground from './components/bg';
 
@@ -11,8 +12,9 @@ const Page = () => {
     AOS.init({
       duration: 1500,
       once: true,
-    })
-  })
+    });
+  }, []);
+
   return (
     <div className="relative min-h-screen">
       {/* Background Effects */}
@@ -20,13 +22,6 @@ const Page = () => {
 
       {/* 3D Spline Scene - Hidden on mobile for better performance */}
       <div className="hidden sm:block">
-        {/* <Spline data-aos="fade-zoom-in"
-          data-aos-easing="ease-in-back"
-          data-aos-delay="300"
-          data-aos-offset="0"
-          data-aos-duration="2000"
-          className='important absolute top-[150px] sm:top-[200px] -translate-y-1/2 w-full sm:w-[80%] md:w-[70%] lg:w-[50%] right-[-300px] sm:right-[-400px] md:right-[-500px] md:-mr-32 lg:-mr-48'
-          scene="https://prod.spline.design/12P53t-4DXT3O2sb/scene.splinecode" /> */}
         <Spline
           data-aos="fade-zoom-in"
           data-aos-easing="ease-in-back"
@@ -34,16 +29,17 @@ const Page = () => {
           data-aos-offset="0"
           data-aos-duration="2000"
           className='important absolute top-[150px] sm:top-[200px] -translate-y-1/2 w-full sm:w-[80%] md:w-[70%] lg:w-[50%] left-[400px] right-[-300px] sm:right-[-400px] md:right-[-500px] md:-mr-32 lg:-mr-48'
-          scene="https://prod.spline.design/al2kfe4tU-6AQZYs/scene.splinecode" />
-
+          scene="https://prod.spline.design/al2kfe4tU-6AQZYs/scene.splinecode"
+        />
       </div>
 
       {/* Hero Section */}
-      <div data-aos="fade-right"
+      <div
+        data-aos="fade-right"
         data-aos-offset="300"
         data-aos-easing="ease-in-sine"
-        // data-aos-easing="ease-in-sine"
-        className="relative z-10 p-4 sm:p-8 md:p-12 lg:p-24 max-w-3xl">
+        className="relative z-10 p-4 sm:p-8 md:p-12 lg:p-24 max-w-3xl"
+      >
         <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-6xl text-white mb-4 batman-font leading-tight">
           NIT WARANGAL ROBOTICS CLUB
         </h1>
@@ -79,6 +75,9 @@ const Page = () => {
           </p>
         </div>
       </div>
+
+      {/* Vercel Analytics */}
+      <Analytics />
     </div>
   );
 };
