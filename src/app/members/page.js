@@ -15,19 +15,19 @@ const profiles = {
     },
   ],
   secretaries: [
+   {
+      name: 'Sai Sasivardhan Gampa ',
+      email: 'gs22chb0b13@student.nitw.ac.in',
+      img: '/members/gensecs/Gampa Sai Sasivardhan.jpg',
+      linkedin: 'https://in.linkedin.com/in/sai-sasivardhan-gampa-59559a254',
+      instagram: 'https://www.instagram.com/sasivardhansai'
+    },
     {
       name: 'Sudhakar Kumar ',
       email: 'krsudhakar1103@gmail.com',
       img: '/members/gensecs/_Sudhakar_photo - Sudhakar Kumar.jpg',
       linkedin: 'https://www.linkedin.com/in/sudhakar-kumar-38a9a4282/#',
       instagram: 'https://www.instagram.com/_sudhakar.08?igsh=MWcxeTJrb2J5OWI2bA=='
-    },
-    {
-      name: 'Sai Sasivardhan Gampa ',
-      email: 'gs22chb0b13@student.nitw.ac.in',
-      img: '/members/gensecs/Gampa Sai Sasivardhan.jpg',
-      linkedin: 'https://in.linkedin.com/in/sai-sasivardhan-gampa-59559a254',
-      instagram: 'https://www.instagram.com/sasivardhansai'
     },
   ],
   addlSecretaries: [
