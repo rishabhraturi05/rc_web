@@ -34,7 +34,7 @@ const alumniData = [
   {
     name: 'Shaik Abdullah',
     description: "Overhauled the robotics club through 2020-2023 by establishing streamlined structure and training programmes. Defined robotics career pathway. Initiated research teams. Authored multiple robotics research papers and now lead a startup's robotics department. Interested in MAVs.",
-    imageUrl: '/alumini/ShaikAbdullah.jpg',
+    imageUrl: '/alumini/ShaikAbdullah.JPG',
     linkedin: 'https://www.linkedin.com/in/shaik-abdullah-6ab62219b?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app',
     instagram: 'https://www.instagram.com/milkshaik203?igsh=MXZ3bzYzNWNqcHZncw==',
     email: 'abdullah.sk203@gmail.com'
