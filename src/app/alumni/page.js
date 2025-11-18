@@ -48,12 +48,52 @@ const alumniData = [
     email: 'varungupta.tallam@gmail.com'
   },
   {
+    name: 'SK Munawwar Ali',
+    description: 'I’m fortunate to follow my passion as an R&D Mechanical Engineer at ideaForge, India’s leading drone manufacturer. I started my journey in 2022 with the robotics club and went on to serve as Joint Secretary for the 2024 batch. It makes me truly happy to see the club reach new heights each year.',
+    imageUrl: '/alumini/SKMunawwarAli.jpg',
+    linkedin: 'https://www.linkedin.com/in/sk-munawwar-ali',
+    instagram: 'https://www.instagram.com/skmunawwarali',
+    email: 'munawwarali2402@gmail.com'
+  },
+  {
+    name: 'Aryan Panhale',
+    description: "Started my journey as a ROS enthusiast driven by a passion for problem-solving, I leveraged my skills and deep understanding of data flow to pivot into an analyst role, where I help drive data-informed decisions.",
+    imageUrl: '/alumini/Aryan_Rajan.jpg',
+    linkedin: 'https://www.linkedin.com/in/aryan-panhale-a49bb11b9',
+    instagram: '/',
+    email: 'aryanrajan24@gmail.com'
+  },
+  {
+    name: 'Kevin Amal Darren',
+    description: "Hey guys, I was the General Secretary in the year 2024-2025. Currently working as a Robot Software Engineer at Clutterbot. I specialise in ROS, Motion planning and Manipulation for Multi-DOF systems.",
+    imageUrl: '/alumini/Kevin.jpg',
+    linkedin: 'https://www.linkedin.com/in/kevin-amal-darren-794707209',
+    instagram: 'https://www.instagram.com/kiwikev23',
+    email: 'kad232003@gmail.com'
+  },
+  {
     name: 'Sarvepalli Mahathi',
     description: "I am a graduate of ECE'25 batch. Interested in analog electronics, RF and wireless comm. systems. Also a waste management enthusiast!",
     imageUrl: '/alumini/S.Mahathi.jpg',
     linkedin: 'https://in.linkedin.com/in/mahathi-sarvepalli',
     instagram: '/',
     email: 's.mahathi1319@gmail.com'
+  },
+  {
+    name: 'Vattam Sai Sharanya',
+    description: "I’m an electronics enthusiast who loves diving deep into how things work—even if my patience doesn’t always keep up with my curiosity. I enjoy experimenting, trying new tools, and breaking down tech until it actually makes sense. I’m always chasing that “aha!” moment in whatever I work on.",
+    imageUrl: '/alumini/SAISHARANYA.jpeg',
+    linkedin: 'https://www.linkedin.com/in/sai-sharanya-vattam-5b342130a',
+    instagram: 'https://www.instagram.com/_saisharanya_vattam_',
+    email: 'sharanyavattam1@gmail.com'
+  },
+  {
+    name: 'Mydam Umamaheshwar',
+    description: 'A passionate enthusiast in business analysis, data analytics. Passionate about ML in robotics solving problems through data-driven solutions and strategic thinking. ',
+    imageUrl: '/alumini/UMAMAHESHWAR_MYDAM.jpg',
+    linkedin: 'https://www.linkedin.com/in/mydam-umamaheshwar-605726227/',
+    instagram: 'https://www.instagram.com/umamaheshwarchintu_20',
+    email: 'mu21btb0a44@student.nitw.ac.in'
   },
 ];
 
