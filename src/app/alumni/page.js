@@ -72,6 +72,14 @@ const alumniData = [
     email: 'kad232003@gmail.com'
   },
   {
+    name: 'Potnuri Sri Anjali Pravallika',
+    description: "I’m Anjali Pravallika, an Electronics Engineer who enjoys working on practical, hands-on projects. I’ve explored areas like PCB design, antenna design, and I’m interested in pursuing VLSI research. I like learning new things, solving problems, and building designs that help to make life easier.",
+    imageUrl: '/alumini/ANJALI.jpg',
+    linkedin: 'https://www.linkedin.com/in/potnuri-sri-anjali-pravallika-451979237',
+    instagram: '/',
+    email: 'potnuripravallika2504@gmail.com'
+  },
+  {
     name: 'Sarvepalli Mahathi',
     description: "I am a graduate of ECE'25 batch. Interested in analog electronics, RF and wireless comm. systems. Also a waste management enthusiast!",
     imageUrl: '/alumini/S.Mahathi.jpg',
