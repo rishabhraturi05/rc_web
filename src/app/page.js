@@ -3,7 +3,7 @@ import React from 'react';
 import Spline from '@splinetool/react-spline';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
-import { Analytics } from "@vercel/analytics/react";
+import { Analytics } from '@vercel/analytics/next';
 import { useEffect } from 'react';
 // import ConnectingDotsBackground from './components/bg';
 
