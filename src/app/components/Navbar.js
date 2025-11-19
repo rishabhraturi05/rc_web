@@ -13,7 +13,8 @@ const Navbar = () => {
         { name: 'Competitions', href: '/competitions', active: false, sum: 1500 },
         { name: 'Events', href: '/events_page', active: false, sum: 1700 },
         { name: 'Projects', href: '/projects', active: false, sum: 2000 },
-        { name: 'Alumni', href: '/alumni', active: false, sum: 2200 }
+        { name: 'Alumni', href: '/alumni', active: false, sum: 2200 },
+        { name: 'Contact', href: '/contact', active: false, sum: 2200 }
     ];
 
     const toggleMobileMenu = () => {
