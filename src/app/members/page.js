@@ -15,19 +15,19 @@ const profiles = {
     },
   ],
   secretaries: [
+   {
+      name: 'Sai Sasivardhan Gampa ',
+      email: 'gs22chb0b13@student.nitw.ac.in',
+      img: '/members/gensecs/Gampa Sai Sasivardhan.jpg',
+      linkedin: 'https://in.linkedin.com/in/sai-sasivardhan-gampa-59559a254',
+      instagram: 'https://www.instagram.com/sasivardhansai'
+    },
     {
       name: 'Sudhakar Kumar ',
       email: 'krsudhakar1103@gmail.com',
       img: '/members/gensecs/_Sudhakar_photo - Sudhakar Kumar.jpg',
       linkedin: 'https://www.linkedin.com/in/sudhakar-kumar-38a9a4282/#',
       instagram: 'https://www.instagram.com/_sudhakar.08?igsh=MWcxeTJrb2J5OWI2bA=='
-    },
-    {
-      name: 'Sai Sasivardhan Gampa ',
-      email: 'gs22chb0b13@student.nitw.ac.in',
-      img: '/members/gensecs/Gampa Sai Sasivardhan.jpg',
-      linkedin: 'https://in.linkedin.com/in/sai-sasivardhan-gampa-59559a254',
-      instagram: 'https://www.instagram.com/sasivardhansai'
     },
   ],
   addlSecretaries: [
@@ -53,10 +53,10 @@ const profiles = {
       instagram: '#'
     },
     {
-      name: 'Addl Sec 4',
-      email: 'addl4@nitw.ac.in',
-      img: '/members/addsecs/Varakala Varshith.jpg',
-      linkedin: '#',
+      name: 'Dhanvanth Chandrasekaran ',
+      email: 'dhanvanth.chandrasekaran@gmail.com',
+      img: 'members/addsecs/DhanvanthChandrasekaran - Dhanvanth Chandrasekaran.jpg',
+      linkedin: 'https://www.linkedin.com/in/dhanvanth-chandrasekaran-271a29342?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app',
       instagram: '#'
     },
   ],

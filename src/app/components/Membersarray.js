@@ -157,6 +157,13 @@ export const allmembers = {
     ],
     software: [
         {
+            name: 'Dhanvanth Chandrasekaran ',
+            email: 'dhanvanth.chandrasekaran@gmail.com',
+            img: 'members/addsecs/DhanvanthChandrasekaran - Dhanvanth Chandrasekaran.jpg',
+            linkedin: 'https://www.linkedin.com/in/dhanvanth-chandrasekaran-271a29342?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app',
+            instagram: '#'
+        },
+        {
             name: `Rishabh Raturi`,
             email: `rishabhraturi05@gmail.com`,
             img: `/members/software/Rishab Raturi.jpg`,

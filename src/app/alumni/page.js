@@ -8,6 +8,30 @@ import Image from 'next/image';
 
 const alumniData = [
   {
+    name: 'Raj Kumar Darshanala',
+    description: 'Currently a software engineer. I was part of club from its start to 2022. Will be happy to collaborate for robotics advancements.',
+    imageUrl: '/alumini/KumarDarshanala.jpeg',
+    linkedin: 'http://linkedin.com/in/rajkumar-darshanala',
+    instagram: 'https://www.instagram.com/raj.kumar.darshanala',
+    email: 'rkdarshanala@gmail.com'
+  },
+  {
+    name: 'Shaik Abdullah',
+    description: "Overhauled the robotics club through 2020-2023 by establishing streamlined structure and training programmes. Defined robotics career pathway. Initiated research teams. Authored multiple robotics research papers and now lead a startup's robotics department. Interested in MAVs.",
+    imageUrl: '/alumini/ShaikAbdullah.jpg',
+    linkedin: 'https://www.linkedin.com/in/shaik-abdullah-6ab62219b?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app',
+    instagram: 'https://www.instagram.com/milkshaik203?igsh=MXZ3bzYzNWNqcHZncw==',
+    email: 'abdullah.sk203@gmail.com'
+  },
+  {
+    name: 'Aaditya Prakash Kattekola',
+    description: 'I am a Ph.D student in the Mostofi Lab at University of California, Santa Barbara. I am interested in creating robust communication frameworks for robots as well as utilizing robots in enhancing communication networks. I obtained my Bachelor of Technology from the National Institute of Technology, Warangal (NITW) in the Department of Electronics & Communication Engineering.',
+    imageUrl: '/alumini/Aaditya.jpeg',
+    linkedin: 'https://www.linkedin.com/in/kapi2910/',
+    instagram: '@aham.kapi',
+    email: 'aadityapra2910@gmail.com'
+  },
+  {
     name: 'VSK Kumar',
     description: 'Hi team! This is VSK, I served as the General Secretary of the Robotics Club from 2023-2024. I am currently working as a Data Scientist at AT&T. My rule in life is to always do what you like!',
     imageUrl: '/alumini/KaushikVempati.jpg',
@@ -24,20 +48,36 @@ const alumniData = [
     email: 'varungupta.tallam@gmail.com'
   },
   {
-    name: 'Raj Kumar Darshanala',
-    description: 'Currently a software engineer. I was part of club from its start to 2022. Will be happy to collaborate for robotics advancements.',
-    imageUrl: '/alumini/KumarDarshanala.jpeg',
-    linkedin: 'http://linkedin.com/in/rajkumar-darshanala',
-    instagram: 'https://www.instagram.com/irajkumar._?igsh=YmNoeTZpdHo1ZGZj&utm_source=qr',
-    email: 'rkdarshanala@gmail.com'
+    name: 'SK Munawwar Ali',
+    description: 'I’m fortunate to follow my passion as an R&D Mechanical Engineer at ideaForge, India’s leading drone manufacturer. I started my journey in 2022 with the robotics club and went on to serve as Joint Secretary for the 2024 batch. It makes me truly happy to see the club reach new heights each year.',
+    imageUrl: '/alumini/SKMunawwarAli.jpg',
+    linkedin: 'https://www.linkedin.com/in/sk-munawwar-ali',
+    instagram: 'https://www.instagram.com/skmunawwarali',
+    email: 'munawwarali2402@gmail.com'
   },
   {
-    name: 'Shaik Abdullah',
-    description: "Overhauled the robotics club through 2020-2023 by establishing streamlined structure and training programmes. Defined robotics career pathway. Initiated research teams. Authored multiple robotics research papers and now lead a startup's robotics department. Interested in MAVs.",
-    imageUrl: '/alumini/ShaikAbdullah.jpg',
-    linkedin: 'https://www.linkedin.com/in/shaik-abdullah-6ab62219b?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app',
-    instagram: 'https://www.instagram.com/milkshaik203?igsh=MXZ3bzYzNWNqcHZncw==',
-    email: 'abdullah.sk203@gmail.com'
+    name: 'Aryan Panhale',
+    description: "Started my journey as a ROS enthusiast driven by a passion for problem-solving, I leveraged my skills and deep understanding of data flow to pivot into an analyst role, where I help drive data-informed decisions.",
+    imageUrl: '/alumini/Aryan_Rajan.jpg',
+    linkedin: 'https://www.linkedin.com/in/aryan-panhale-a49bb11b9',
+    instagram: '/',
+    email: 'aryanrajan24@gmail.com'
+  },
+  {
+    name: 'Kevin Amal Darren',
+    description: "Hey guys, I was the General Secretary in the year 2024-2025. Currently working as a Robot Software Engineer at Clutterbot. I specialise in ROS, Motion planning and Manipulation for Multi-DOF systems.",
+    imageUrl: '/alumini/Kevin.jpg',
+    linkedin: 'https://www.linkedin.com/in/kevin-amal-darren-794707209',
+    instagram: 'https://www.instagram.com/kiwikev23',
+    email: 'kad232003@gmail.com'
+  },
+  {
+    name: 'Potnuri Sri Anjali Pravallika',
+    description: "I’m Anjali Pravallika, an Electronics Engineer who enjoys working on practical, hands-on projects. I’ve explored areas like PCB design, antenna design, and I’m interested in pursuing VLSI research. I like learning new things, solving problems, and building designs that help to make life easier.",
+    imageUrl: '/alumini/ANJALI.jpg',
+    linkedin: 'https://www.linkedin.com/in/potnuri-sri-anjali-pravallika-451979237',
+    instagram: '/',
+    email: 'potnuripravallika2504@gmail.com'
   },
   {
     name: 'Sarvepalli Mahathi',
@@ -48,12 +88,20 @@ const alumniData = [
     email: 's.mahathi1319@gmail.com'
   },
   {
-    name: 'Aaditya Prakash Kattekola',
-    description: 'I am a Ph.D student in the Mostofi Lab at University of California, Santa Barbara. I am interested in creating robust communication frameworks for robots as well as utilizing robots in enhancing communication networks. I obtained my Bachelor of Technology from the National Institute of Technology, Warangal (NITW) in the Department of Electronics & Communication Engineering.',
-    imageUrl: '/alumini/Aaditya.jpeg',
-    linkedin: 'https://www.linkedin.com/in/kapi2910/',
-    instagram: '@aham.kapi',
-    email: 'aadityapra2910@gmail.com'
+    name: 'Vattam Sai Sharanya',
+    description: "I’m an electronics enthusiast who loves diving deep into how things work—even if my patience doesn’t always keep up with my curiosity. I enjoy experimenting, trying new tools, and breaking down tech until it actually makes sense. I’m always chasing that “aha!” moment in whatever I work on.",
+    imageUrl: '/alumini/SAISHARANYA.jpeg',
+    linkedin: 'https://www.linkedin.com/in/sai-sharanya-vattam-5b342130a',
+    instagram: 'https://www.instagram.com/_saisharanya_vattam_',
+    email: 'sharanyavattam1@gmail.com'
+  },
+  {
+    name: 'Mydam Umamaheshwar',
+    description: 'A passionate enthusiast in business analysis, data analytics. Passionate about ML in robotics solving problems through data-driven solutions and strategic thinking. ',
+    imageUrl: '/alumini/UMAMAHESHWAR_MYDAM.jpg',
+    linkedin: 'https://www.linkedin.com/in/mydam-umamaheshwar-605726227/',
+    instagram: 'https://www.instagram.com/umamaheshwarchintu_20',
+    email: 'mu21btb0a44@student.nitw.ac.in'
   },
 ];
 
