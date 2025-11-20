@@ -8,6 +8,7 @@ const ContactSchema = new mongoose.Schema(
     queryType: String,
     otherQuery: String,
     message: String,
+    isSpecial: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

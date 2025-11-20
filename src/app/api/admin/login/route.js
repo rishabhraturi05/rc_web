@@ -41,6 +41,13 @@ export async function POST(req) {
     //   maxAge: 0,
     });
 
+    // cookies.set("adminToken", token, {
+    //   httpOnly: true,
+    //   secure: process.env.NODE_ENV === "production",
+    //   path: "/",
+    // });
+    
+
     return response;
   } catch (err) {
     console.log("LOGIN ERROR:", err);   // ADD THIS TO DEBUG
