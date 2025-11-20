@@ -2,7 +2,7 @@ import React from 'react'
 
 const responses = () => {
   return (
-    <div>responses</div>
+    <div className='text-white'>responses</div>
   )
 }
 

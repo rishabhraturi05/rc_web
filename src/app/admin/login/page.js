@@ -19,12 +19,28 @@ const Login = () => {
     }));
   };
 
-  //*//
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
+
+    const { username, password } = credentials;
+
+    const res = await fetch("/api/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+
+    const data = await res.json();
+
+    setIsSubmitting(false);
+
+    if (data.success) {
+      router.push("/admin/responses");
+    } else {
+      alert(data.message || "Login failed");
+    }
   };
-  //*//
 
   return (
     <div className="relative min-h-screen text-white">
