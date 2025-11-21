@@ -35,11 +35,12 @@ export async function POST(req) {
 
     response.cookies.set("adminToken", token, {
       httpOnly: true,
-      secure: false,
+      secure: process.env.NODE_ENV === "production", // 🔥 important
+      sameSite: "strict",
       path: "/",
       maxAge: 60 * 60 * 24,
-    //   maxAge: 0,
     });
+    
 
     // cookies.set("adminToken", token, {
     //   httpOnly: true,
