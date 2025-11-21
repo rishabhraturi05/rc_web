@@ -15,7 +15,7 @@ const Navbar = () => {
         { name: 'Projects', href: '/projects', active: false, sum: 2000 },
         { name: 'Alumni', href: '/alumni', active: false, sum: 2200 },
         { name: 'Contact', href: '/contact', active: false, sum: 2200 },
-        { name: 'Admin', href: '/admin/login', active: false, sum: 2200 },
+        // { name: 'Admin', href: '/admin/login', active: false, sum: 2200 },
     ];
 
     const toggleMobileMenu = () => {

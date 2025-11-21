@@ -6,3 +6,4 @@ const AdminSchema = new mongoose.Schema({
 });
 
 export default mongoose.models.Admin || mongoose.model("Admin", AdminSchema);
+
