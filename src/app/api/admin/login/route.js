@@ -35,19 +35,11 @@ export async function POST(req) {
 
     response.cookies.set("adminToken", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production", // 🔥 important
-      sameSite: "strict",
+      sameSite: "none",
+      secure: true,
       path: "/",
       maxAge: 60 * 60 * 24,
     });
-    
-
-    // cookies.set("adminToken", token, {
-    //   httpOnly: true,
-    //   secure: process.env.NODE_ENV === "production",
-    //   path: "/",
-    // });
-    
 
     return response;
   } catch (err) {

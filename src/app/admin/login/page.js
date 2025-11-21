@@ -25,12 +25,19 @@ const Login = () => {
 
     const { username, password } = credentials;
 
+    // const res = await fetch("/api/admin/login", {
+    //   method: "POST",
+    //   headers: { "Content-Type": "application/json" },
+    //   body: JSON.stringify({ username, password }),
+    // });
+
     const res = await fetch("/api/admin/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
+      credentials: "include",   // 🔥 required for cookies on vercel
     });
-
+    
     const data = await res.json();
 
     setIsSubmitting(false);
