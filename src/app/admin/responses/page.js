@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { FaStar, FaRegStar, FaTrash } from 'react-icons/fa';
 
@@ -11,12 +11,7 @@ const Responses = () => {
   const [deleting, setDeleting] = useState(null);
   const [showSavedOnly, setShowSavedOnly] = useState(false);
 
-  useEffect(() => {
-    // Check authentication before fetching responses
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
+  const checkAuth = useCallback(async () => {
     try {
       const res = await fetch("/api/admin/responses");
       const data = await res.json();
@@ -44,7 +39,12 @@ const Responses = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    // Check authentication before fetching responses
+    checkAuth();
+  }, [checkAuth]);
 
   const fetchResponses = async () => {
     try {
@@ -190,11 +190,10 @@ const Responses = () => {
   const renderResponseCard = (response) => (
     <div
       key={response._id}
-      className={`bg-gray-900/50 border rounded-2xl p-6 sm:p-8 transition-all duration-300 ${
-        response.isSpecial
+      className={`bg-gray-900/50 border rounded-2xl p-6 sm:p-8 transition-all duration-300 ${response.isSpecial
           ? "border-yellow-500/80 bg-gray-900/70"
           : "border-gray-700/80"
-      }`}
+        }`}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
@@ -254,11 +253,10 @@ const Responses = () => {
           <button
             onClick={() => handleToggleSpecial(response._id, response.isSpecial)}
             disabled={updating === response._id}
-            className={`p-3 rounded-lg transition-all duration-300 transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 focus:ring-offset-gray-900 ${
-              response.isSpecial
+            className={`p-3 rounded-lg transition-all duration-300 transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 focus:ring-offset-gray-900 ${response.isSpecial
                 ? "text-yellow-400 hover:text-yellow-300"
                 : "text-gray-400 hover:text-yellow-400"
-            } ${updating === response._id ? "opacity-50 cursor-not-allowed" : ""}`}
+              } ${updating === response._id ? "opacity-50 cursor-not-allowed" : ""}`}
             title={response.isSpecial ? "Remove from special" : "Mark as special"}
             aria-label={response.isSpecial ? "Remove from special" : "Mark as special"}
           >
@@ -267,9 +265,8 @@ const Responses = () => {
           <button
             onClick={() => handleDeleteResponse(response._id)}
             disabled={deleting === response._id}
-            className={`p-3 rounded-lg transition-all duration-300 transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-gray-900 text-red-400 hover:text-red-300 ${
-              deleting === response._id ? "opacity-50 cursor-not-allowed" : ""
-            }`}
+            className={`p-3 rounded-lg transition-all duration-300 transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-gray-900 text-red-400 hover:text-red-300 ${deleting === response._id ? "opacity-50 cursor-not-allowed" : ""
+              }`}
             title="Delete response"
             aria-label="Delete response"
           >
@@ -297,11 +294,10 @@ const Responses = () => {
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={() => setShowSavedOnly((prev) => !prev)}
-                className={`mx-2 px-6 py-3 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 batman-font text-base tracking-wide ${
-                  showSavedOnly
+                className={`mx-2 px-6 py-3 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 batman-font text-base tracking-wide ${showSavedOnly
                     ? "bg-yellow-600/20 text-yellow-300 border border-yellow-500/60 focus:ring-yellow-500"
                     : "bg-gray-800/60 text-white border border-gray-600/60 hover:bg-gray-800 focus:ring-blue-500"
-                }`}
+                  }`}
               >
                 {showSavedOnly ? "All Mes " : "Saved Mes"}
               </button>
