@@ -39,7 +39,8 @@ const Login = () => {
       const data = await res.json();
 
       if (data.success) {
-        setLoginMessage("Login successful! Redirecting to dashboard...");
+        // setLoginMessage("Login successful! Redirecting to dashboard...");
+        alert('ok redirecting')
         window.location.href = "/admin/responses";
       } else {
         setLoginMessage(data.message || "Login failed. Please check your credentials.");
