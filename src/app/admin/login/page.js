@@ -167,7 +167,11 @@ const Login = () => {
 
             </div>
 
-
+            {loginMessage && (
+              <div className="px-4 py-3 bg-red-600/20 border border-red-600/50 rounded-lg">
+                <p className="destruct-font text-red-400 text-sm">{loginMessage}</p>
+              </div>
+            )}
 
             <div className="pt-2">
 

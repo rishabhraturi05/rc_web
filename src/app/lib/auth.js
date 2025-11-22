@@ -3,6 +3,12 @@ import { connectDB } from "@/app/lib/db";
 import Admin from "@/app/models/admin";
 import bcrypt from "bcryptjs";
 
+// Ensure we have a secret - required for JWT token signing
+const secret = process.env.NEXTAUTH_SECRET || process.env.JWT_SECRET;
+if (!secret) {
+  console.error("ERROR: NEXTAUTH_SECRET or JWT_SECRET must be set in environment variables!");
+}
+
 export const authOptions = {
   providers: [
     CredentialsProvider({
@@ -15,6 +21,10 @@ export const authOptions = {
         try {
           await connectDB();
           const { username, password } = credentials;
+
+          if (!username || !password) {
+            return null;
+          }
 
           const adminUser = await Admin.findOne({ username });
           if (!adminUser) {
@@ -32,7 +42,7 @@ export const authOptions = {
             role: "admin",
           };
         } catch (error) {
-          console.log("AUTH ERROR:", error);
+          console.error("AUTH ERROR:", error);
           return null;
         }
       },
@@ -63,6 +73,10 @@ export const authOptions = {
     strategy: "jwt",
     maxAge: 24 * 60 * 60, // 1 day
   },
-  secret: process.env.NEXTAUTH_SECRET || process.env.JWT_SECRET,
+  secret: secret,
+  debug: process.env.NODE_ENV === "development",
+  trustHost: true, // Required for Vercel and other serverless platforms
+  // Use environment URL or auto-detect for Vercel
+  useSecureCookies: process.env.NODE_ENV === "production",
 };
 

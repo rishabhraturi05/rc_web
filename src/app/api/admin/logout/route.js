@@ -13,7 +13,7 @@ export async function POST(req) {
       );
     }
 
-    // NextAuth handles session invalidation on the client side
+    // NextAuth handles JWT token invalidation on the client side via signOut
     // This endpoint is kept for backward compatibility
     return NextResponse.json({ 
       success: true, 

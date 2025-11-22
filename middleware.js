@@ -15,8 +15,8 @@ export default withAuth(
           return true;
         }
         
-        // Allow access if user has admin role
-        return token?.role === "admin";
+        // Allow access if user has admin role (JWT token contains role)
+        return !!token && token.role === "admin";
       },
     },
     pages: {
@@ -26,7 +26,8 @@ export default withAuth(
 );
 
 export const config = {
-  matcher: ["/admin/:path*"], // Protect ALL admin pages
+  matcher: [
+    "/admin/:path*", // Protect ALL admin pages
+  ],
 };
-
 
