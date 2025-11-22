@@ -40,12 +40,7 @@ const Login = () => {
 
       if (data.success) {
         setLoginMessage("Login successful! Redirecting to dashboard...");
-
-        // 🔥 CRITICAL FIX: Use window.location.href for a full page reload.
-        // This forces the browser to synchronize the new authentication cookie
-        // before the next page request, allowing it to pass the server-side middleware check.
         window.location.href = "/admin/responses";
-
       } else {
         setLoginMessage(data.message || "Login failed. Please check your credentials.");
         setIsSubmitting(false); // Only set submitting to false if redirect didn't happen

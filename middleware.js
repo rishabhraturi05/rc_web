@@ -18,6 +18,7 @@ export function middleware(req) {
 
   // If no token, redirect
   if (!token) {
+    alert('no token')
     url.pathname = "/admin/login";
     return NextResponse.redirect(url);
   }
