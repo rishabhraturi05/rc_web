@@ -3,6 +3,7 @@ import Navbar from "./components/Navbar";
 import Footer from "./components/footer";
 import ConnectingDotsBackground from "./components/bg";
 import PageLoaderWrapper from "./components/PageLoaderWrapper";
+import SessionProvider from "./components/SessionProvider";
 
 
 export const metadata = {
@@ -14,11 +15,13 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body className="bg-black">
-        <PageLoaderWrapper />
-        <Navbar />
-        <ConnectingDotsBackground />
-        {children}
-        <Footer />
+        <SessionProvider>
+          <PageLoaderWrapper />
+          <Navbar />
+          <ConnectingDotsBackground />
+          {children}
+          <Footer />
+        </SessionProvider>
       </body>
     </html>
   );

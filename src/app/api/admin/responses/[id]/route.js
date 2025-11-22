@@ -1,25 +1,16 @@
 import { NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/lib/auth";
 import { connectDB } from "@/app/lib/db";
 import Contact from "@/app/models/ContactResponse";
 
-async function validateAdmin(req) {
-  const token = req.cookies.get("adminToken")?.value;
-  if (!token) {
+async function validateAdmin() {
+  const session = await getServerSession(authOptions);
+  
+  if (!session || session.user?.role !== "admin") {
     return {
       response: NextResponse.json(
         { success: false, message: "Unauthorized" },
-        { status: 401 }
-      ),
-    };
-  }
-
-  try {
-    jwt.verify(token, process.env.JWT_SECRET);
-  } catch (err) {
-    return {
-      response: NextResponse.json(
-        { success: false, message: "Invalid token" },
         { status: 401 }
       ),
     };
@@ -30,7 +21,7 @@ async function validateAdmin(req) {
 
 export async function PUT(req, { params }) {
   try {
-    const authResult = await validateAdmin(req);
+    const authResult = await validateAdmin();
     if (authResult.response) {
       return authResult.response;
     }
@@ -65,7 +56,7 @@ export async function PUT(req, { params }) {
 
 export async function DELETE(req, { params }) {
   try {
-    const authResult = await validateAdmin(req);
+    const authResult = await validateAdmin();
     if (authResult.response) {
       return authResult.response;
     }

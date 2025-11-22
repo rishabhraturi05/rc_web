@@ -1,10 +1,12 @@
 "use client";
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession, signOut } from 'next-auth/react';
 import { FaStar, FaRegStar, FaTrash } from 'react-icons/fa';
 
 const Responses = () => {
   const router = useRouter();
+  const { data: session, status } = useSession();
   const [responses, setResponses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(null);
@@ -12,18 +14,27 @@ const Responses = () => {
   const [showSavedOnly, setShowSavedOnly] = useState(false);
 
   const checkAuth = useCallback(async () => {
+    // Check if session is loading
+    if (status === "loading") {
+      return;
+    }
+
+    // Check if user is authenticated
+    if (status === "unauthenticated" || !session || session.user?.role !== "admin") {
+      router.push("/admin/login");
+      return;
+    }
+
+    // If authenticated, fetch responses
     try {
       const res = await fetch("/api/admin/responses");
       const data = await res.json();
 
       if (!data.success && res.status === 401) {
-        // No token or invalid token - redirect to login
-        alert('no token')
         router.push("/admin/login");
         return;
       }
 
-      // If authenticated, fetch responses
       if (data.success) {
         setResponses(
           [...data.data].sort(
@@ -34,14 +45,12 @@ const Responses = () => {
         alert(data.message || "Failed to fetch responses");
       }
     } catch (error) {
-      alert('some error')
       console.error("Auth check error:", error);
-      // On error, redirect to login to be safe
       router.push("/admin/login");
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [router, session, status]);
 
   useEffect(() => {
     // Check authentication before fetching responses
@@ -133,18 +142,9 @@ const Responses = () => {
 
   const handleLogout = async () => {
     try {
-      const res = await fetch("/api/admin/logout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        router.push("/admin/login");
-      } else {
-        alert(data.message || "Logout failed");
-      }
+      await signOut({ redirect: false });
+      router.push("/admin/login");
+      router.refresh();
     } catch (error) {
       console.error("Logout error:", error);
       alert("Logout failed. Please try again.");
@@ -278,6 +278,26 @@ const Responses = () => {
       </div>
     </div>
   );
+
+  // Show loading while checking session
+  if (status === "loading") {
+    return (
+      <div className="relative min-h-screen text-white">
+        <div className="relative z-10 px-4 sm:px-6 lg:px-8 pt-24 pb-8">
+          <div className="max-w-7xl mx-auto">
+            <div className="bg-gray-900/50 border border-gray-700/80 rounded-2xl p-6 sm:p-8 text-center">
+              <p className="destruct-font text-gray-300 text-lg">Loading...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect if not authenticated (handled by middleware, but just in case)
+  if (status === "unauthenticated" || !session || session.user?.role !== "admin") {
+    return null;
+  }
 
   return (
     <div className="relative min-h-screen text-white">

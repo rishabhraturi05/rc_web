@@ -1,24 +1,17 @@
 import { NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/lib/auth";
 import { connectDB } from "@/app/lib/db";
 import Contact from "@/app/models/ContactResponse";
 
 export async function GET(req) {
   try {
-    // Verify admin token
-    const token = req.cookies.get("adminToken")?.value;
-    if (!token) {
+    // Verify admin session using NextAuth
+    const session = await getServerSession(authOptions);
+    
+    if (!session || session.user?.role !== "admin") {
       return NextResponse.json(
         { success: false, message: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
-    try {
-      jwt.verify(token, process.env.JWT_SECRET);
-    } catch (err) {
-      return NextResponse.json(
-        { success: false, message: "Invalid token" },
         { status: 401 }
       );
     }

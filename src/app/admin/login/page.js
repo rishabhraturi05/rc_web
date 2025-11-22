@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
-
-// NOTE: Removed `useRouter` import as we are using window.location.href for the
-// critical full page reload necessary after setting the auth cookie.
+import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 const Login = () => {
+  const router = useRouter();
   const [credentials, setCredentials] = useState({
     username: "",
     password: "",
@@ -29,25 +29,21 @@ const Login = () => {
     const { username, password } = credentials;
 
     try {
-      const res = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-        credentials: "include", // Required for cookies
+      const result = await signIn("credentials", {
+        username,
+        password,
+        redirect: false,
       });
 
-      const data = await res.json();
-
-      if (data.success) {
-        // setLoginMessage("Login successful! Redirecting to dashboard...");
-        alert('ok redirecting')
-        window.location.href = "/admin/responses";
-      } else {
-        setLoginMessage(data.message || "Login failed. Please check your credentials.");
-        setIsSubmitting(false); // Only set submitting to false if redirect didn't happen
+      if (result?.error) {
+        setLoginMessage("Login failed. Please check your credentials.");
+        setIsSubmitting(false);
+      } else if (result?.ok) {
+        router.push("/admin/responses");
+        router.refresh();
       }
     } catch (error) {
-      console.error("Login API Error:", error);
+      console.error("Login Error:", error);
       setLoginMessage("An error occurred during sign-in.");
       setIsSubmitting(false);
     }

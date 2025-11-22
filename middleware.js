@@ -1,39 +1,30 @@
+import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 
-export function middleware(req) {
-  const token = req.cookies.get("adminToken")?.value;
-  const url = req.nextUrl.clone();
-  const pathname = url.pathname;
-
-  // Allow login route
-  if (pathname.startsWith("/admin/login")) {
+export default withAuth(
+  function middleware(req) {
     return NextResponse.next();
+  },
+  {
+    callbacks: {
+      authorized: ({ token, req }) => {
+        const pathname = req.nextUrl.pathname;
+        
+        // Allow access to login page
+        if (pathname.startsWith("/admin/login")) {
+          return true;
+        }
+        
+        // Allow access if user has admin role
+        return token?.role === "admin";
+      },
+    },
+    pages: {
+      signIn: "/admin/login",
+    },
   }
-
-  // Allow public admin root
-  if (pathname === "/admin") {
-    return NextResponse.next();
-  }
-
-  // If no token, redirect
-  if (!token) {
-    alert('no token')
-    // url.pathname = "/admin/login";
-    return NextResponse.next();
-  }
-
-  // Verify token
-  try {
-    jwt.verify(token, process.env.JWT_SECRET);
-    return NextResponse.next();
-  } catch (err) {
-    url.pathname = "/admin/login";
-    alert("dont know")
-    return NextResponse.redirect(url);
-  }
-}
+);
 
 export const config = {
-  matcher: ["/admin/:path*"],  // Protect ALL admin pages
+  matcher: ["/admin/:path*"], // Protect ALL admin pages
 };
