@@ -18,7 +18,7 @@ export function middleware(req) {
 
   // If no token, redirect
   if (!token) {
-    // alert('no token')
+    alert('no token')
     // url.pathname = "/admin/login";
     return NextResponse.next();
   }
@@ -29,6 +29,7 @@ export function middleware(req) {
     return NextResponse.next();
   } catch (err) {
     url.pathname = "/admin/login";
+    alert("dont know")
     return NextResponse.redirect(url);
   }
 }
