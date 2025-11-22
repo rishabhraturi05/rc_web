@@ -7,7 +7,7 @@ export async function POST(req) {
     // Clear the adminToken cookie
     response.cookies.set("adminToken", "", {
       httpOnly: true,
-      secure: false,
+      secure: true,
       path: "/",
       maxAge: 0, // Expire immediately
     });
