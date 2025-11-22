@@ -46,10 +46,8 @@ const Login = () => {
       // Use window.location for full page reload to ensure cookie is available
       // This is more reliable in production environments like Vercel
       if (data.success) {
-        setTimeout(() => {
-          router.push("/admin/responses");
-          // window.location.href = "/admin/responses";
-        }, 100); // small delay
+        alert("you are right")
+        router.push("/admin/responses");
       }
       
     } else {
