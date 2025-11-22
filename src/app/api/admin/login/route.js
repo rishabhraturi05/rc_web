@@ -35,8 +35,8 @@ export async function POST(req) {
 
     response.cookies.set("adminToken", token, {
       httpOnly: true,
-      sameSite: "lax",
       secure: true,
+      sameSite: "none",
       path: "/",
       maxAge: 60 * 60 * 24,
     });
