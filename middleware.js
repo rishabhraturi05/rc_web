@@ -32,6 +32,17 @@ export function middleware(req) {
   }
 }
 
+// export const config = {
+//   matcher: [
+//     "/admin/responses/:path*",   // protect responses page
+//     "/admin/secret/:path*",      // add more if needed
+//   ],
+// };
+
 export const config = {
-  matcher: ["/admin/:path*"], // protect admin pages
+  matcher: [
+    "/admin/responses/:path*",
+  ],
 };
+
+
