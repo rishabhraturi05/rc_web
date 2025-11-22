@@ -34,6 +34,7 @@ const Responses = () => {
         alert(data.message || "Failed to fetch responses");
       }
     } catch (error) {
+      alert('some error')
       console.error("Auth check error:", error);
       // On error, redirect to login to be safe
       router.push("/admin/login");
