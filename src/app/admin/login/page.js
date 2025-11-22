@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 // NOTE: Removed `useRouter` import as we are using window.location.href for the
 // critical full page reload necessary after setting the auth cookie.
@@ -12,6 +12,31 @@ const Login = () => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginMessage, setLoginMessage] = useState(""); // State for user feedback
+
+  // Check if user is already authenticated on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const res = await fetch("/api/admin/responses", {
+          method: "GET",
+          credentials: "include",
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success) {
+            // Already authenticated, redirect to responses
+            window.location.href = "/admin/responses";
+          }
+        }
+      } catch (error) {
+        // Not authenticated or error, stay on login page
+        console.log("Auth check:", error);
+      }
+    };
+
+    checkAuth();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;

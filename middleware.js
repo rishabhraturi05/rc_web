@@ -6,8 +6,20 @@ export function middleware(req) {
   const url = req.nextUrl.clone();
   const pathname = url.pathname;
 
-  // Allow login route
-  if (pathname.startsWith("/admin/login")) {
+  // If on login page and has valid token, redirect to responses
+  if (pathname === "/admin/login" || pathname.startsWith("/admin/login/")) {
+    if (token) {
+      try {
+        jwt.verify(token, process.env.JWT_SECRET);
+        // Valid token, redirect to responses
+        const redirectUrl = new URL("/admin/responses", req.url);
+        return NextResponse.redirect(redirectUrl);
+      } catch (err) {
+        // Invalid token, allow login page
+        return NextResponse.next();
+      }
+    }
+    // No token, allow login page
     return NextResponse.next();
   }
 
