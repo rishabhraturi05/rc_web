@@ -18,6 +18,7 @@ const Responses = () => {
 
       if (!data.success && res.status === 401) {
         // No token or invalid token - redirect to login
+        alert('no token')
         router.push("/admin/login");
         return;
       }
