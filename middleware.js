@@ -6,34 +6,32 @@ export function middleware(req) {
   const url = req.nextUrl.clone();
   const pathname = url.pathname;
 
-  // Allow login route
+  // Allow login route through
   if (pathname.startsWith("/admin/login")) {
     return NextResponse.next();
   }
 
-  // Allow public admin root
+  // Allow /admin (blank dashboard)
   if (pathname === "/admin") {
     return NextResponse.next();
   }
 
-  // If no token, redirect
+  // If missing token → redirect to login
   if (!token) {
-    alert('no token')
-    // url.pathname = "/admin/login";
-    return NextResponse.next();
+    url.pathname = "/admin/login";
+    return NextResponse.redirect(url);
   }
 
-  // Verify token
+  // Verify JWT
   try {
     jwt.verify(token, process.env.JWT_SECRET);
     return NextResponse.next();
   } catch (err) {
     url.pathname = "/admin/login";
-    alert("dont know")
     return NextResponse.redirect(url);
   }
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],  // Protect ALL admin pages
+  matcher: ["/admin/:path*"], // protect admin pages
 };
