@@ -47,7 +47,8 @@ const Login = () => {
       // This is more reliable in production environments like Vercel
       if (data.success) {
         alert("you are right")
-        router.push("/admin/responses");
+        // router.push("/admin/responses");
+        window.location.href = "/admin/responses";
       }
       
     } else {
