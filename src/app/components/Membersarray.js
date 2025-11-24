@@ -260,6 +260,20 @@ export const allmembers = {
             img: `/members/software/Chinta Anupama.jpg`,
             linkedin: 'https://www.linkedin.com/in/anupama-chinta-8347b532b',
             instagram: 'https://www.instagram.com/ch_anupama_18?igsh=eWxzYTQ3b3J1NTJm'
+        },
+        {
+            name: `Mohammad Kaif Adil `,
+            email: `kaifmdkaif1@gmail.com`,
+            img: `/members/software/Mohammad_Kaif_Adil.jpg`,
+            linkedin: 'https://www.linkedin.com/in/mohammad-kaif-adil-8721b0286?utm_source=share_via&utm_content=profile&utm_medium=member_android',
+            instagram: 'https://www.instagram.com/kaiif_adiil?igsh=MWg0aHRwdHp4YmljMg=='
+        },
+        {
+            name: `Saarth Yawale`,
+            email: `saarth.yawale27@gmail.com`,
+            img: `/members/software/Yawale_Saarth_Rajesh.jpg`,
+            linkedin: 'https://www.linkedin.com/in/saarth-yawale-451342346?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app',
+            instagram: 'https://www.instagram.com/saarth_yawale72?igsh=MTNsNDI4aHF5ZDN3eg=='
         }
     ],
     mechanical: [
@@ -439,6 +453,20 @@ export const allmembers = {
             img: `/members/PR/Aryan Nit w.png`,
             linkedin: 'https://www.linkedin.com/in/aryannitw?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app',
             instagram: 'https://www.instagram.com/chopra_00013?igsh=Y202MW15NXVtaGFq'
+        },
+        {
+            name: `M.Abhinav`,
+            email: `ma24eeb0b35@student.nitw.ac.in`,
+            img: `/members/PR/Marda_Abhinav.jpg`,
+            linkedin: 'https://www.linkedin.com/in/abhinav-marda-72939b372?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app',
+            instagram: 'https://www.instagram.com/abhinav77_77?igsh=OTY1cnFyMjN4ZjY5'
+        },
+        {
+            name: `Nandana Anilkumar `,
+            email: `Na24mae0010@student.nitw.ac.in`,
+            img: `/members/PR/Nandana_Anilkumar.jpg`,
+            linkedin: '#',
+            instagram: '#'
         }
     ],
 }

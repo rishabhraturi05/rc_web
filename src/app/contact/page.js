@@ -162,7 +162,7 @@ const Contact = () => {
               >
                 <option value="" className="bg-gray-800">Select a query type</option>
                 <option value="general" className="bg-gray-800">General Inquiry</option>
-                <option value="membership" className="bg-gray-800">Membership</option>
+                <option value="Recruitment" className="bg-gray-800">Recruitment</option>
                 <option value="events" className="bg-gray-800">Events</option>
                 <option value="projects" className="bg-gray-800">Projects</option>
                 <option value="collaboration" className="bg-gray-800">Collaboration</option>
