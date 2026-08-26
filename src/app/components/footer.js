@@ -14,7 +14,7 @@ const Footer = () => {
             <h3 className="text-2xl font-bold mb-2">Robotics Club NITW</h3>
             <p className="text-gray-400">National Institute of Technology Warangal</p>
             <p className="text-gray-400"><Link href="mailto:roboticsclub@nitw.ac.in">Email: roboticsclub@nitw.ac.in</Link></p>
-            <p className="text-gray-400">Phone: 7661991859</p>
+            <p className="text-gray-400">Phone: 9701877170</p>
           </div>
           {/* Right Section: Social Links */}
           <div>
