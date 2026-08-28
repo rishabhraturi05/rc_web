@@ -1,10 +1,19 @@
 import "./globals.css";
-import Navbar from "./components/Navbar";
-import Footer from "./components/footer";
-import ConnectingDotsBackground from "./components/bg";
-import PageLoaderWrapper from "./components/PageLoaderWrapper";
+import LayoutShell from "./components/LayoutShell";
 import SessionProvider from "./components/SessionProvider";
+import { Bangers, Nunito } from "next/font/google";
 
+const bangers = Bangers({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-bangers",
+});
+
+const nunito = Nunito({
+  weight: ["400", "600", "700", "800"],
+  subsets: ["latin"],
+  variable: "--font-nunito",
+});
 
 export const metadata = {
   title: "RC NITW",
@@ -14,13 +23,9 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body className="bg-black">
+      <body className={`${bangers.variable} ${nunito.variable} bg-black`}>
         <SessionProvider>
-          <PageLoaderWrapper />
-          <Navbar />
-          <ConnectingDotsBackground />
-          {children}
-          <Footer />
+          <LayoutShell>{children}</LayoutShell>
         </SessionProvider>
       </body>
     </html>

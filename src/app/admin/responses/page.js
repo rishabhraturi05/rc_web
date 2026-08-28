@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
-import { FaStar, FaRegStar, FaTrash } from 'react-icons/fa';
+import Link from 'next/link';
+import { FaStar, FaRegStar, FaTrash, FaArrowLeft } from 'react-icons/fa';
 
 const Responses = () => {
   const router = useRouter();
@@ -306,6 +307,9 @@ const Responses = () => {
         <div className="max-w-7xl mx-auto flex flex-col gap-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
+              <Link href="/admin" className="inline-flex items-center gap-2 text-gray-400 hover:text-white destruct-font text-sm mb-3 transition-colors">
+                <FaArrowLeft size={12} /> Back to Admin Panel
+              </Link>
               <h1 className="batman-font text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-2">
                 Admin Responses
               </h1>

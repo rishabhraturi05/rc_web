@@ -39,7 +39,7 @@ const Login = () => {
         setLoginMessage("Login failed. Please check your credentials.");
         setIsSubmitting(false);
       } else if (result?.ok) {
-        router.push("/admin/responses");
+        router.push("/admin");
         router.refresh();
       }
     } catch (error) {
