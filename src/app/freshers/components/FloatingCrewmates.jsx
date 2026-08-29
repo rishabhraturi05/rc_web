@@ -51,9 +51,11 @@ export default function FloatingCrewmates({ count = 6 }) {
       const color = colors[index % colors.length];
       const spriteUrl = amongUsAssets.crewmates[colorKey];
       
-      const top = 5 + ((index * 17) % 80);
+      const sideIndex = Math.floor(index / 2);
+      const top = 12 + (sideIndex * 30);
+      
       const isLeft = index % 2 === 0;
-      const left = isLeft ? 2 + ((index * 13) % 18) : 80 + ((index * 13) % 15);
+      const left = isLeft ? 3 + (sideIndex * 4) : 82 + (sideIndex * 3);
       
       const duration = 20 + (index % 4) * 5;
       const delay = index * -3; 
@@ -87,14 +89,14 @@ export default function FloatingCrewmates({ count = 6 }) {
       <style jsx global>{`
         @keyframes driftRight {
           0% { transform: translate(0px, 0px) rotate(-15deg); }
-          33% { transform: translate(50px, -70px) rotate(10deg); }
-          66% { transform: translate(25px, 50px) rotate(-5deg); }
+          33% { transform: translate(30px, -40px) rotate(10deg); }
+          66% { transform: translate(15px, 30px) rotate(-5deg); }
           100% { transform: translate(0px, 0px) rotate(-15deg); }
         }
         @keyframes driftLeft {
           0% { transform: translate(0px, 0px) rotate(15deg); }
-          33% { transform: translate(-50px, 70px) rotate(-10deg); }
-          66% { transform: translate(-25px, -50px) rotate(5deg); }
+          33% { transform: translate(-30px, 40px) rotate(-10deg); }
+          66% { transform: translate(-15px, -30px) rotate(5deg); }
           100% { transform: translate(0px, 0px) rotate(15deg); }
         }
       `}</style>
