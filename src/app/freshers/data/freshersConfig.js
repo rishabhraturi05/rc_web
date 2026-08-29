@@ -8,11 +8,11 @@ export const freshersEvent = {
   tagline: "EMERGENCY MEETING: JOIN THE CREW OR BE LEFT IN THE VENT",
   eventDate: "TBD — EVENT DATE",
   eventTime: "TBD — EVENT TIME",
-  venue: "TBD — VENUE (Seminar Hall / SAC)",
+  venue: "TBD — VENUE",
   registrationDeadline: "TBD — REGISTRATION DEADLINE",
   registrationOpen: true,
   prizes: "TBD — EXCITING PRIZES & CERTIFICATES",
-  teamSize: "3 to 6 Crewmates per Team",
+  teamSize: "6 Crewmates per Team",
   eligibility: "All First-Year Students of NIT Warangal",
 
   // Media
@@ -25,12 +25,11 @@ export const freshersEvent = {
 
   // Rules list for Rules Terminal
   rules: [
-    "01. All crewmates must present a valid NIT Warangal Student ID Card at entry.",
-    "02. Teams must contain between 3 to 6 members. Individual participants will be merged into teams.",
-    "03. Late arrivals after mission launch time may forfeit their task slots.",
-    "04. Impostor tactics, unsportsmanlike behavior, or task tampering will lead to immediate ejection.",
-    "05. Mobile phones are allowed only for event task verification.",
-    "06. The decisions of the RC Flight Command (Organizers) are final and binding.",
+    "01. Teams must contain 6 members. Individual participants will be merged into teams.",
+    "02. Time Commitment: Expect Round 1 to take 1.5 hours. Squads that qualify for Round 2 will need at least another 30 minutes.",
+    "03. Arriving late, violating game rules, unsportsmanlike behavior, or task tampering will lead to immediate ejection.",
+    "04. Phones are strictly for scanning tasks and event verification.",
+    "05. All decisions made by the organising team are final.",
   ],
 
   // Task list for Task Navigation
