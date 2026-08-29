@@ -64,11 +64,14 @@ export default function RegisteredFlash({ registrationData, eventConfig, onRetur
             <div className="pt-1">
               <span className="text-gray-400 block mb-1">CREWMATE MEMBERS:</span>
               <div className="flex flex-wrap gap-1.5">
-                {registrationData.participants.map((p, i) => (
-                  <span key={i} className="px-2 py-0.5 bg-gray-900 border border-yellow-500/40 text-yellow-300 rounded text-[11px]">
-                    👤 {p}
-                  </span>
-                ))}
+                {registrationData.participants.map((p, i) => {
+                  const label = typeof p === "object" ? `${p.name}${p.rollNo ? ` (${p.rollNo})` : ""}` : p;
+                  return (
+                    <span key={i} className="px-2 py-0.5 bg-gray-900 border border-yellow-500/40 text-yellow-300 rounded text-[11px]">
+                      👤 {label}
+                    </span>
+                  );
+                })}
               </div>
             </div>
           )}
