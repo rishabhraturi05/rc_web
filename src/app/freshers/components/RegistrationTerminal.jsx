@@ -27,17 +27,25 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+    let finalValue = type === "checkbox" ? checked : value;
+    
+    if (name === "rollNo") {
+      finalValue = finalValue.toUpperCase();
+    }
+
     setFormData((prev) => ({
       ...prev,
-      [name]: type === "checkbox" ? checked : value,
+      [name]: finalValue,
     }));
   };
 
   const addParticipant = () => setParticipants((prev) => [...prev, ""]);
+  
   const removeParticipant = (index) => {
     if (participants.length <= 1) return;
     setParticipants((prev) => prev.filter((_, i) => i !== index));
   };
+  
   const updateParticipant = (index, value) => {
     setParticipants((prev) => prev.map((p, i) => (i === index ? value : p)));
   };
@@ -46,9 +54,14 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
     if (e) e.preventDefault();
     setErrorMessage("");
 
-    // Client side validation
     if (!formData.name.trim() || !formData.email.trim() || !formData.contactNo.trim() || !formData.rollNo.trim() || !formData.branch || !formData.teamName.trim()) {
       setErrorMessage("MISSING REQUIRED FIELDS. FILL ALL CREWMATE IDENTIFICATION DATA.");
+      return;
+    }
+
+    const rollRegex = /^26(BTB|CEB|CHB|CSB|ECB|EEB|MEB|MMB|CYC|MAC|PHC|EDB)[0-1][A-B][0-9]{2}$/;
+    if (!rollRegex.test(formData.rollNo)) {
+      setErrorMessage("INVALID ROLL NUMBER FORMAT. VERIFY YOUR BRANCH CODE.");
       return;
     }
 
@@ -85,20 +98,20 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
     }
   };
 
-  if (registeredData) {
-    return (
-      <RegisteredFlash
-        registrationData={registeredData}
-        eventConfig={eventConfig}
-        onReturn={() => setRegisteredData(null)}
-      />
-    );
-  }
+  const handleFlashComplete = () => {
+    setRegisteredData(null);
+    setFormData(initialForm);
+    setParticipants([""]);
+    setSubmitting(false);
+    setTerminalLog("");
+  };
 
   return (
     <section id="register" className="relative z-10 w-full max-w-3xl mx-auto my-12 px-4 font-vcr">
+      
+      {registeredData && <RegisteredFlash onComplete={handleFlashComplete} />}
+
       <div className="crt-screen crt-scanlines p-6 sm:p-8 bg-gray-950/95 text-white border-2 border-red-500/70 shadow-[0_0_35px_rgba(239,68,68,0.25)]">
-        {/* Section Title Header */}
         <div className="flex items-center justify-between border-b-2 border-red-500/50 pb-3 mb-6">
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
@@ -109,14 +122,12 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
           <span className="text-xs text-yellow-400 font-mono hidden sm:inline">CREWMATE TERMINAL</span>
         </div>
 
-        {/* Dynamic Terminal Console Log */}
         {terminalLog && (
           <div className="p-3 mb-6 rounded bg-gray-900 border border-green-500/60 text-xs font-mono text-green-400">
             {terminalLog}
           </div>
         )}
 
-        {/* Error Alert Box */}
         {errorMessage && (
           <div className="p-3 mb-6 rounded bg-red-950/90 border border-red-500 text-xs font-mono text-red-300">
             🚨 ERROR: {errorMessage}
@@ -124,7 +135,6 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
         )}
 
         <form onSubmit={handleRegisterSubmit} className="space-y-5">
-          {/* Team Name */}
           <div>
             <label className="block text-xs text-yellow-400 font-bold mb-1 tracking-wider">
               [!] CREWMATE TEAM NAME *
@@ -140,7 +150,6 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
             />
           </div>
 
-          {/* Leader Name & Email */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs text-yellow-400 font-bold mb-1 tracking-wider">
@@ -173,7 +182,6 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
             </div>
           </div>
 
-          {/* Roll No, Contact & Branch */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs text-yellow-400 font-bold mb-1 tracking-wider">
@@ -184,9 +192,12 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
                 value={formData.rollNo}
                 onChange={handleChange}
                 required
+                pattern="^26(BTB|CEB|CHB|CSB|ECB|EEB|MEB|MMB|CYC|MAC|PHC|EDB)[0-1][A-B][0-9]{2}$"
+                title="Format must include a valid branch code (e.g., 26CSB0A09)"
+                maxLength={9}
                 disabled={submitting}
                 className="w-full px-4 py-2.5 bg-gray-900 border-2 border-gray-700 rounded-lg text-white font-vcr text-sm focus:outline-none focus:border-yellow-400 focus:shadow-[0_0_15px_rgba(245,158,11,0.3)]"
-                placeholder="e.g. 241101"
+                placeholder="26CSB0A09"
               />
             </div>
             <div>
@@ -226,7 +237,6 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
             </div>
           </div>
 
-          {/* Team Participants List Builder */}
           <div className="pt-2">
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs text-yellow-400 font-bold tracking-wider">
@@ -268,7 +278,6 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
             </div>
           </div>
 
-          {/* RC Recruitment Checkbox */}
           <div className="flex items-center gap-3 p-3 rounded-lg border border-gray-800 bg-gray-900/60">
             <input
               type="checkbox"
@@ -284,7 +293,6 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
             </label>
           </div>
 
-          {/* Dramatic 3D Emergency Meeting Submit Button */}
           <div className="pt-4 flex justify-center">
             <EmergencyButton
               onClick={handleRegisterSubmit}
