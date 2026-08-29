@@ -11,8 +11,8 @@ export const amongUsAssets = {
     purple: "/freshers/among-us/crewmates/purple.svg",
   },
   intro: {
-    crewmate: "/freshers/among-us/intro/shhh-crewmate.svg",
-    hand: "/freshers/among-us/intro/shhh-hand.svg",
+    crewmate: "/freshers/among-us/intro/shhh-body.png",
+    hand: "/freshers/among-us/intro/shhh-hand.png",
   },
   impostor: {
     standing: "/freshers/among-us/crewmates/red.svg",

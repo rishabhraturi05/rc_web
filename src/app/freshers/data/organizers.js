@@ -7,7 +7,7 @@ export const organizers = [
     color: "#e74c3c", // Red crewmate
     phone: "+91 9701877170",
     email: "roboticsclub@nitw.ac.in",
-    sprite: "/freshers/sprites/crewmates/red.png",
+    sprite: "/freshers/among-us/crewmates/red.svg",
   },
   {
     id: "org-2",
@@ -16,7 +16,7 @@ export const organizers = [
     color: "#3498db", // Blue crewmate
     phone: "+91 9000000000",
     email: "roboticsclub@nitw.ac.in",
-    sprite: "/freshers/sprites/crewmates/blue.png",
+    sprite: "/freshers/among-us/crewmates/blue.svg",
   },
   {
     id: "org-3",
@@ -25,7 +25,7 @@ export const organizers = [
     color: "#00ffff", // Cyan crewmate
     phone: "+91 9000000001",
     email: "roboticsclub@nitw.ac.in",
-    sprite: "/freshers/sprites/crewmates/cyan.png",
+    sprite: "/freshers/among-us/crewmates/cyan.svg",
   },
   {
     id: "org-4",
@@ -34,7 +34,7 @@ export const organizers = [
     color: "#f1c40f", // Yellow crewmate
     phone: "+91 9000000002",
     email: "roboticsclub@nitw.ac.in",
-    sprite: "/freshers/sprites/crewmates/yellow.png",
+    sprite: "/freshers/among-us/crewmates/yellow.svg",
   },
   {
     id: "org-5",
@@ -43,6 +43,6 @@ export const organizers = [
     color: "#2ecc71", // Green crewmate
     phone: "+91 9000000003",
     email: "roboticsclub@nitw.ac.in",
-    sprite: "/freshers/sprites/crewmates/green.png",
+    sprite: "/freshers/among-us/crewmates/green.svg",
   },
 ];

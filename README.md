@@ -6,7 +6,7 @@ This repository hosts the source code for our club’s website — built to show
 ---
 
 ## 🌐 Live Website
-[🔗 Visit Website](https://rc-nitw.vercel.app/) *(replace with your deployed link if different)*
+[🔗 Visit Website](https://www.rc-nitw.org/)
 
 ---
 

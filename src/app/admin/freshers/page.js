@@ -79,7 +79,15 @@ export default function AdminFreshers() {
       (t) =>
         t.teamName.toLowerCase().includes(q) ||
         t.name.toLowerCase().includes(q) ||
-        t.participants.some((p) => p.toLowerCase().includes(q))
+        t.participants.some((p) => {
+          if (typeof p === "object") {
+            return (
+              p.name?.toLowerCase().includes(q) ||
+              p.rollNo?.toLowerCase().includes(q)
+            );
+          }
+          return p.toLowerCase().includes(q);
+        })
     );
   }, [teams, search]);
 
@@ -296,11 +304,14 @@ export default function AdminFreshers() {
                           Team Members ({team.participants.length})
                         </p>
                         <ul className="space-y-1">
-                          {team.participants.map((p, i) => (
-                            <li key={i} className="destruct-font text-white text-sm flex items-center gap-2">
-                              <span className="text-cyan-400">•</span> {p}
-                            </li>
-                          ))}
+                          {team.participants.map((p, i) => {
+                            const label = typeof p === "object" ? `${p.name} ${p.rollNo ? `(${p.rollNo})` : ""}` : p;
+                            return (
+                              <li key={i} className="destruct-font text-white text-sm flex items-center gap-2">
+                                <span className="text-cyan-400">•</span> {label}
+                              </li>
+                            );
+                          })}
                         </ul>
                       </div>
                     )}

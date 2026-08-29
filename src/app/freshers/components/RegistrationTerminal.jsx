@@ -19,7 +19,7 @@ const initialForm = {
 
 export default function RegistrationTerminal({ eventConfig, onSuccessComplete }) {
   const [formData, setFormData] = useState(initialForm);
-  const [participants, setParticipants] = useState([""]);
+  const [participants, setParticipants] = useState([{ name: "", rollNo: "" }]);
   const [submitting, setSubmitting] = useState(false);
   const [terminalLog, setTerminalLog] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
@@ -39,15 +39,15 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
     }));
   };
 
-  const addParticipant = () => setParticipants((prev) => [...prev, ""]);
-  
+  const addParticipant = () => setParticipants((prev) => [...prev, { name: "", rollNo: "" }]);
   const removeParticipant = (index) => {
     if (participants.length <= 1) return;
     setParticipants((prev) => prev.filter((_, i) => i !== index));
   };
-  
-  const updateParticipant = (index, value) => {
-    setParticipants((prev) => prev.map((p, i) => (i === index ? value : p)));
+  const updateParticipant = (index, field, value) => {
+    setParticipants((prev) =>
+      prev.map((p, i) => (i === index ? { ...p, [field]: value } : p))
+    );
   };
 
   const handleRegisterSubmit = async (e) => {
@@ -66,8 +66,23 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
     }
 
     const cleanParticipants = participants.map((p) => p.trim()).filter(Boolean);
+    const cleanParticipants = participants
+      .map((p) => ({
+        name: typeof p === "string" ? p.trim() : (p.name || "").trim(),
+        rollNo: typeof p === "string" ? "" : (p.rollNo || "").trim(),
+      }))
+      .filter((p) => p.name.length > 0);
+
     if (cleanParticipants.length === 0) {
       setErrorMessage("AT LEAST ONE PARTICIPANT NAME IS REQUIRED.");
+      return;
+    }
+
+    const missingRoll = cleanParticipants.some((p) => !p.rollNo);
+    if (missingRoll) {
+      const msg = "ROLL NUMBER IS REQUIRED FOR ALL TEAM PARTICIPANTS.";
+      setErrorMessage(msg);
+      alert(`⚠️ REGISTRATION BLOCKED:\n${msg}`);
       return;
     }
 
@@ -94,7 +109,10 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
     } else {
       setSubmitting(false);
       setTerminalLog("> TRANSMISSION FAILED.");
-      setErrorMessage(res.error || "TRANSMISSION ERROR. PLEASE RETRY.");
+      const errorMsg = res.error || "TRANSMISSION ERROR. PLEASE RETRY.";
+      setErrorMessage(errorMsg);
+      // Popup alert to inform user clearly when duplicate roll number or email is detected
+      alert(`⚠️ REGISTRATION BLOCKED:\n\n${errorMsg}`);
     }
   };
 
@@ -105,6 +123,28 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
     setSubmitting(false);
     setTerminalLog("");
   };
+  if (registeredData) {
+    return (
+      <RegisteredFlash
+        registrationData={registeredData}
+        onReset={() => {
+          setRegisteredData(null);
+          setFormData(initialForm);
+          setParticipants([{ name: "", rollNo: "" }]);
+        }}
+      />
+    );
+  }
+
+  if (registeredData) {
+    return (
+      <RegisteredFlash
+        registrationData={registeredData}
+        eventConfig={eventConfig}
+        onReturn={() => setRegisteredData(null)}
+      />
+    );
+  }
 
   return (
     <section id="register" className="relative z-10 w-full max-w-3xl mx-auto my-12 px-4 font-vcr">
@@ -254,21 +294,29 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
 
             <div className="space-y-2">
               {participants.map((participant, index) => (
-                <div key={index} className="flex items-center gap-2">
+                <div key={index} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                   <input
-                    value={participant}
-                    onChange={(e) => updateParticipant(index, e.target.value)}
+                    value={participant.name || ""}
+                    onChange={(e) => updateParticipant(index, "name", e.target.value)}
                     required
                     disabled={submitting}
                     className="flex-1 px-4 py-2 bg-gray-900 border border-gray-700 rounded text-sm text-white font-vcr focus:outline-none focus:border-yellow-400"
                     placeholder={`Crewmate ${index + 1} Name`}
+                  />
+                  <input
+                    value={participant.rollNo || ""}
+                    onChange={(e) => updateParticipant(index, "rollNo", e.target.value)}
+                    required
+                    disabled={submitting}
+                    className="w-full sm:w-44 px-4 py-2 bg-gray-900 border border-gray-700 rounded text-sm text-white font-vcr focus:outline-none focus:border-yellow-400 uppercase"
+                    placeholder="Roll No"
                   />
                   {participants.length > 1 && (
                     <button
                       type="button"
                       onClick={() => removeParticipant(index)}
                       disabled={submitting}
-                      className="px-3 py-2 bg-red-950 text-red-400 border border-red-800 rounded text-xs hover:bg-red-900 cursor-pointer"
+                      className="px-3 py-2 bg-red-950 text-red-400 border border-red-800 rounded text-xs hover:bg-red-900 cursor-pointer self-end sm:self-auto"
                     >
                       ✕
                     </button>

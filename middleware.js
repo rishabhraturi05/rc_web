@@ -9,12 +9,12 @@ export default withAuth(
     callbacks: {
       authorized: ({ token, req }) => {
         const pathname = req.nextUrl.pathname;
-        
+
         // Allow access to login page
         if (pathname.startsWith("/admin/login")) {
           return true;
         }
-        
+
         // Allow access if user has admin role (JWT token contains role)
         return !!token && token.role === "admin";
       },
