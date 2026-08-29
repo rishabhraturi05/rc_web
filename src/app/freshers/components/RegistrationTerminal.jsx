@@ -65,7 +65,6 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
       return;
     }
 
-    const cleanParticipants = participants.map((p) => p.trim()).filter(Boolean);
     const cleanParticipants = participants
       .map((p) => ({
         name: typeof p === "string" ? p.trim() : (p.name || "").trim(),
@@ -116,41 +115,25 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
     }
   };
 
-  const handleFlashComplete = () => {
-    setRegisteredData(null);
-    setFormData(initialForm);
-    setParticipants([""]);
-    setSubmitting(false);
-    setTerminalLog("");
-  };
-  if (registeredData) {
-    return (
-      <RegisteredFlash
-        registrationData={registeredData}
-        onReset={() => {
-          setRegisteredData(null);
-          setFormData(initialForm);
-          setParticipants([{ name: "", rollNo: "" }]);
-        }}
-      />
-    );
-  }
-
   if (registeredData) {
     return (
       <RegisteredFlash
         registrationData={registeredData}
         eventConfig={eventConfig}
-        onReturn={() => setRegisteredData(null)}
+        onReset={() => {
+          setRegisteredData(null);
+          setFormData(initialForm);
+          setParticipants([{ name: "", rollNo: "" }]);
+          setSubmitting(false);
+          setTerminalLog("");
+          setErrorMessage("");
+        }}
       />
     );
   }
 
   return (
     <section id="register" className="relative z-10 w-full max-w-3xl mx-auto my-12 px-4 font-vcr">
-      
-      {registeredData && <RegisteredFlash onComplete={handleFlashComplete} />}
-
       <div className="crt-screen crt-scanlines p-6 sm:p-8 bg-gray-950/95 text-white border-2 border-red-500/70 shadow-[0_0_35px_rgba(239,68,68,0.25)]">
         <div className="flex items-center justify-between border-b-2 border-red-500/50 pb-3 mb-6">
           <div className="flex items-center gap-2">

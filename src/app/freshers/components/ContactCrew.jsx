@@ -49,12 +49,6 @@ export default function ContactCrew() {
                   📞 {org.phone}
                 </a>
 
-                <a
-                  href={`mailto:${org.email}`}
-                  className="block px-3 py-1.5 rounded bg-gray-950 hover:bg-gray-800 text-yellow-400 hover:text-yellow-300 transition-colors font-mono truncate"
-                >
-                  ✉️ {org.email}
-                </a>
               </div>
             </div>
           ))}

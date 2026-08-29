@@ -22,9 +22,7 @@ const FreshersRegistrationSchema = new mongoose.Schema(
   }
 );
 
-// Indexes for ultra-fast lookups and duplicate checks on roll numbers and email
-FreshersRegistrationSchema.index({ rollNo: 1 });
-FreshersRegistrationSchema.index({ email: 1 });
+// Indexes for ultra-fast lookups on team participant roll numbers
 FreshersRegistrationSchema.index({ "participants.rollNo": 1 });
 
 export default mongoose.models.FreshersRegistration ||

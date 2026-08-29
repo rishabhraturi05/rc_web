@@ -42,7 +42,7 @@ export default function EventDetails({ eventConfig }) {
             </div>
             <div className="text-sm font-bold text-white">{eventConfig.eligibility}</div>
             <p className="text-[11px] text-gray-400 mt-1 font-sans">
-              Open exclusively to all batch 2026 first-year NIT Warangal students.
+              Open exclusively to all branches 2026 first-year NIT Warangal students.
             </p>
           </div>
 
@@ -72,24 +72,18 @@ export default function EventDetails({ eventConfig }) {
           <div className="text-xs text-yellow-400 font-bold tracking-wider mb-3">
             MISSION STAGES & TASKS
           </div>
-          <ul className="space-y-2 text-xs text-gray-200 font-vcr">
-            <li className="flex items-start gap-2">
-              <span className="text-yellow-400">STAGE 1:</span>
-              <span>Card Swipe Registration & ID Verification at AirLock</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-green-400">STAGE 2:</span>
-              <span>Interactive Hardware & Circuit Task Stations in Task Zone</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-red-400">STAGE 3:</span>
-              <span>Impostor Mystery Challenge & Bot Showcase on Main Stage</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-yellow-400">STAGE 4:</span>
-              <span>Emergency Assembly & Prize Distribution Ceremony</span>
-            </li>
-          </ul>
+          <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-y-4 sm:gap-y-6 gap-x-4 text-white font-mono text-xs sm:text-sm">
+            <div className="text-yellow-400 font-bold sm:font-normal">BOARD THE SHIP:</div>
+            <div className="text-gray-300">Swipe your ID at the airlock and dive straight into fast-paced tech quizzes, mini-games, and logic puzzles. Only the top-performing squads will advance to the 2nd round.</div>
+            <div className="text-green-400 font-bold sm:font-normal">AMONG US:</div>
+            <div className="text-gray-300">You will be secretly assigned as a hardworking Crewmate or an Impostor. This round has 8 tasks to be completed in 20 minutes</div>
+            <div className="text-red-400 font-bold sm:font-normal">CREWMATE MISSION:</div>
+            <div className="text-gray-300">Run around the station fixing broken hardware and solving hands-on tech puzzles to keep the ship flying. Zero prior engineering experience needed!</div>
+            <div className="text-cyan-400 font-bold sm:font-normal">IMPOSTOR MISSION:</div>
+            <div className="text-gray-300">Secretly "eliminate" Crewmates and trigger massive system sabotages to cause chaos—all while pretending to be fixing things.</div>
+            <div className="text-orange-400 font-bold sm:font-normal">EMERGENCY MEETING:</div>
+            <div className="text-gray-300">Found a downed crewmate or hit the big red button? All gameplay pauses. The squad gathers to debate, point fingers, and vote to eject the Impostor out the airlock!</div>
+          </div>
         </div>
       </div>
     </section>
