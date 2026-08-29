@@ -22,9 +22,29 @@ export default function SecurityMap() {
           </span>
         </div>
 
+        {/* Mobile Room Quick Select Tabs */}
+        <div className="flex sm:hidden overflow-x-auto gap-2 pb-3 mb-3 scrollbar-none">
+          {mapRooms.map((room) => {
+            const isSelected = selectedRoom?.id === room.id;
+            return (
+              <button
+                key={room.id}
+                onClick={() => setSelectedRoom(room)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap border transition-all ${
+                  isSelected
+                    ? "border-yellow-400 bg-yellow-500/20 text-yellow-300"
+                    : "border-green-500/40 bg-gray-900 text-gray-300"
+                }`}
+              >
+                {room.code}: {room.name}
+              </button>
+            );
+          })}
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
           {/* Interactive Blueprint Canvas */}
-          <div className="lg:col-span-2 relative aspect-[16/10] w-full bg-gray-900/90 rounded-xl border-2 border-gray-700 p-2 overflow-hidden shadow-[inset_0_0_30px_rgba(0,0,0,0.8)]">
+          <div className="lg:col-span-2 relative min-h-[240px] sm:min-h-[300px] aspect-[16/10] w-full bg-gray-900/90 rounded-xl border-2 border-gray-700 p-2 overflow-hidden shadow-[inset_0_0_30px_rgba(0,0,0,0.8)]">
             {/* Grid Lines */}
             <div
               className="absolute inset-0 opacity-10 pointer-events-none"

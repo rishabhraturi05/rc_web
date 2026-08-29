@@ -4,24 +4,24 @@ import React from "react";
 
 export default function FreshersHero({ eventConfig, onRegisterClick }) {
   return (
-    <section className="relative z-10 w-full max-w-5xl mx-auto px-4 pt-6 pb-12 font-vcr text-center">
+    <section className="relative z-10 w-full max-w-5xl mx-auto px-4 pt-4 sm:pt-6 pb-8 sm:pb-12 font-vcr text-center">
       {/* Top Tagline Badge */}
-      <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full border border-red-500/70 bg-red-950/50 text-red-400 text-xs sm:text-sm font-bold tracking-wider glow-red mb-6">
-        <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping inline-block" />
-        {eventConfig.tagline || "EMERGENCY MEETING: JOIN THE CREW OR BE LEFT IN THE VENT"}
+      <div className="inline-flex max-w-full items-center justify-center gap-2 px-4 sm:px-5 py-2 rounded-full border border-red-500/70 bg-red-950/50 text-red-400 text-[11px] sm:text-sm font-bold tracking-wider glow-red mb-4 sm:mb-6 text-center leading-relaxed">
+        <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping inline-block shrink-0" />
+        <span className="truncate sm:whitespace-normal">{eventConfig.tagline || "EMERGENCY MEETING: JOIN THE CREW OR BE LEFT IN THE VENT"}</span>
       </div>
 
       {/* Main Title Header */}
-      <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-wider mb-3 text-white glow-white drop-shadow-[0_0_20px_rgba(255,255,255,0.4)]">
+      <h1 className="text-3xl sm:text-6xl lg:text-7xl font-extrabold tracking-wider mb-3 text-white glow-white drop-shadow-[0_0_20px_rgba(255,255,255,0.4)]">
         FRESHERS EVENT
       </h1>
 
       {/* Subtitle */}
-      <p className="text-lg sm:text-2xl text-yellow-400 max-w-3xl mx-auto mb-2 font-vcr glow-yellow">
+      <p className="text-base sm:text-2xl text-yellow-400 max-w-3xl mx-auto mb-2 font-vcr glow-yellow">
         THE SPACESHIP IS READY. WELCOME, CREWMATE.
       </p>
 
-      <p className="text-sm sm:text-base text-gray-300 max-w-2xl mx-auto mb-8 font-sans">
+      <p className="text-xs sm:text-base text-gray-300 max-w-2xl mx-auto mb-6 sm:mb-8 font-sans px-2">
         {eventConfig.eventSubtitle}
       </p>
 

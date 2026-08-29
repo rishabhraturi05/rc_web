@@ -253,3 +253,58 @@
   0% { opacity: 0; transform: scale(0.9); }
   100% { opacity: 1; transform: scale(1); }
 }
+
+/* Responsive Mobile Rules */
+@media (max-width: 640px) {
+  .shhh-character-wrapper {
+    width: 260px;
+    height: 260px;
+  }
+  
+  .shhh-text-img {
+    width: 200px;
+    margin-top: 1.5rem;
+  }
+
+  .emergency-btn-3d-active {
+    width: 120px;
+    height: 120px;
+    font-size: 0.85rem;
+  }
+
+  .emergency-button-container {
+    padding: 8px;
+  }
+
+  .crt-screen {
+    padding: 1rem !important;
+    border-radius: 8px;
+  }
+}
+
+@media (max-width: 380px) {
+  .shhh-character-wrapper {
+    width: 220px;
+    height: 220px;
+  }
+
+  .shhh-text-img {
+    width: 170px;
+    margin-top: 1rem;
+  }
+
+  .emergency-btn-3d-active {
+    width: 100px;
+    height: 100px;
+    font-size: 0.75rem;
+  }
+}
+
+/* Scrollbar hide utility for mobile pills */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
