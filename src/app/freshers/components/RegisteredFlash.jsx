@@ -2,22 +2,53 @@
 
 import React, { useEffect, useState } from "react";
 
-export default function RegisteredFlash({ onComplete }) {
+export default function RegisteredFlash({ onComplete, onReset, onReturn }) {
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
+    // Lock scrolling on both html and body elements
+    const originalHtmlOverflow = document.documentElement.style.overflow;
+    const originalBodyOverflow = document.body.style.overflow;
+
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+
+    // Prevent wheel and touch drag scrolling on mobile / desktop
+    const preventScroll = (e) => {
+      e.preventDefault();
+    };
+
+    window.addEventListener("touchmove", preventScroll, { passive: false });
+    window.addEventListener("wheel", preventScroll, { passive: false });
+
     const totalTimer = setTimeout(() => {
+      document.documentElement.style.overflow = originalHtmlOverflow;
+      document.body.style.overflow = originalBodyOverflow;
+      window.removeEventListener("touchmove", preventScroll);
+      window.removeEventListener("wheel", preventScroll);
+
       setVisible(false);
       if (onComplete) onComplete();
+      if (onReset) onReset();
+      if (onReturn) onReturn();
     }, 4000);
 
-    return () => clearTimeout(totalTimer);
-  }, [onComplete]);
+    return () => {
+      document.documentElement.style.overflow = originalHtmlOverflow;
+      document.body.style.overflow = originalBodyOverflow;
+      window.removeEventListener("touchmove", preventScroll);
+      window.removeEventListener("wheel", preventScroll);
+      clearTimeout(totalTimer);
+    };
+  }, [onComplete, onReset, onReturn]);
 
   if (!visible) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black overflow-hidden pointer-events-none">
+    <div
+      className="fixed top-0 left-0 right-0 bottom-0 w-screen h-screen min-h-[100dvh] z-[99999] bg-black/80 backdrop-blur-lg overflow-hidden flex items-center justify-center pointer-events-auto"
+      style={{ touchAction: "none", overscrollBehavior: "none" }}
+    >
       
       <div 
         className="absolute inset-0 flex items-center justify-center"
