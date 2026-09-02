@@ -20,7 +20,7 @@ const Particlesbg = () => {
     }, []);
 
     const particlesLoaded = (container) => {
-        console.log(container);
+        // Particles loaded
     };
 
     if (!init) {

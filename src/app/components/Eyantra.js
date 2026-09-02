@@ -4,101 +4,58 @@ import { VerticalTimeline, VerticalTimelineElement } from 'react-vertical-timeli
 import 'react-vertical-timeline-component/style.min.css';
 import { FaLaptopCode, FaCogs, FaTrophy } from 'react-icons/fa';
 
+const glassStyle = { background: 'rgba(0, 0, 0, 0.6)', backdropFilter: 'blur(10px)', border: '1px solid rgba(34, 211, 238, 0.3)', color: '#fff', boxShadow: 'inset 0 0 20px rgba(34, 211, 238, 0.1)' };
+const glassArrow = { borderRight: '7px solid rgba(34, 211, 238, 0.3)' };
+const iconStyle = { background: 'rgba(0, 0, 0, 0.8)', border: '2px solid #22d3ee', color: '#22d3ee', boxShadow: '0 0 15px rgba(34, 211, 238, 0.5)' };
+
 const EyantraTimeline = () => {
     return (
-        <div className="comptime">
-
-            <VerticalTimeline className='comptimeline batman-font' layout='1-column-left'>
+        <div className="comptime w-full max-w-5xl mx-auto">
+            <VerticalTimeline className='comptimeline' layout='1-column-left' lineColor="rgba(34, 211, 238, 0.2)">
                 <VerticalTimelineElement
                     className="vertical-timeline-element--work "
-                    contentStyle={{ background: 'rgb(33, 150, 243)', color: '#fff' }}
-                    contentArrowStyle={{ borderRight: '7px solid  rgb(33, 150, 243)' }}
-                    date="2011 - present"
-                    iconStyle={{ background: 'rgb(33, 150, 243)', color: '#fff' }}
-                // icon={<WorkIcon />}
+                    contentStyle={glassStyle}
+                    contentArrowStyle={glassArrow}
+                    date="Task 1 Phase"
+                    iconStyle={iconStyle}
+                    icon={<FaLaptopCode />}
                 >
-                    <h3 className="vertical-timeline-element-title">Creative Director</h3>
-                    <h4 className="vertical-timeline-element-subtitle">Miami, FL</h4>
-                    <p>
-                        Creative Direction, User Experience, Visual Design, Project Management, Team Leading
+                    <h3 className="font-bold text-cyan-400 mb-2 tracking-widest uppercase" style={{ fontFamily: 'var(--font-orbitron)' }}>E-Yantra Competition</h3>
+                    <h4 className="text-gray-300 font-mono text-sm">Simulation & Design</h4>
+                    <p className="font-mono text-sm text-gray-400 mt-4">
+                        Initial simulation, algorithm design phase, and theoretical problem solving.
                     </p>
                 </VerticalTimelineElement>
+                
                 <VerticalTimelineElement
                     className="vertical-timeline-element--work"
-                    date="2010 - 2011"
-                    iconStyle={{ background: 'rgb(33, 150, 243)', color: '#fff' }}
-                // icon={<WorkIcon />}
+                    date="Task 2 Phase"
+                    contentStyle={glassStyle}
+                    contentArrowStyle={glassArrow}
+                    iconStyle={iconStyle}
+                    icon={<FaCogs />}
                 >
-                    <h3 className="vertical-timeline-element-title">Art Director</h3>
-                    <h4 className="vertical-timeline-element-subtitle">San Francisco, CA</h4>
-                    <p>
-                        Creative Direction, User Experience, Visual Design, SEO, Online Marketing
+                    <h3 className="font-bold text-cyan-400 mb-2 tracking-widest uppercase" style={{ fontFamily: 'var(--font-orbitron)' }}>Hardware Integration</h3>
+                    <h4 className="text-gray-300 font-mono text-sm">Prototyping</h4>
+                    <p className="font-mono text-sm text-gray-400 mt-4">
+                        Deploying algorithms onto actual hardware and testing in real-world scenarios.
                     </p>
                 </VerticalTimelineElement>
+
                 <VerticalTimelineElement
                     className="vertical-timeline-element--work"
-                    date="2008 - 2010"
-                    iconStyle={{ background: 'rgb(33, 150, 243)', color: '#fff' }}
-                // icon={<WorkIcon />}
+                    date="Finals"
+                    contentStyle={glassStyle}
+                    contentArrowStyle={glassArrow}
+                    iconStyle={iconStyle}
+                    icon={<FaTrophy />}
                 >
-                    <h3 className="vertical-timeline-element-title">Web Designer</h3>
-                    <h4 className="vertical-timeline-element-subtitle">Los Angeles, CA</h4>
-                    <p>
-                        User Experience, Visual Design
+                    <h3 className="font-bold text-cyan-400 mb-2 tracking-widest uppercase" style={{ fontFamily: 'var(--font-orbitron)' }}>National Finals</h3>
+                    <h4 className="text-gray-300 font-mono text-sm">IIT Bombay</h4>
+                    <p className="font-mono text-sm text-gray-400 mt-4">
+                        Final demonstration and evaluation at the national level.
                     </p>
                 </VerticalTimelineElement>
-                <VerticalTimelineElement
-                    className="vertical-timeline-element--work"
-                    date="2006 - 2008"
-                    iconStyle={{ background: 'rgb(33, 150, 243)', color: '#fff' }}
-                // icon={<WorkIcon />}
-                >
-                    <h3 className="vertical-timeline-element-title">Web Designer</h3>
-                    <h4 className="vertical-timeline-element-subtitle">San Francisco, CA</h4>
-                    <p>
-                        User Experience, Visual Design
-                    </p>
-                </VerticalTimelineElement>
-                <VerticalTimelineElement
-                    className="vertical-timeline-element--education"
-                    date="April 2013"
-                    iconStyle={{ background: 'rgb(233, 30, 99)', color: '#fff' }}
-                // icon={<SchoolIcon />}
-                >
-                    <h3 className="vertical-timeline-element-title">Content Marketing for Web, Mobile and Social Media</h3>
-                    <h4 className="vertical-timeline-element-subtitle">Online Course</h4>
-                    <p>
-                        Strategy, Social Media
-                    </p>
-                </VerticalTimelineElement>
-                <VerticalTimelineElement
-                    className="vertical-timeline-element--education"
-                    date="November 2012"
-                    iconStyle={{ background: 'rgb(233, 30, 99)', color: '#fff' }}
-                // icon={<SchoolIcon />}
-                >
-                    <h3 className="vertical-timeline-element-title">Agile Development Scrum Master</h3>
-                    <h4 className="vertical-timeline-element-subtitle">Certification</h4>
-                    <p>
-                        Creative Direction, User Experience, Visual Design
-                    </p>
-                </VerticalTimelineElement>
-                <VerticalTimelineElement
-                    className="vertical-timeline-element--education"
-                    date="2002 - 2006"
-                    iconStyle={{ background: 'rgb(233, 30, 99)', color: '#fff' }}
-                // icon={<SchoolIcon />}
-                >
-                    <h3 className="vertical-timeline-element-title">Bachelor of Science in Interactive Digital Media Visual Imaging</h3>
-                    <h4 className="vertical-timeline-element-subtitle">Bachelor Degree</h4>
-                    <p>
-                        Creative Direction, Visual Design
-                    </p>
-                </VerticalTimelineElement>
-                <VerticalTimelineElement
-                    iconStyle={{ background: 'rgb(16, 204, 82)', color: '#fff' }}
-                // icon={<StarIcon />}
-                />
             </VerticalTimeline>
         </div>
     );

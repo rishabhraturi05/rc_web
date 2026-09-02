@@ -168,15 +168,20 @@ export default function AdminFreshers() {
   };
 
   const handleLogout = async () => {
-    await signOut({ redirect: false });
-    router.push("/admin/login");
-    router.refresh();
+    try {
+      await signOut({ redirect: false });
+      router.push("/admin/login");
+      router.refresh();
+    } catch (error) {
+      console.error("Logout error:", error);
+      alert("Logout failed. Please try again.");
+    }
   };
 
   if (status === "loading" || loading) {
     return (
       <div className="relative min-h-screen text-white flex items-center justify-center pt-24">
-        <p className="destruct-font text-gray-300 text-lg">Loading...</p>
+        <p className="font-mono text-gray-300 text-lg">Loading...</p>
       </div>
     );
   }
@@ -191,41 +196,41 @@ export default function AdminFreshers() {
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
             <div>
-              <Link href="/admin" className="inline-flex items-center gap-2 text-gray-400 hover:text-white destruct-font text-sm mb-3 transition-colors">
+              <Link href="/admin" className="inline-flex items-center gap-2 text-gray-400 hover:text-white font-mono text-sm mb-3 transition-colors">
                 <FaArrowLeft size={12} /> Back to Admin Panel
               </Link>
-              <h1 className="batman-font text-4xl sm:text-5xl font-bold tracking-tight mb-2">
-                Freshers Registration
+              <h1 className="font-mono text-4xl sm:text-5xl font-bold tracking-tight mb-2 text-white">
+                {">_"} FRESHERS_REGISTRATION
               </h1>
-              <p className="destruct-font text-gray-300 text-lg">
+              <p className="font-mono text-gray-300 text-lg">
                 Manage registered teams and walk-in entries
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={() => setShowWalkInForm(true)}
-                className="flex items-center gap-2 px-5 py-3 bg-green-700/30 border border-green-600/50 text-green-300 rounded-lg hover:bg-green-700/50 transition-all batman-font text-sm"
+                className="flex items-center gap-2 px-5 py-2 border border-white text-white bg-transparent rounded hover:bg-white hover:text-black transition-colors font-mono uppercase text-sm tracking-widest"
               >
-                <FaPlus /> Add Walk-in
+                <FaPlus /> [ + WALK-IN ]
               </button>
               <button
                 onClick={handleLogout}
-                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-red-600 hover:from-blue-700 hover:to-red-700 text-white font-semibold rounded-lg transition-all batman-font text-sm"
+                className="px-6 py-2 bg-transparent border border-white text-white font-mono rounded hover:bg-white hover:text-black transition-colors uppercase text-sm tracking-widest"
               >
-                Logout
+                [ LOGOUT ]
               </button>
             </div>
           </div>
 
           {/* Stats */}
           <div className="grid sm:grid-cols-2 gap-4 mb-8">
-            <div className="bg-gray-900/50 border border-cyan-700/50 rounded-2xl p-6 text-center">
-              <p className="destruct-font text-gray-400 text-sm mb-1">Total Teams Registered</p>
-              <p className="batman-font text-4xl text-cyan-400">{stats.totalTeams}</p>
+            <div className="glass-panel p-6 text-center">
+              <p className="font-mono text-gray-400 text-sm mb-1 uppercase tracking-wider">Total Teams Registered</p>
+              <p className="font-mono text-4xl text-white">{stats.totalTeams}</p>
             </div>
-            <div className="bg-gray-900/50 border border-green-700/50 rounded-2xl p-6 text-center">
-              <p className="destruct-font text-gray-400 text-sm mb-1">Teams Attended (Checked In)</p>
-              <p className="batman-font text-4xl text-green-400">{stats.totalAttended}</p>
+            <div className="glass-panel p-6 text-center">
+              <p className="font-mono text-gray-400 text-sm mb-1 uppercase tracking-wider">Teams Attended (Checked In)</p>
+              <p className="font-mono text-4xl text-white">{stats.totalAttended}</p>
             </div>
           </div>
 
@@ -236,7 +241,7 @@ export default function AdminFreshers() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by team name or participant name..."
-              className="w-full max-w-md px-4 py-3 bg-gray-900/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 destruct-font"
+              className="w-full max-w-md px-4 py-3 bg-black/50 border border-white/20 rounded text-white placeholder-gray-500 focus:outline-none focus:border-white transition-all duration-300 font-mono"
             />
           </div>
         </div>
@@ -246,8 +251,8 @@ export default function AdminFreshers() {
       <div className="relative z-10 px-4 sm:px-6 lg:px-8 pb-20">
         <div className="max-w-7xl mx-auto space-y-4">
           {filteredTeams.length === 0 ? (
-            <div className="bg-gray-900/50 border border-gray-700/80 rounded-2xl p-8 text-center">
-              <p className="destruct-font text-gray-300">
+            <div className="glass-panel p-8 text-center">
+              <p className="font-mono text-gray-300">
                 {search ? "No teams match your search." : "No registrations yet."}
               </p>
             </div>
@@ -255,8 +260,8 @@ export default function AdminFreshers() {
             filteredTeams.map((team) => (
               <div
                 key={team._id}
-                className={`bg-gray-900/50 border rounded-2xl p-5 sm:p-6 transition-all ${
-                  team.attended ? "border-green-600/60 bg-gray-900/70" : "border-gray-700/80"
+                className={`glass-panel p-5 sm:p-6 transition-all ${
+                  team.attended ? "border-white bg-white/5" : "border-white/20"
                 }`}
               >
                 <div className="flex items-start justify-between gap-4">
@@ -266,7 +271,7 @@ export default function AdminFreshers() {
                         onClick={() =>
                           setExpandedTeam(expandedTeam === team._id ? null : team._id)
                         }
-                        className="flex items-center gap-2 batman-font text-xl sm:text-2xl text-white hover:text-cyan-300 transition-colors"
+                        className="flex items-center gap-2 font-mono text-xl sm:text-2xl text-white hover:text-cyan-300 transition-colors"
                       >
                         {expandedTeam === team._id ? (
                           <FaChevronUp className="text-cyan-400" />
@@ -276,18 +281,18 @@ export default function AdminFreshers() {
                         {team.teamName}
                       </button>
                       {team.isWalkIn && (
-                        <span className="px-2 py-0.5 bg-yellow-600/20 text-yellow-400 text-xs rounded border border-yellow-600/30 destruct-font">
+                        <span className="px-2 py-0.5 bg-yellow-600/20 text-yellow-400 text-xs rounded border border-yellow-600/30 font-mono">
                           Walk-in
                         </span>
                       )}
                       {team.attended && (
-                        <span className="px-2 py-0.5 bg-green-600/20 text-green-400 text-xs rounded border border-green-600/30 destruct-font">
+                        <span className="px-2 py-0.5 bg-green-600/20 text-green-400 text-xs rounded border border-green-600/30 font-mono">
                           Attended
                         </span>
                       )}
                     </div>
 
-                    <div className="destruct-font text-gray-400 text-sm space-y-1">
+                    <div className="font-mono text-gray-400 text-sm space-y-1">
                       <p>Leader: {team.name} · {team.branch} · {team.rollNo}</p>
                       <p>{team.email} · {team.contactNo}</p>
                       <p>
@@ -300,14 +305,14 @@ export default function AdminFreshers() {
 
                     {expandedTeam === team._id && (
                       <div className="mt-4 p-4 bg-gray-800/50 rounded-lg border border-gray-700/50">
-                        <p className="destruct-font text-gray-300 text-sm font-semibold mb-2">
+                        <p className="font-mono text-gray-300 text-sm font-semibold mb-2">
                           Team Members ({team.participants.length})
                         </p>
                         <ul className="space-y-1">
                           {team.participants.map((p, i) => {
                             const label = typeof p === "object" ? `${p.name} ${p.rollNo ? `(${p.rollNo})` : ""}` : p;
                             return (
-                              <li key={i} className="destruct-font text-white text-sm flex items-center gap-2">
+                              <li key={i} className="font-mono text-white text-sm flex items-center gap-2">
                                 <span className="text-cyan-400">•</span> {label}
                               </li>
                             );
@@ -351,15 +356,15 @@ export default function AdminFreshers() {
       {/* Walk-in modal */}
       {showWalkInForm && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 sm:p-8 w-full max-w-lg max-h-[90vh] overflow-y-auto relative">
+          <div className="glass-panel p-6 sm:p-8 w-full max-w-lg max-h-[90vh] overflow-y-auto relative">
             <button
               onClick={() => setShowWalkInForm(false)}
               className="absolute top-4 right-4 text-gray-400 hover:text-white"
             >
               <FaTimes size={20} />
             </button>
-            <h2 className="batman-font text-2xl mb-4">Add Walk-in Team</h2>
-            <form onSubmit={handleWalkInSubmit} className="space-y-3 destruct-font">
+            <h2 className="font-mono text-2xl mb-4">Add Walk-in Team</h2>
+            <form onSubmit={handleWalkInSubmit} className="space-y-3 font-mono">
               <input
                 placeholder="Team Name *"
                 value={walkInData.teamName}
@@ -450,9 +455,9 @@ export default function AdminFreshers() {
               <button
                 type="submit"
                 disabled={submittingWalkIn}
-                className="w-full py-3 bg-green-700 hover:bg-green-600 rounded-lg batman-font disabled:opacity-50"
+                className="w-full py-3 bg-white text-black hover:bg-gray-200 rounded font-bold font-mono uppercase tracking-widest disabled:opacity-50 transition-colors border border-white"
               >
-                {submittingWalkIn ? "Adding..." : "Add Walk-in Team"}
+                {submittingWalkIn ? "[ ADDING... ]" : "[ + ADD_WALK-IN_TEAM ]"}
               </button>
             </form>
           </div>
