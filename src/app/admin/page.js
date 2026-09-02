@@ -18,15 +18,20 @@ export default function AdminDashboard() {
   }, [status, session, router]);
 
   const handleLogout = async () => {
-    await signOut({ redirect: false });
-    router.push("/admin/login");
-    router.refresh();
+    try {
+      await signOut({ redirect: false });
+      router.push("/admin/login");
+      router.refresh();
+    } catch (error) {
+      console.error("Logout error:", error);
+      alert("Logout failed. Please try again.");
+    }
   };
 
   if (status === "loading") {
     return (
       <div className="relative min-h-screen text-white flex items-center justify-center">
-        <p className="destruct-font text-gray-300 text-lg">Loading...</p>
+        <p className="font-mono text-gray-300 text-lg animate-pulse">Loading[...]_</p>
       </div>
     );
   }
@@ -41,40 +46,40 @@ export default function AdminDashboard() {
         <div className="max-w-4xl mx-auto">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-10">
             <div>
-              <h1 className="batman-font text-4xl sm:text-5xl font-bold tracking-tight mb-2">
-                Admin Panel
+              <h1 className="font-mono text-4xl sm:text-5xl font-bold tracking-tight mb-2 text-white">
+                {">_"} ADMIN_PANEL
               </h1>
-              <p className="destruct-font text-gray-300 text-lg">
-                Welcome, {session.user?.username || "Admin"}
+              <p className="font-mono text-gray-400 text-lg">
+                Welcome, {session.user?.username || "sysadmin"}
               </p>
             </div>
             <button
               onClick={handleLogout}
-              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-red-600 hover:from-blue-700 hover:to-red-700 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 batman-font text-base tracking-wide"
+              className="px-6 py-2 bg-transparent border border-white text-white font-mono rounded hover:bg-white hover:text-black transition-colors uppercase text-sm tracking-widest"
             >
-              Logout
+              [ LOGOUT ]
             </button>
           </div>
 
           <div className="grid sm:grid-cols-2 gap-6">
             <Link
               href="/admin/responses"
-              className="group bg-gray-900/50 border border-gray-700/80 rounded-2xl p-8 hover:border-blue-500/60 hover:bg-gray-900/70 transition-all duration-300"
+              className="group glass-panel p-8 glass-panel-hover flex flex-col"
             >
-              <FaEnvelope className="text-4xl text-blue-400 mb-4 group-hover:scale-110 transition-transform" />
-              <h2 className="batman-font text-2xl font-bold mb-2">Contact Responses</h2>
-              <p className="destruct-font text-gray-400">
+              <FaEnvelope className="text-3xl text-white mb-6 group-hover:scale-110 transition-transform" />
+              <h2 className="font-mono text-xl font-bold mb-2 text-white">CONTACT_RESPONSES</h2>
+              <p className="font-mono text-gray-400 text-sm leading-relaxed">
                 View and manage contact form submissions from the website
               </p>
             </Link>
 
             <Link
               href="/admin/freshers"
-              className="group bg-gray-900/50 border border-gray-700/80 rounded-2xl p-8 hover:border-cyan-500/60 hover:bg-gray-900/70 transition-all duration-300"
+              className="group glass-panel p-8 glass-panel-hover flex flex-col"
             >
-              <FaUserAstronaut className="text-4xl text-cyan-400 mb-4 group-hover:scale-110 transition-transform" />
-              <h2 className="batman-font text-2xl font-bold mb-2">Freshers Registration</h2>
-              <p className="destruct-font text-gray-400">
+              <FaUserAstronaut className="text-3xl text-white mb-6 group-hover:scale-110 transition-transform" />
+              <h2 className="font-mono text-xl font-bold mb-2 text-white">FRESHERS_REGISTRATION</h2>
+              <p className="font-mono text-gray-400 text-sm leading-relaxed">
                 Manage team registrations, attendance, and walk-in entries
               </p>
             </Link>

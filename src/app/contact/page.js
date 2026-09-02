@@ -1,7 +1,7 @@
 "use client"
-import React, { useState, useEffect } from 'react';
-import AOS from 'aos';
-import 'aos/dist/aos.css';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import PixelCanvas from '../components/PixelCanvas';
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -13,13 +13,7 @@ const Contact = () => {
     message: ''
   });
   const [showOtherInput, setShowOtherInput] = useState(false);
-
-  useEffect(() => {
-    AOS.init({
-      duration: 1500,
-      once: true,
-    });
-  }, []);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -39,6 +33,7 @@ const Contact = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
 
     try {
       const res = await fetch("/api/contact", {
@@ -52,11 +47,12 @@ const Contact = () => {
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.msg || "Something went wrong!");
+        alert(data.msg || "TRANSMISSION FAILED!");
+        setIsSubmitting(false);
         return;
       }
 
-      alert("Message sent successfully!");
+      alert("DATA TRANSMITTED SUCCESSFULLY!");
 
       // Reset form
       setFormData({
@@ -71,34 +67,48 @@ const Contact = () => {
 
     } catch (error) {
       console.error(error);
-      alert("Server error! Please try again later.");
+      alert("SERVER ERROR! PLEASE TRY AGAIN.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="relative min-h-screen text-white">
+    <main className="relative min-h-screen bg-black text-white overflow-hidden pb-24">
+      {/* Global Background */}
+      <div className="fixed inset-0 z-0">
+        <PixelCanvas />
+      </div>
+
       {/* Header Section */}
-      <div className="relative z-10 text-center pt-24 pb-12 px-4" data-aos="fade-up">
-        <h1 className="batman-font text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-4">
-          Contact Us
-        </h1>
-        <p className="destruct-font text-gray-300 text-lg sm:text-xl max-w-2xl mx-auto">
-          Have a question or want to get in touch? We&apos;d love to hear from you.
-        </p>
+      <div className="relative z-10 text-center pt-32 pb-12 px-4">
+        <motion.div
+           initial={{ opacity: 0, y: -20 }}
+           animate={{ opacity: 1, y: 0 }}
+           transition={{ duration: 0.8 }}
+        >
+          <h1 className="mb-4 text-5xl md:text-7xl font-black text-white title-glow tracking-tighter uppercase" style={{ fontFamily: 'var(--font-orbitron)' }}>
+            Contact Us
+          </h1>
+          <p className="text-cyan-400 font-mono text-lg max-w-2xl mx-auto bg-black/40 backdrop-blur-sm p-4 rounded-lg shadow-xl border border-white/10">
+            Have a question or want to get in touch? We&apos;d love to hear from you.
+          </p>
+        </motion.div>
       </div>
 
       {/* Contact Form Section */}
       <div className="relative z-10 px-4 sm:px-6 lg:px-8 pb-20">
         <div className="max-w-2xl mx-auto">
-          <form
+          <motion.form
             onSubmit={handleSubmit}
-            className="bg-gray-900/50 border border-gray-700/80 rounded-2xl p-6 sm:p-8 lg:p-10 space-y-6"
-            data-aos="fade-up"
-            data-aos-delay="200"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+            className="glass-panel p-6 sm:p-8 lg:p-10 space-y-6"
           >
             {/* Name Field */}
             <div>
-              <label htmlFor="name" className="block text-sm font-semibold text-gray-300 mb-2 destruct-font">
+              <label htmlFor="name" className="block text-sm font-semibold text-cyan-400 mb-2 font-mono tracking-widest uppercase">
                 Name <span className="text-red-500">*</span>
               </label>
               <input
@@ -108,15 +118,15 @@ const Contact = () => {
                 value={formData.name}
                 onChange={handleChange}
                 required
-                className="w-full px-4 py-3 bg-gray-800/70 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 destruct-font"
+                className="w-full px-4 py-3 bg-cyan-950/30 border border-cyan-500/30 rounded-md text-white placeholder-cyan-700 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400 focus:bg-cyan-900/50 transition-all duration-300 font-mono"
                 placeholder="Enter your name"
               />
             </div>
 
             {/* Email Field */}
             <div>
-              <label htmlFor="email" className="block text-sm font-semibold text-gray-300 mb-2 destruct-font">
-                Email ID <span className="text-red-500">*</span>
+              <label htmlFor="email" className="block text-sm font-semibold text-cyan-400 mb-2 font-mono tracking-widest uppercase">
+                Email Address <span className="text-red-500">*</span>
               </label>
               <input
                 type="email"
@@ -125,14 +135,14 @@ const Contact = () => {
                 value={formData.email}
                 onChange={handleChange}
                 required
-                className="w-full px-4 py-3 bg-gray-800/70 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 destruct-font"
+                className="w-full px-4 py-3 bg-cyan-950/30 border border-cyan-500/30 rounded-md text-white placeholder-cyan-700 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400 focus:bg-cyan-900/50 transition-all duration-300 font-mono"
                 placeholder="Enter your email"
               />
             </div>
 
             {/* Phone Number Field */}
             <div>
-              <label htmlFor="phone" className="block text-sm font-semibold text-gray-300 mb-2 destruct-font">
+              <label htmlFor="phone" className="block text-sm font-semibold text-cyan-400 mb-2 font-mono tracking-widest uppercase">
                 Phone Number <span className="text-red-500">*</span>
               </label>
               <input
@@ -142,15 +152,15 @@ const Contact = () => {
                 value={formData.phone}
                 onChange={handleChange}
                 required
-                className="w-full px-4 py-3 bg-gray-800/70 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 destruct-font"
+                className="w-full px-4 py-3 bg-cyan-950/30 border border-cyan-500/30 rounded-md text-white placeholder-cyan-700 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400 focus:bg-cyan-900/50 transition-all duration-300 font-mono"
                 placeholder="Enter your phone number"
               />
             </div>
 
             {/* Type of Query Dropdown */}
             <div>
-              <label htmlFor="queryType" className="block text-sm font-semibold text-gray-300 mb-2 destruct-font">
-                Type of Query <span className="text-red-500">*</span>
+              <label htmlFor="queryType" className="block text-sm font-semibold text-cyan-400 mb-2 font-mono tracking-widest uppercase">
+                Query Type <span className="text-red-500">*</span>
               </label>
               <select
                 id="queryType"
@@ -158,40 +168,46 @@ const Contact = () => {
                 value={formData.queryType}
                 onChange={handleChange}
                 required
-                className="w-full px-4 py-3 bg-gray-800/70 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 destruct-font appearance-none cursor-pointer"
+                className="w-full px-4 py-3 bg-cyan-950/30 border border-cyan-500/30 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400 focus:bg-cyan-900/50 transition-all duration-300 font-mono appearance-none cursor-pointer"
               >
-                <option value="" className="bg-gray-800">Select a query type</option>
-                <option value="general" className="bg-gray-800">General Inquiry</option>
-                <option value="Recruitment" className="bg-gray-800">Recruitment</option>
-                <option value="events" className="bg-gray-800">Events</option>
-                <option value="projects" className="bg-gray-800">Projects</option>
-                <option value="collaboration" className="bg-gray-800">Collaboration</option>
-                <option value="others" className="bg-gray-800">Others</option>
+                <option value="" className="bg-gray-900 text-gray-300">Select query type</option>
+                <option value="general" className="bg-gray-900 text-cyan-300">General Inquiry</option>
+                <option value="Recruitment" className="bg-gray-900 text-cyan-300">Recruitment</option>
+                <option value="events" className="bg-gray-900 text-cyan-300">Events</option>
+                <option value="projects" className="bg-gray-900 text-cyan-300">Projects</option>
+                <option value="collaboration" className="bg-gray-900 text-cyan-300">Collaboration</option>
+                <option value="others" className="bg-gray-900 text-cyan-300">Others</option>
               </select>
             </div>
 
             {/* Other Query Input - Shows when "Others" is selected */}
-            {showOtherInput && (
-              <div data-aos="fade-up" data-aos-duration="500">
-                <label htmlFor="otherQuery" className="block text-sm font-semibold text-gray-300 mb-2 destruct-font">
-                  Please specify <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  id="otherQuery"
-                  name="otherQuery"
-                  value={formData.otherQuery}
-                  onChange={handleChange}
-                  required={showOtherInput}
-                  className="w-full px-4 py-3 bg-gray-800/70 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 destruct-font"
-                  placeholder="Please specify your query type"
-                />
-              </div>
-            )}
+            <AnimatePresence>
+              {showOtherInput && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                >
+                  <label htmlFor="otherQuery" className="block text-sm font-semibold text-cyan-400 mb-2 font-mono tracking-widest uppercase mt-4">
+                    Please Specify <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="otherQuery"
+                    name="otherQuery"
+                    value={formData.otherQuery}
+                    onChange={handleChange}
+                    required={showOtherInput}
+                    className="w-full px-4 py-3 bg-cyan-950/30 border border-cyan-500/30 rounded-md text-white placeholder-cyan-700 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400 focus:bg-cyan-900/50 transition-all duration-300 font-mono"
+                    placeholder="Enter your query type"
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Message Field */}
             <div>
-              <label htmlFor="message" className="block text-sm font-semibold text-gray-300 mb-2 destruct-font">
+              <label htmlFor="message" className="block text-sm font-semibold text-cyan-400 mb-2 font-mono tracking-widest uppercase">
                 Message <span className="text-red-500">*</span>
               </label>
               <textarea
@@ -201,24 +217,26 @@ const Contact = () => {
                 onChange={handleChange}
                 required
                 rows={6}
-                className="w-full px-4 py-3 bg-gray-800/70 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 resize-none destruct-font"
+                className="w-full px-4 py-3 bg-cyan-950/30 border border-cyan-500/30 rounded-md text-white placeholder-cyan-700 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400 focus:bg-cyan-900/50 transition-all duration-300 resize-none font-mono"
                 placeholder="Enter your message here..."
               />
             </div>
 
             {/* Submit Button */}
-            <div className="pt-4">
+            <div className="pt-6">
               <button
                 type="submit"
-                className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-red-600 hover:from-blue-700 hover:to-red-700 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 batman-font text-lg tracking-wide hover:cursor-pointer"
+                disabled={isSubmitting}
+                className="w-full px-6 py-4 bg-cyan-500/20 hover:bg-cyan-500/40 border border-cyan-400 text-cyan-300 hover:text-white font-bold rounded-md transition-all duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-black uppercase tracking-[0.2em] shadow-[0_0_15px_rgba(34,211,238,0.3)] hover:shadow-[0_0_25px_rgba(34,211,238,0.6)] disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ fontFamily: 'var(--font-orbitron)' }}
               >
-                Send Message
+                {isSubmitting ? 'SENDING...' : 'SEND MESSAGE'}
               </button>
             </div>
-          </form>
+          </motion.form>
         </div>
       </div>
-    </div>
+    </main>
   );
 };
 

@@ -45,10 +45,10 @@ const PageLoader = () => {
         
         {/* Loading Text */}
         <div className="text-center">
-          <p className="text-white text-sm sm:text-base font-semibold batman-font tracking-wide">
+          <p className="text-white text-sm sm:text-base font-black tracking-widest uppercase title-glow" style={{ fontFamily: 'var(--font-orbitron)' }}>
             Loading...
           </p>
-          <p className="text-gray-400 text-xs sm:text-sm destruct-font mt-1">
+          <p className="text-cyan-400 text-xs sm:text-sm font-mono mt-1">
             Robotics Club NITW
           </p>
         </div>

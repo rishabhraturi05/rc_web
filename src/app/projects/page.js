@@ -1,9 +1,8 @@
-
 "use client"
 
-import React, { useEffect, useMemo, useRef, useState } from 'react'
-import AOS from 'aos'
-import 'aos/dist/aos.css'
+import React, { useMemo, useRef, useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import PixelCanvas from '../components/PixelCanvas'
 
 // SVG Icon for the close button
 const XIcon = (props) => (
@@ -69,145 +68,166 @@ const ProjectsPage = () => {
     }
   ]), []);
 
-  // Initialize AOS animations
-  useEffect(() => {
-    AOS.init({ duration: 1000, once: true, easing: 'ease-out' })
-  }, [])
-
-  // Effect to handle keyboard controls (Escape to close, Tab for focus trapping)
   useEffect(() => {
     const handleKeydown = (e) => {
       if (e.key === 'Escape') {
         setActiveProjectIndex(null);
       }
       if (e.key === 'Tab' && activeProjectIndex !== null) {
-        // Simple focus trap: ensures focus stays on the close button
         e.preventDefault();
         closeButtonRef.current?.focus();
       }
     };
-
     window.addEventListener('keydown', handleKeydown);
     return () => window.removeEventListener('keydown', handleKeydown);
   }, [activeProjectIndex]);
 
-  // Effect to lock body scroll when modal is open
   useEffect(() => {
     if (activeProjectIndex !== null) {
       document.body.style.overflow = 'hidden';
+      // Slight delay to ensure element is rendered
+      setTimeout(() => closeButtonRef.current?.focus(), 100);
     } else {
       document.body.style.overflow = '';
     }
-    // Cleanup on component unmount
     return () => {
       document.body.style.overflow = '';
     };
   }, [activeProjectIndex]);
 
-  // Effect to focus the close button when the modal opens
-  useEffect(() => {
-    if (activeProjectIndex !== null) {
-      closeButtonRef.current?.focus();
-    }
-  }, [activeProjectIndex]);
-
-
   const activeProject = activeProjectIndex !== null ? projects[activeProjectIndex] : null;
 
   return (
-    <div className="relative min-h-screen text-white overflow-x-hidden">
-      <div className="relative z-10 text-center pt-24 pb-12" data-aos="fade-up">
-        <h1 className="batman-font text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight">Projects</h1>
-        <p className="destruct-font text-gray-300 mt-4 max-w-2xl mx-auto">Explore what we build and how we build it.</p>
+    <main className="relative min-h-screen bg-black text-white overflow-x-hidden pb-24">
+      {/* Global Background */}
+      <div className="fixed inset-0 z-0">
+        <PixelCanvas />
+      </div>
+
+      <div className="relative z-10 pt-32 pb-16 text-center">
+        <motion.div
+           initial={{ opacity: 0, y: -20 }}
+           animate={{ opacity: 1, y: 0 }}
+           transition={{ duration: 0.8 }}
+        >
+          <h1 className="mb-4 text-5xl md:text-7xl font-black text-white title-glow tracking-tighter uppercase" style={{ fontFamily: 'var(--font-orbitron)' }}>
+            Projects
+          </h1>
+          <p className="text-cyan-400 font-mono text-lg max-w-2xl mx-auto bg-black/40 backdrop-blur-sm p-4 rounded-lg shadow-xl border border-white/10">
+            Explore what we build and how we build it.
+          </p>
+        </motion.div>
       </div>
 
       <div className="relative z-10 px-4 sm:px-6 lg:px-8 pb-20">
         <div className="grid gap-8 sm:gap-10 md:grid-cols-2 lg:grid-cols-3 max-w-7xl mx-auto">
           {projects.map((p, idx) => (
-            <div key={p.title} className="[perspective:1000px]" data-aos="zoom-in" data-aos-delay={idx * 100}>
+            <motion.div 
+              key={p.title} 
+              className="h-full"
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ duration: 0.5, delay: idx * 0.1 }}
+            >
               <button
                 onClick={() => setActiveProjectIndex(idx)}
-                className="group relative block w-full h-full bg-gray-800/50 border border-gray-700/80 rounded-2xl overflow-hidden focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-gray-900"
+                className="group relative block w-full h-full text-left glass-panel glass-panel-hover flex flex-col justify-start focus:outline-none focus:ring-2 focus:ring-cyan-400"
               >
-                <div className="relative h-64 w-full overflow-hidden rounded-t-2xl">
+                <div className="relative h-64 w-full overflow-hidden rounded-t-xl">
                   {/* Image zoom on hover */}
-                  <img src={p.image} alt={p.title} className="absolute inset-0 w-full h-full object-fit transition-transform duration-500 group-hover:scale-110" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
+                  <img src={p.image} alt={p.title} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-70 group-hover:opacity-100" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
                 </div>
 
-                <div className="p-5 text-left [transform:translateZ(40px)]">
-                  <h3 className="batman-font text-xl sm:text-2xl text-gray-100">{p.title}</h3>
-                  <p className="destruct-font text-sm text-gray-300 mt-2 line-clamp-2">{p.summary}</p>
-                  <div className="mt-4 flex flex-wrap gap-2">
+                <div className="p-6 flex-1 flex flex-col transform transition-transform duration-300 group-hover:-translate-y-2">
+                  <h3 className="text-xl sm:text-2xl text-white uppercase tracking-wider group-hover:text-cyan-300 transition-colors" style={{ fontFamily: 'var(--font-orbitron)' }}>{p.title}</h3>
+                  <p className="font-mono text-sm text-gray-300 mt-3 line-clamp-3 border-l-2 border-cyan-400 pl-3">{p.summary}</p>
+                  
+                  <div className="mt-auto pt-6 flex flex-wrap gap-2">
                     {p.tags.map((t) => (
-                      <span key={t} className="destruct-font text-xs px-2.5 py-1 rounded-md bg-gray-800/70 border border-gray-700 text-gray-200">{t}</span>
+                      <span key={t} className="font-mono text-xs px-2.5 py-1 rounded-sm bg-cyan-900/30 border border-cyan-400/50 text-cyan-300 tracking-wider">
+                        {t}
+                      </span>
                     ))}
                   </div>
+                  <p className="mt-4 font-mono text-xs text-cyan-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300 uppercase">
+                      {'>'} INITIATE PROJECT LINK
+                  </p>
                 </div>
               </button>
-            </div>
+            </motion.div>
           ))}
         </div>
       </div>
 
       {/* Modal Dialog */}
-      {activeProject && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="project-title"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-        >
-          {/* Backdrop with transition */}
+      <AnimatePresence>
+        {activeProject && (
           <div
-            className={`absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity duration-300 ease-in-out ${activeProjectIndex !== null ? 'opacity-100' : 'opacity-0'}`}
-            onClick={() => setActiveProjectIndex(null)}
-          ></div>
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="project-title"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
+          >
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+              onClick={() => setActiveProjectIndex(null)}
+            ></motion.div>
 
-          {/* Modal Content with transition */}
-          <div className={`relative z-10 w-full max-w-4xl bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 ease-in-out ${activeProjectIndex !== null ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
-            <div className="relative h-56 sm:h-72">
-              <img src={activeProject.image} alt={activeProject.title} className="absolute inset-0 w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
-              <button
-                ref={closeButtonRef}
-                onClick={() => setActiveProjectIndex(null)}
-                aria-label="Close dialog"
-                className="absolute top-4 right-4 text-gray-300 hover:text-white bg-black/60 rounded-full p-2 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-400 border border-gray-700"
-              >
-                <XIcon />
-              </button>
-            </div>
-
-            <div className="p-6 sm:p-8">
-              <h2 id="project-title" className="batman-font text-2xl sm:text-4xl mb-2 text-white">{activeProject.title}</h2>
-              <div className="flex flex-wrap gap-2 mb-4">
-                {activeProject.tags.map((t) => (
-                  <span key={t} className="destruct-font text-xs px-2.5 py-1 rounded-md bg-gray-800/70 border border-gray-700 text-gray-200">{t}</span>
-                ))}
+            {/* Modal Content */}
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="relative z-10 w-full max-w-4xl max-h-[90vh] overflow-y-auto custom-scrollbar glass-panel"
+            >
+              <div className="relative h-56 sm:h-80 rounded-t-xl overflow-hidden">
+                <img src={activeProject.image} alt={activeProject.title} className="absolute inset-0 w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent"></div>
+                <button
+                  ref={closeButtonRef}
+                  onClick={() => setActiveProjectIndex(null)}
+                  aria-label="Close dialog"
+                  className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center bg-black/50 hover:bg-cyan-500/20 border border-white/20 hover:border-cyan-400 rounded-full text-white hover:text-cyan-400 transition-all duration-300 z-20 focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                >
+                  <XIcon />
+                </button>
+                
+                <div className="absolute bottom-6 left-6 right-6">
+                  <h2 id="project-title" className="text-3xl sm:text-5xl font-bold text-white uppercase tracking-widest drop-shadow-lg" style={{ fontFamily: 'var(--font-orbitron)' }}>
+                      {activeProject.title}
+                  </h2>
+                </div>
               </div>
-              <p className="destruct-font text-gray-300 leading-relaxed">
-                {activeProject.description}
-              </p>
 
-              {activeProject.links?.length > 0 && (
-                <div className="mt-6 flex flex-wrap gap-4">
-                  {activeProject.links.map((l) => (
-                    <a
-                      key={l.href}
-                      href={l.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="destruct-font inline-block text-sm px-5 py-2.5 rounded-lg border border-blue-500/70 text-blue-300 hover:border-blue-400 hover:text-white transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    >{l.label}</a>
+              <div className="p-6 sm:p-10">
+                <div className="flex flex-wrap gap-2 mb-8">
+                  {activeProject.tags.map((t) => (
+                    <span key={t} className="font-mono text-xs px-3 py-1.5 rounded-sm bg-cyan-900/30 border border-cyan-400 text-cyan-300 tracking-wider">
+                      {t}
+                    </span>
                   ))}
                 </div>
-              )}
-            </div>
+                
+                <h3 className="text-xl font-bold mb-4 text-cyan-400 uppercase tracking-widest flex items-center gap-2" style={{ fontFamily: 'var(--font-orbitron)' }}>
+                  <span className="w-4 h-[2px] bg-cyan-400"></span>
+                  Project Logs
+                </h3>
+                <p className="font-mono text-sm text-gray-300 leading-relaxed whitespace-pre-wrap pl-6 border-l border-white/10">
+                  {activeProject.description}
+                </p>
+              </div>
+            </motion.div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </AnimatePresence>
+    </main>
   )
 }
 

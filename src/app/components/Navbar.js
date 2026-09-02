@@ -25,7 +25,7 @@ const Navbar = () => {
     };
 
     return (
-        <nav className="relative z-30 w-full h-18 flex items-center justify-between px-4 sm:px-8 pt-3 overflow-hidden destruct-font">
+        <nav className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-7xl h-18 flex items-center justify-between px-4 sm:px-8 py-2 glass-panel rounded-full font-mono transition-all duration-500 hover:bg-white/10">
             {/* Logo Section */}
             <div className="relative z-10 flex items-center space-x-2 sm:space-x-4">
                 <Link href="/" className="flex items-center space-x-2 sm:space-x-3">
@@ -64,44 +64,12 @@ const Navbar = () => {
                             data-aos-duration={link.sum}
                             key={link.name}
                             href={link.href}
-                            className={`relative px-3 xl:px-4 py-2 rounded-b-xl rounded-t-md text-white uppercase font-extralight tracking-wide transition-all duration-500 ease-in-out hover:text-gray-300 group overflow-hidden text-sm xl:text-base ${
-                                isActive ? 'bg-gray-800' : 'hover:bg-gray-800'
-                            } ${link.isFreshers ? 'border border-red-500/40 text-red-400 font-bold' : ''}`}
+                            className={`cyber-link uppercase text-xs sm:text-sm xl:text-base ${
+                                isActive ? 'text-white font-bold' : 'text-gray-300'
+                            } ${link.isFreshers ? 'text-red-400 hover:text-red-400' : ''}`}
                         >
-                            {/* Active link - static borders */}
-                            {isActive && (
-                                <div
-                                    className={`absolute inset-0 rounded-b-xl rounded-t-md border-2 ${
-                                        link.isFreshers
-                                            ? 'border-l-red-500 border-t-yellow-400 border-b-cyan-400 border-r-red-500 shadow-[0_0_10px_rgba(231,76,60,0.5)]'
-                                            : 'border-l-blue-500 border-t-blue-500 border-b-red-500 border-r-red-500'
-                                    }`}
-                                ></div>
-                            )}
-
-                            {/* Hover animation - only for non-active links */}
-                            {!isActive && (
-                                <div
-                                    className={`absolute inset-0 rounded-b-xl rounded-t-md border-2 transform translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-in-out ${
-                                        link.isFreshers
-                                            ? 'border-l-red-500 border-t-yellow-400 border-b-cyan-400 border-r-red-500'
-                                            : 'border-l-blue-500 border-t-blue-500 border-b-red-500 border-r-red-500'
-                                    }`}
-                                ></div>
-                            )}
-
-                            {/* Text content */}
-                            <span
-                                className={`relative z-10 ${
-                                    link.isFreshers ? 'text-red-400 group-hover:text-yellow-300 font-bold' : ''
-                                }`}
-                                data-aos="fade-down"
-                                data-aos-easing="linear"
-                                data-aos-duration={link.sum}
-                            >
-                                {link.isFreshers ? '🚀 ' : ''}
-                                {link.name}
-                            </span>
+                            {link.isFreshers ? '🚀 ' : ''}
+                            {link.name}
                         </Link>
                     );
                 })}

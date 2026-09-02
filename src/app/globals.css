@@ -1,27 +1,67 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
 @import "tailwindcss";
 
-@font-face {
-  font-family: 'Batman';
-  src: url('/fonts/batmfa__.ttf') format('truetype');
-  font-weight: 100;
-  font-style: normal;
-}
-
-@font-face {
-  font-family: 'destruct';
-  src: url('/fonts/destructobeambb_reg.ttf') format('truetype');
-  font-weight: 100;
-  font-style: normal;
+body {
+  background-color: #000000;
+  color: #f5f1ea;
+  position: relative;
 }
 
 
-.batman-font {
-  font-family: 'Batman', sans-serif;
+@layer utilities {
+  .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .text-cyber {
+    color: #ffffff;
+  }
+  .glass-panel {
+    @apply bg-black/60 backdrop-blur-md border border-white/20 rounded-xl;
+    box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.05);
+  }
+  .glass-panel-hover {
+    @apply transition-all duration-300;
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
+  }
+  .glass-panel-hover:hover {
+    @apply border-white/60;
+    box-shadow: 0 0 30px rgba(255, 255, 255, 0.2), inset 0 0 20px rgba(255, 255, 255, 0.1);
+    transform: translateY(-2px);
+  }
+  
+  .cyber-link {
+    position: relative;
+    display: inline-flex;
+    align-items: baseline;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+    transition: color 0.2s ease;
+  }
+  
+  .cyber-link::before {
+    content: ">_";
+    display: inline-block;
+    width: 0;
+    margin-right: 0;
+    overflow: hidden;
+    white-space: pre;
+    color: #ffffff;
+    opacity: 0;
+    transition: width 0.2s steps(2, end), margin-right 0.2s steps(2, end), opacity 0.15s ease;
+  }
+  
+  .cyber-link:hover::before {
+    width: 1.8ch;
+    margin-right: 0.5ch;
+    opacity: 1;
+  }
+  
+  .cyber-link:hover {
+    color: #ffffff;
+  }
 }
 
-.destruct-font {
-  font-family: 'destruct', sans-serif;
-}
+
 
 /* body{
   background-color: black;
