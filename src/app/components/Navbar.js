@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { FaBars, FaTimes } from 'react-icons/fa';
+import { motion } from 'framer-motion';
 
 const Navbar = () => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -25,27 +26,24 @@ const Navbar = () => {
     };
 
     return (
-        <nav className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-7xl h-18 flex items-center justify-between px-4 sm:px-8 py-2 glass-panel rounded-full font-mono transition-all duration-500 hover:bg-white/10">
+        <motion.nav 
+            initial={{ y: -100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.8, ease: 'easeOut' }}
+            className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-7xl h-18 flex items-center justify-between px-4 sm:px-8 py-2 glass-panel rounded-full font-mono transition-all duration-500 hover:bg-white/10"
+        >
             {/* Logo Section */}
             <div className="relative z-10 flex items-center space-x-2 sm:space-x-4">
                 <Link href="/" className="flex items-center space-x-2 sm:space-x-3">
                     {/* Logo Image */}
                     <Image
-                        data-aos="fade-down"
-                        data-aos-easing="linear"
-                        data-aos-duration="1000"
                         src="/Robotics Club, NITW.png"
                         alt="Robotics Club Logo"
                         width={40}
                         height={40}
                         className="object-contain sm:w-[60px] sm:h-[60px]"
                     />
-                    <div
-                        className="text-white"
-                        data-aos="fade-down"
-                        data-aos-easing="linear"
-                        data-aos-duration="1500"
-                    >
+                    <div className="text-white">
                         <div className="text-xs sm:text-sm font-bold uppercase tracking-wide">ROBOTICS CLUB</div>
                         <div className="text-xs uppercase tracking-wider">NITW</div>
                     </div>
@@ -59,9 +57,6 @@ const Navbar = () => {
 
                     return (
                         <Link
-                            data-aos="fade-down"
-                            data-aos-easing="linear"
-                            data-aos-duration={link.sum}
                             key={link.name}
                             href={link.href}
                             className={`cyber-link uppercase text-xs sm:text-sm xl:text-base ${
@@ -122,7 +117,7 @@ const Navbar = () => {
                     </div>
                 </div>
             )}
-        </nav>
+        </motion.nav>
     );
 };
 
