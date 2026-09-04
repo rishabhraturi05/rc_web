@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -24,6 +24,23 @@ const Navbar = () => {
     const toggleMobileMenu = () => {
         setIsMobileMenuOpen(!isMobileMenuOpen);
     };
+
+    // Body scroll lock + Escape key handler when mobile menu is open
+    useEffect(() => {
+        if (isMobileMenuOpen) {
+            document.body.style.overflow = 'hidden';
+            const handleEscape = (e) => {
+                if (e.key === 'Escape') setIsMobileMenuOpen(false);
+            };
+            window.addEventListener('keydown', handleEscape);
+            return () => {
+                document.body.style.overflow = '';
+                window.removeEventListener('keydown', handleEscape);
+            };
+        } else {
+            document.body.style.overflow = '';
+        }
+    }, [isMobileMenuOpen]);
 
     return (
         <motion.nav 
@@ -75,7 +92,8 @@ const Navbar = () => {
                 <button
                     onClick={toggleMobileMenu}
                     className="text-white p-2 hover:text-gray-300 transition-colors duration-300"
-                    aria-label="Toggle mobile menu"
+                    aria-label={isMobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+                    aria-expanded={isMobileMenuOpen}
                 >
                     {isMobileMenuOpen ? <FaTimes size={24} /> : <FaBars size={24} />}
                 </button>
@@ -83,12 +101,17 @@ const Navbar = () => {
 
             {/* Mobile Menu Overlay */}
             {isMobileMenuOpen && (
-                <div className="lg:hidden fixed inset-0 bg-black bg-opacity-95 z-50 flex items-center justify-center">
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="Navigation menu"
+                    className="lg:hidden fixed inset-0 bg-black bg-opacity-95 z-50 flex items-center justify-center"
+                >
                     {/* Close Button */}
                     <button
                         onClick={() => setIsMobileMenuOpen(false)}
                         className="absolute top-4 right-4 text-white p-2 hover:text-gray-300 transition-colors duration-300 z-60"
-                        aria-label="Close mobile menu"
+                        aria-label="Close navigation menu"
                     >
                         <FaTimes size={28} />
                     </button>

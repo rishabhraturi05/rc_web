@@ -1,5 +1,5 @@
 "use client";
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Box, Cylinder, Float, Cone } from '@react-three/drei';
 import * as THREE from 'three';
@@ -13,13 +13,37 @@ export default function CyberCore() {
   const engineBL = useRef();
   const engineBR = useRef();
 
+  // Cache scroll offset and viewport width in refs to avoid DOM reads at 60fps
+  const scrollRef = useRef(0);
+  const isMobileRef = useRef(false);
+
+  useEffect(() => {
+    // Set initial values
+    isMobileRef.current = window.innerWidth < 768;
+    
+    const onScroll = () => {
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      scrollRef.current = max > 0 ? window.scrollY / max : 0;
+    };
+    const onResize = () => {
+      isMobileRef.current = window.innerWidth < 768;
+    };
+    
+    onScroll(); // set initial scroll
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onResize);
+    };
+  }, []);
+
   useFrame((state, delta) => {
     if (!groupRef.current) return;
     const time = state.clock.elapsedTime;
     
-    // Read body scroll to determine offset (0 to 1)
-    const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-    const scrollOffset = maxScroll > 0 ? window.scrollY / maxScroll : 0;
+    // Read cached scroll offset (updated via passive event listener, not DOM)
+    const scrollOffset = scrollRef.current;
 
     let targetX = 0;
     let targetY = 0.5;
@@ -53,7 +77,7 @@ export default function CyberCore() {
         targetScale = 0.2; // Shrink rapidly as it flies away
     }
 
-    if (window.innerWidth < 768) {
+    if (isMobileRef.current) {
         targetX *= 0.3;
         if (!isTakingOff) targetY *= 0.5;
         targetScale *= 0.6;

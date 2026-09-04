@@ -1,7 +1,6 @@
 "use client"
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import PixelCanvas from '../components/PixelCanvas';
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -75,10 +74,6 @@ const Contact = () => {
 
   return (
     <main className="relative min-h-screen bg-black text-white overflow-hidden pb-24">
-      {/* Global Background */}
-      <div className="fixed inset-0 z-0">
-        <PixelCanvas />
-      </div>
 
       {/* Header Section */}
       <div className="relative z-10 text-center pt-32 pb-12 px-4">

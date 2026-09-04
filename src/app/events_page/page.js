@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import PixelCanvas from '../components/PixelCanvas'
 
 const EventCard = ({ event, onClick, index }) => {
   const getStatusBadge = (status) => {
@@ -60,10 +59,29 @@ const EventCard = ({ event, onClick, index }) => {
 }
 
 const EventModal = ({ event, isOpen, onClose }) => {
+  // Escape key + body scroll lock
+  React.useEffect(() => {
+    if (!isOpen) return;
+    document.body.style.overflow = 'hidden';
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [isOpen, onClose]);
+
   return (
     <AnimatePresence>
       {isOpen && event && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="event-modal-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
+        >
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -90,13 +108,14 @@ const EventModal = ({ event, isOpen, onClose }) => {
               
               <button
                 onClick={onClose}
-                className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center bg-black/50 hover:bg-cyan-500/20 border border-white/20 hover:border-cyan-400 rounded-full text-white hover:text-cyan-400 transition-all duration-300 z-20"
+                aria-label="Close dialog"
+                className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center bg-black/50 hover:bg-cyan-500/20 border border-white/20 hover:border-cyan-400 rounded-full text-white hover:text-cyan-400 transition-all duration-300 z-20 focus:outline-none focus:ring-2 focus:ring-cyan-400"
               >
-                ×
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
               </button>
               
               <div className="absolute bottom-6 left-6 right-6">
-                <h2 className="text-3xl sm:text-4xl font-bold text-white uppercase tracking-widest drop-shadow-lg" style={{ fontFamily: 'var(--font-orbitron)' }}>
+                <h2 id="event-modal-title" className="text-3xl sm:text-4xl font-bold text-white uppercase tracking-widest drop-shadow-lg" style={{ fontFamily: 'var(--font-orbitron)' }}>
                     {event.title}
                 </h2>
               </div>
@@ -162,7 +181,7 @@ const EventsPage = () => {
       status: "completed",
       image: "/events/freshers.jpg",
       shortDescription: "Exclusive event for freshers",
-      description: "The wait is finally OVER.\nThe heist of creativity is about to begin…\n🎭 LA CASA DE ROBOT\nHere’s the Masterplan, Crew:\n🔹 Rendezvous Point: MME Seminar Hall\n🔹 Mission: Crack codes, conquer challenges, outsmart the clock\n🔹 Goal: Unleash your inner innovator 🤖\n\nAnd the spoils of this heist ? 🏆\nRobotic Kits, Refreshments, Glory, and Bragging Rights! ⚙\nThis time, we’re not after gold or banks…\nWe’re after something bigger —\n⚡ Innovation.Imagination.The Future of Robotics! ⚡\n",
+      description: "The wait is finally OVER.\nThe heist of creativity is about to begin…\n🎭 LA CASA DE ROBOT\nHere's the Masterplan, Crew:\n🔹 Rendezvous Point: MME Seminar Hall\n🔹 Mission: Crack codes, conquer challenges, outsmart the clock\n🔹 Goal: Unleash your inner innovator 🤖\n\nAnd the spoils of this heist ? 🏆\nRobotic Kits, Refreshments, Glory, and Bragging Rights! ⚙\nThis time, we're not after gold or banks…\nWe're after something bigger —\n⚡ Innovation.Imagination.The Future of Robotics! ⚡\n",
       contact: "Contact: robotics@nitw.ac.in | Phone: +91-7661991859"
     },
     {
@@ -249,10 +268,6 @@ const EventsPage = () => {
 
   return (
     <main className="relative min-h-screen bg-black text-white overflow-hidden pb-24">
-      {/* Global Background */}
-      <div className="fixed inset-0 z-0">
-        <PixelCanvas />
-      </div>
 
       {/* Hero Section */}
       <div className="relative z-10 pt-32 pb-16 text-center">

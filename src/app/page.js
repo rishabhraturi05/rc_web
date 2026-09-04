@@ -1,19 +1,12 @@
 "use client"
 import React, { useEffect } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
-import AOS from 'aos';
-import 'aos/dist/aos.css';
 import { Analytics } from '@vercel/analytics/next';
 import Lenis from 'lenis';
 import ThreeScene from './components/ThreeScene';
 
 const Page = () => {
   useEffect(() => {
-    AOS.init({
-      duration: 1500,
-      once: true,
-    });
-
     // Initialize Lenis for buttery smooth scrolling
     const lenis = new Lenis({
       duration: 1.2,
@@ -27,13 +20,15 @@ const Page = () => {
       infinite: false,
     });
 
+    let rafId;
     function raf(time) {
       lenis.raf(time);
-      requestAnimationFrame(raf);
+      rafId = requestAnimationFrame(raf);
     }
-    requestAnimationFrame(raf);
+    rafId = requestAnimationFrame(raf);
 
     return () => {
+      cancelAnimationFrame(rafId);
       lenis.destroy();
     };
   }, []);

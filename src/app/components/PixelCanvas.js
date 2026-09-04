@@ -53,6 +53,9 @@ export default function PixelCanvas() {
       ctx.fillStyle = '#000000';
       ctx.fillRect(0, 0, width, height);
 
+      // Hoist time calculation out of inner loop (was called 5000+ times/frame)
+      const time = Date.now() * 0.001;
+
       for (let i = 0; i < cols; i++) {
         for (let j = 0; j < rows; j++) {
           const index = i + j * cols;
@@ -76,7 +79,6 @@ export default function PixelCanvas() {
           
           // Draw a very faint baseline grid dot if alpha is low, applying a breathing effect
           if (alpha <= 0.05) {
-             const time = Date.now() * 0.001; // slightly faster
              // Create a wave that moves diagonally across the screen
              const wave = Math.sin(time + (px * 0.005) + (py * 0.005));
              

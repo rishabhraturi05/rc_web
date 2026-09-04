@@ -2,7 +2,6 @@
 
 import React, { useMemo, useRef, useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import PixelCanvas from '../components/PixelCanvas'
 
 // SVG Icon for the close button
 const XIcon = (props) => (
@@ -99,10 +98,6 @@ const ProjectsPage = () => {
 
   return (
     <main className="relative min-h-screen bg-black text-white overflow-x-hidden pb-24">
-      {/* Global Background */}
-      <div className="fixed inset-0 z-0">
-        <PixelCanvas />
-      </div>
 
       <div className="relative z-10 pt-32 pb-16 text-center">
         <motion.div

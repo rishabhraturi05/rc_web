@@ -13,7 +13,13 @@ body {
     font-family: 'JetBrains Mono', monospace;
   }
   .text-cyber {
-    color: #ffffff;
+    color: #22d3ee;
+  }
+  .title-glow {
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.3), 0 0 40px rgba(34, 211, 238, 0.2);
+  }
+  .font-orbitron {
+    font-family: var(--font-orbitron), sans-serif;
   }
   .glass-panel {
     @apply bg-black/60 backdrop-blur-md border border-white/20 rounded-xl;
@@ -62,10 +68,6 @@ body {
 }
 
 
-
-/* body{
-  background-color: black;
-} */
 
 html {
   overflow-x: hidden;
@@ -198,7 +200,7 @@ html {
 }
 
 .among-body {
-  font-family: var(--font-nunito), sans-serif;
+  font-family: var(--font-rajdhani), sans-serif;
 }
 
 .freshers-space-bg {
