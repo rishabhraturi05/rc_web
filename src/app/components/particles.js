@@ -20,7 +20,7 @@ const Particlesbg = () => {
     }, []);
 
     const particlesLoaded = (container) => {
-        console.log(container);
+        // Particles loaded
     };
 
     if (!init) {
@@ -42,8 +42,8 @@ const Particlesbg = () => {
             options={{
                 fpsLimit: 60,
                 fullScreen: {
-                    enable: false, // Set to false to not cover the whole screen
-                    zIndex: -1      // Set to -1 to place it behind other content
+                    enable: false,
+                    zIndex: -1
                 },
                 background: {
                     color: {
@@ -52,68 +52,56 @@ const Particlesbg = () => {
                 },
                 interactivity: {
                     events: {
-                        onClick: {
-                            enable: true,
-                            mode: "push",
-                        },
                         onHover: {
                             enable: true,
-                            mode: "connect"
+                            mode: "bubble"
                         },
                         resize: true,
                     },
                     modes: {
-                        push: {
-                            quantity: 2,
-                        },
-                        connect: {
-                            distance: 200,
-                            links: {
-                                opacity: 0.5
-                            },
-                            radius: 200,
+                        bubble: {
+                            distance: 250,
+                            size: 4,
+                            duration: 2,
+                            opacity: 1
                         },
                     },
                 },
                 particles: {
                     color: {
-                        value: ['#ffffff', '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57']
+                        value: '#ffffff'
                     },
                     links: {
-                        color: "#ffffff",
-                        distance: 150,
-                        enable: true,
-                        opacity: 0.3,
-                        width: 1,
+                        enable: false,
                     },
                     collisions: {
                         enable: false,
                     },
                     move: {
-                        direction: "none",
+                        direction: "right",
                         enable: true,
                         outModes: {
-                            default: "bounce",
+                            default: "out",
                         },
-                        random: true,
-                        speed: 1,
-                        straight: false,
+                        random: false,
+                        speed: { min: 3, max: 12 },
+                        straight: true,
                     },
                     number: {
                         density: {
                             enable: true,
-                            area: 1000,
+                            area: 800,
                         },
-                        value: 60,
+                        value: 350,
                     },
                     opacity: {
-                        value: 0.6,
+                        value: { min: 0.1, max: 0.8 },
                     },
                     shape: {
                         type: "circle",
                     },
                     size: {
-                        value: { min: 1, max: 3 },
+                        value: { min: 0.5, max: 2.5 },
                     },
                 },
                 detectRetina: true,

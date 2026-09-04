@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
-import { FaStar, FaRegStar, FaTrash } from 'react-icons/fa';
+import Link from 'next/link';
+import { FaStar, FaRegStar, FaTrash, FaArrowLeft } from 'react-icons/fa';
 
 const Responses = () => {
   const router = useRouter();
@@ -57,32 +58,7 @@ const Responses = () => {
     checkAuth();
   }, [checkAuth]);
 
-  const fetchResponses = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch("/api/admin/responses");
-      const data = await res.json();
 
-      if (data.success) {
-        setResponses(
-          [...data.data].sort(
-            (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-          )
-        );
-      } else {
-        if (res.status === 401) {
-          router.push("/admin/login");
-          return;
-        }
-        alert(data.message || "Failed to fetch responses");
-      }
-    } catch (error) {
-      console.error("Fetch error:", error);
-      alert("Failed to fetch responses. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleToggleSpecial = async (id, currentStatus) => {
     try {
@@ -192,28 +168,28 @@ const Responses = () => {
   const renderResponseCard = (response) => (
     <div
       key={response._id}
-      className={`bg-gray-900/50 border rounded-2xl p-6 sm:p-8 transition-all duration-300 ${response.isSpecial
-          ? "border-yellow-500/80 bg-gray-900/70"
-          : "border-gray-700/80"
+      className={`glass-panel p-6 sm:p-8 transition-all duration-300 ${response.isSpecial
+          ? "border-white bg-white/5"
+          : "border-white/20"
         }`}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-3 flex-wrap">
-            <h3 className="batman-font text-xl sm:text-2xl font-bold text-white">
+            <h3 className="font-mono text-xl sm:text-2xl font-bold text-white">
               {response.name}
             </h3>
-            <span className="px-3 py-1 bg-blue-600/20 text-blue-400 rounded-lg text-sm destruct-font border border-blue-600/30">
+            <span className="px-3 py-1 bg-blue-600/20 text-blue-400 rounded-lg text-sm font-mono border border-blue-600/30">
               {getQueryTypeLabel(response.queryType)}
             </span>
             {response.isSpecial && (
-              <span className="px-3 py-1 bg-yellow-600/20 text-yellow-400 rounded-lg text-sm destruct-font border border-yellow-600/30">
+              <span className="px-3 py-1 bg-yellow-600/20 text-yellow-400 rounded-lg text-sm font-mono border border-yellow-600/30">
                 Special
               </span>
             )}
           </div>
 
-          <div className="space-y-2 mb-4 destruct-font text-gray-300">
+          <div className="space-y-2 mb-4 font-mono text-gray-300">
             <div className="flex items-center gap-2">
               <span className="text-gray-400">Email:</span>
               <a
@@ -245,7 +221,7 @@ const Responses = () => {
           </div>
 
           <div className="mt-4 p-4 bg-gray-800/50 rounded-lg border border-gray-700/50">
-            <p className="destruct-font text-white leading-relaxed whitespace-pre-wrap">
+            <p className="font-mono text-white leading-relaxed whitespace-pre-wrap">
               {response.message}
             </p>
           </div>
@@ -286,7 +262,7 @@ const Responses = () => {
         <div className="relative z-10 px-4 sm:px-6 lg:px-8 pt-24 pb-8">
           <div className="max-w-7xl mx-auto">
             <div className="bg-gray-900/50 border border-gray-700/80 rounded-2xl p-6 sm:p-8 text-center">
-              <p className="destruct-font text-gray-300 text-lg">Loading...</p>
+              <p className="font-mono text-gray-300 text-lg">Loading...</p>
             </div>
           </div>
         </div>
@@ -306,28 +282,31 @@ const Responses = () => {
         <div className="max-w-7xl mx-auto flex flex-col gap-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h1 className="batman-font text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-2">
+              <Link href="/admin" className="inline-flex items-center gap-2 text-gray-400 hover:text-white font-mono text-sm mb-3 transition-colors">
+                <FaArrowLeft size={12} /> Back to Admin Panel
+              </Link>
+              <h1 className="font-mono text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-2">
                 Admin Responses
               </h1>
-              <p className="destruct-font text-gray-300 text-lg sm:text-xl">
+              <p className="font-mono text-gray-300 text-lg sm:text-xl">
                 View and manage contact form responses
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={() => setShowSavedOnly((prev) => !prev)}
-                className={`mx-2 px-6 py-3 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 batman-font text-base tracking-wide ${showSavedOnly
-                    ? "bg-yellow-600/20 text-yellow-300 border border-yellow-500/60 focus:ring-yellow-500"
-                    : "bg-gray-800/60 text-white border border-gray-600/60 hover:bg-gray-800 focus:ring-blue-500"
+                className={`mx-2 px-6 py-2 border font-mono rounded transition-colors uppercase text-sm tracking-widest ${showSavedOnly
+                    ? "bg-white text-black border-white"
+                    : "bg-transparent text-white border-white/50 hover:border-white"
                   }`}
               >
-                {showSavedOnly ? "All Mes " : "Saved Mes"}
+                {showSavedOnly ? "All Messages" : "Saved Messages"}
               </button>
               <button
                 onClick={handleLogout}
-                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-red-600 hover:from-blue-700 hover:to-red-700 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 batman-font text-base tracking-wide"
+                className="px-6 py-2 bg-transparent border border-white text-white font-mono rounded hover:bg-white hover:text-black transition-colors uppercase text-sm tracking-widest"
               >
-                Logout
+                [ LOGOUT ]
               </button>
             </div>
           </div>
@@ -338,23 +317,23 @@ const Responses = () => {
       <div className="relative z-10 px-4 sm:px-6 lg:px-8 pb-20">
         <div className="max-w-7xl mx-auto">
           {loading ? (
-            <div className="bg-gray-900/50 border border-gray-700/80 rounded-2xl p-6 sm:p-8 text-center">
-              <p className="destruct-font text-gray-300 text-lg">Loading responses...</p>
+            <div className="glass-panel p-6 sm:p-8 text-center">
+              <p className="font-mono text-gray-300 text-lg animate-pulse">Loading responses[...]_</p>
             </div>
           ) : sortedResponses.length === 0 ? (
-            <div className="bg-gray-900/50 border border-gray-700/80 rounded-2xl p-6 sm:p-8 text-center">
-              <p className="destruct-font text-gray-300 text-lg">No responses found.</p>
+            <div className="glass-panel p-6 sm:p-8 text-center">
+              <p className="font-mono text-gray-300 text-lg">No responses found.</p>
             </div>
           ) : showSavedOnly ? (
             <div className="space-y-8">
               <section className="space-y-4">
                 <div>
-                  <h2 className="batman-font text-3xl font-bold mb-2">Saved Messages</h2>
-                  <p className="destruct-font text-gray-300">Newest saved responses first</p>
+                  <h2 className="font-mono text-3xl font-bold mb-2">Saved Messages</h2>
+                  <p className="font-mono text-gray-300">Newest saved responses first</p>
                 </div>
                 {savedResponses.length === 0 ? (
-                  <div className="bg-gray-900/50 border border-gray-700/80 rounded-2xl p-6 sm:p-8 text-center">
-                    <p className="destruct-font text-gray-300 text-lg">
+                  <div className="glass-panel p-6 sm:p-8 text-center">
+                    <p className="font-mono text-gray-300 text-lg">
                       No saved responses available.
                     </p>
                   </div>
@@ -369,8 +348,8 @@ const Responses = () => {
             <div className="space-y-8">
               <section className="space-y-4">
                 <div>
-                  <h2 className="batman-font text-3xl font-bold mb-2">All Messages</h2>
-                  <p className="destruct-font text-gray-300">
+                  <h2 className="font-mono text-3xl font-bold mb-2">All Messages</h2>
+                  <p className="font-mono text-gray-300">
                     All responses in newest-first order
                   </p>
                 </div>
