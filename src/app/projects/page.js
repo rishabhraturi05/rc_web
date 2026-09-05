@@ -97,7 +97,7 @@ const ProjectsPage = () => {
   const activeProject = activeProjectIndex !== null ? projects[activeProjectIndex] : null;
 
   return (
-    <main className="relative min-h-screen bg-black text-white overflow-x-hidden pb-24">
+    <main className="relative min-h-screen bg-transparent text-white overflow-x-hidden pb-24">
 
       <div className="relative z-10 pt-32 pb-16 text-center">
         <motion.div

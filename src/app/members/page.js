@@ -111,7 +111,7 @@ const Page = () => {
   const [activeTab, setActiveTab] = useState('core');
 
   return (
-    <main className="relative min-h-screen bg-black text-white overflow-hidden pb-24">
+    <main className="relative min-h-screen bg-transparent text-white overflow-x-hidden pb-24">
 
       {/* Hero Section */}
       <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pt-32 pb-12 text-center">

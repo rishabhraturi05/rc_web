@@ -73,7 +73,7 @@ const Contact = () => {
   };
 
   return (
-    <main className="relative min-h-screen bg-black text-white overflow-hidden pb-24">
+    <main className="relative min-h-screen bg-transparent text-white overflow-x-hidden pb-24">
 
       {/* Header Section */}
       <div className="relative z-10 text-center pt-32 pb-12 px-4">

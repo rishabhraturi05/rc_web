@@ -102,6 +102,30 @@ const alumniData = [
     instagram: 'https://www.instagram.com/umamaheshwarchintu_20',
     email: 'mu21btb0a44@student.nitw.ac.in'
   },
+  {
+    name: 'G. Sai Sasivardhan',
+    description: 'Former member of the Robotics Club.',
+    imageUrl: '/members/gensecs/Gampa Sai Sasivardhan.jpg',
+    linkedin: 'https://in.linkedin.com/in/sai-sasivardhan-gampa-59559a254',
+    instagram: 'https://www.instagram.com/sasivardhansai',
+    email: '/'
+  },
+  {
+    name: 'Sudhakar',
+    description: 'Former member of the Robotics Club.',
+    imageUrl: '/members/gensecs/_Sudhakar_photo - Sudhakar Kumar.jpg',
+    linkedin: 'https://www.linkedin.com/in/sudhakar-kumar-38a9a4282/',
+    instagram: 'https://www.instagram.com/_sudhakar.08?igsh=MWcxeTJrb2J5OWI2bA==',
+    email: 'krsudhakar1103@gmail.com'
+  },
+  {
+    name: 'Anand A.L',
+    description: 'Former member of the Robotics Club.',
+    imageUrl: '/members/mech/Anand A L.jpg',
+    linkedin: 'https://www.linkedin.com/in/anand-al',
+    instagram: 'https://www.instagram.com/anandd_alx?igsh=MTd1ZXMxemh2Y2dxNg==',
+    email: '/'
+  }
 ];
 
 const Alumni = () => {
@@ -118,7 +142,7 @@ const Alumni = () => {
   };
 
   return (
-    <main className="relative min-h-screen bg-black text-white overflow-hidden pb-24">
+    <main className="relative min-h-screen bg-transparent text-white overflow-x-hidden pb-24">
 
       <div className="relative z-10 pt-32 pb-16 text-center">
         <motion.div

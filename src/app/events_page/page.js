@@ -267,7 +267,7 @@ const EventsPage = () => {
   }
 
   return (
-    <main className="relative min-h-screen bg-black text-white overflow-hidden pb-24">
+    <main className="relative min-h-screen bg-transparent text-white overflow-x-hidden pb-24">
 
       {/* Hero Section */}
       <div className="relative z-10 pt-32 pb-16 text-center">
