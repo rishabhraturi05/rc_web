@@ -10,6 +10,13 @@ export const allmembers = {
     ],
     "embedded": [
         {
+            "name": "Ibrahim Azeem",
+            "email": "ibrahim@example.com",
+            "img": "/members/embedded/Ibrahim Azeem.jpg",
+            "linkedin": "/",
+            "instagram": "/"
+        },
+        {
             "name": "Abdul Hadi",
             "email": "ma25eeb0b59@student.nitw.ac.in",
             "img": "/members/2026/abdul_hadi.webp",

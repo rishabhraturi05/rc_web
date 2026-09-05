@@ -47,7 +47,7 @@ const Navbar = () => {
             initial={{ y: -100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.8, ease: 'easeOut' }}
-            className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-7xl h-18 flex items-center justify-between px-4 sm:px-8 py-2 glass-panel rounded-full font-mono transition-all duration-500 hover:bg-white/10"
+            className="fixed top-2 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-7xl h-18 flex items-center justify-between px-4 sm:px-8 py-2 glass-panel rounded-full font-mono transition-all duration-500 hover:bg-white/10"
         >
             {/* Logo Section */}
             <div className="relative z-10 flex items-center space-x-2 sm:space-x-4">

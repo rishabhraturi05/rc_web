@@ -4,7 +4,7 @@ import React from "react";
 
 export default function FreshersHero({ eventConfig, onRegisterClick }) {
   return (
-    <section className="relative z-10 w-full max-w-5xl mx-auto px-4 pt-4 sm:pt-6 pb-8 sm:pb-12 font-vcr text-center">
+    <section className="relative z-10 w-full max-w-5xl mx-auto px-4 pt-24 sm:pt-32 pb-8 sm:pb-12 font-vcr text-center">
       {/* Top Tagline Badge */}
       <div className="inline-flex max-w-full items-center justify-center gap-2 px-4 sm:px-5 py-2 rounded-full border border-red-500/70 bg-red-950/50 text-red-400 text-[11px] sm:text-sm font-bold tracking-wider glow-red mb-4 sm:mb-6 text-center leading-relaxed">
         <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping inline-block shrink-0" />
