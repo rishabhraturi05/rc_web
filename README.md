@@ -53,6 +53,27 @@ rc_official_website/
 └── README.md # Project documentation
 ```
 
+## 🐳 Docker Containerization
+
+You can easily run this website locally without installing Node.js by using Docker. The provided `Dockerfile` uses a highly optimized multi-stage build tailored for Next.js 15.
+
+### Steps to Run via Docker:
+
+1. **Build the Docker Image:**
+   Open your terminal in the project root and run:
+   ```bash
+   docker build -t rc-website .
+   ```
+
+2. **Run the Container:**
+   Once built, start the container and map it to port 3000:
+   ```bash
+   docker run -p 3000:3000 rc-website
+   ```
+
+3. **View the Website:**
+   Open your browser and navigate to `http://localhost:3000`. The fully containerized app is now running!
+
 🧑‍💻 Contributors
 Maintained by the Robotics Club, NIT Warangal.
 Special thanks to all contributors and developers who help keep this project evolving!

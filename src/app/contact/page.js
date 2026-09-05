@@ -1,7 +1,6 @@
 "use client"
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import PixelCanvas from '../components/PixelCanvas';
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -74,11 +73,7 @@ const Contact = () => {
   };
 
   return (
-    <main className="relative min-h-screen bg-black text-white overflow-hidden pb-24">
-      {/* Global Background */}
-      <div className="fixed inset-0 z-0">
-        <PixelCanvas />
-      </div>
+    <main className="relative min-h-screen bg-transparent text-white overflow-x-hidden pb-24">
 
       {/* Header Section */}
       <div className="relative z-10 text-center pt-32 pb-12 px-4">
@@ -187,6 +182,7 @@ const Contact = () => {
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
                 >
                   <label htmlFor="otherQuery" className="block text-sm font-semibold text-cyan-400 mb-2 font-mono tracking-widest uppercase mt-4">
                     Please Specify <span className="text-red-500">*</span>

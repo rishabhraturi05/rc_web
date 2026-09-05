@@ -21,7 +21,7 @@ const Footer = () => {
             <h4 className="text-lg font-semibold mb-4">Follow Us</h4>
             <div className="flex justify-center md:justify-start space-x-6">
               <Link
-                href="https://www.instagram.com/rc.nitw?igsh=dGg0azNiZDV0cjRj"
+                href="https://www.instagram.com/rc.nitw"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-300 hover:text-white transition-colors duration-300"
@@ -30,7 +30,7 @@ const Footer = () => {
                 <FaInstagram size={24} />
               </Link>
               <Link
-                href="http://www.linkedin.com/in/sai-sasivardhan-gampa-59559a254"
+                href="https://www.linkedin.com/company/robotics-club-nit-warangal/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-300 hover:text-white transition-colors duration-300"

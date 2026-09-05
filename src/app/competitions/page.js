@@ -4,7 +4,6 @@ import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import RoboconTimeline from '../components/Robocon'
 import EyantraTimeline from '../components/Eyantra'
-import PixelCanvas from '../components/PixelCanvas'
 
 const CompeteTab = () => {
   const [currtab, setCurrtab] = useState('');
@@ -26,11 +25,7 @@ const CompeteTab = () => {
   };
 
   return (
-    <main className="relative min-h-screen bg-black text-white overflow-hidden pb-24">
-      {/* Global Background */}
-      <div className="fixed inset-0 z-0">
-        <PixelCanvas />
-      </div>
+    <main className="relative min-h-screen bg-transparent text-white overflow-x-hidden pb-24">
 
       {/* Hero Section */}
       <div className="relative z-10 pt-32 pb-16 text-center">

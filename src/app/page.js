@@ -1,19 +1,12 @@
 "use client"
 import React, { useEffect } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
-import AOS from 'aos';
-import 'aos/dist/aos.css';
 import { Analytics } from '@vercel/analytics/next';
 import Lenis from 'lenis';
 import ThreeScene from './components/ThreeScene';
 
 const Page = () => {
   useEffect(() => {
-    AOS.init({
-      duration: 1500,
-      once: true,
-    });
-
     // Initialize Lenis for buttery smooth scrolling
     const lenis = new Lenis({
       duration: 1.2,
@@ -27,13 +20,15 @@ const Page = () => {
       infinite: false,
     });
 
+    let rafId;
     function raf(time) {
       lenis.raf(time);
-      requestAnimationFrame(raf);
+      rafId = requestAnimationFrame(raf);
     }
-    requestAnimationFrame(raf);
+    rafId = requestAnimationFrame(raf);
 
     return () => {
+      cancelAnimationFrame(rafId);
       lenis.destroy();
     };
   }, []);
@@ -112,7 +107,7 @@ const Page = () => {
               className="px-6 py-3 glass-panel border-l-2 border-l-cyber/50 pointer-events-auto self-start bg-black/40 backdrop-blur-sm shadow-xl"
             >
               <p className="text-gray-400 text-sm font-mono italic">
-                {">"} &quot;yes we are a new club, but we ain&apos;t gonna disappoint y&apos;all tho.&quot;
+                {">"} &quot;not the oldest club on campus, just the one with the most solder burns.&quot;
               </p>
             </motion.div>
           </div>
@@ -146,7 +141,7 @@ const Page = () => {
               className="px-6 py-3 glass-panel border-r-2 border-r-cyber/50 pointer-events-auto self-end bg-black/40 backdrop-blur-sm shadow-xl max-w-sm"
             >
               <p className="text-gray-400 text-sm font-mono italic text-right">
-                {">"} &quot;we&apos;re a group of people who got a little bit of brains and we do kinda work hard (u can see it right in front of u)&quot;
+                {">"} &quot;theory is cool, but we prefer watching things actually move.&quot;
               </p>
             </motion.div>
           </div>
@@ -193,7 +188,7 @@ const Page = () => {
               className="px-8 py-4 glass-panel border-b-2 border-b-cyber/50 pointer-events-auto self-center bg-black/40 backdrop-blur-sm shadow-xl"
             >
               <p className="text-gray-400 text-base font-mono italic text-center">
-                {">"} &quot;we do wanna grow big as a community in the college&quot;
+                {">"} &quot;room for anyone curious enough to make a machine come alive.&quot;
               </p>
             </motion.div>
           </div>

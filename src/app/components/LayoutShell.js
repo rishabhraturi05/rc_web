@@ -3,18 +3,15 @@
 import { usePathname } from "next/navigation";
 import Navbar from "./Navbar";
 import Footer from "./footer";
-import ConnectingDotsBackground from "./bg";
-import PageLoaderWrapper from "./PageLoaderWrapper";
+import PageLoader from "./PageLoader";
 
 export default function LayoutShell({ children }) {
   const pathname = usePathname();
-  const isFreshersPage = pathname?.startsWith("/freshers");
 
   return (
     <>
-      <PageLoaderWrapper />
+      <PageLoader />
       <Navbar />
-      {!isFreshersPage && <ConnectingDotsBackground />}
       {children}
       <Footer />
     </>

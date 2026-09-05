@@ -1,10 +1,9 @@
 "use client"
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { FaLinkedin, FaInstagram, FaEnvelope } from 'react-icons/fa';
 import Link from 'next/link';
 import Image from 'next/image';
-import PixelCanvas from '../components/PixelCanvas';
 
 const alumniData = [
   {
@@ -103,21 +102,53 @@ const alumniData = [
     instagram: 'https://www.instagram.com/umamaheshwarchintu_20',
     email: 'mu21btb0a44@student.nitw.ac.in'
   },
+  {
+    name: 'G. Sai Sasivardhan',
+    description: 'Former member of the Robotics Club.',
+    imageUrl: '/members/gensecs/Gampa Sai Sasivardhan.jpg',
+    linkedin: 'https://in.linkedin.com/in/sai-sasivardhan-gampa-59559a254',
+    instagram: 'https://www.instagram.com/sasivardhansai',
+    email: '/'
+  },
+  {
+    name: 'Sudhakar',
+    description: 'Former member of the Robotics Club.',
+    imageUrl: '/members/gensecs/_Sudhakar_photo - Sudhakar Kumar.jpg',
+    linkedin: 'https://www.linkedin.com/in/sudhakar-kumar-38a9a4282/',
+    instagram: 'https://www.instagram.com/_sudhakar.08?igsh=MWcxeTJrb2J5OWI2bA==',
+    email: 'krsudhakar1103@gmail.com'
+  },
+  {
+    name: 'Anand A.L',
+    description: 'Former member of the Robotics Club.',
+    imageUrl: '/members/mech/Anand A L.jpg',
+    linkedin: 'https://www.linkedin.com/in/anand-al',
+    instagram: 'https://www.instagram.com/anandd_alx?igsh=MTd1ZXMxemh2Y2dxNg==',
+    email: '/'
+  }
 ];
 
 const Alumni = () => {
+  const [copiedField, setCopiedField] = useState(null);
+
+  const handleCopy = async (text, fieldId) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(fieldId);
+      setTimeout(() => setCopiedField(null), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
   return (
-    <main className="relative min-h-screen bg-black text-white overflow-hidden pb-24">
-      {/* Global Background */}
-      <div className="fixed inset-0 z-0">
-        <PixelCanvas />
-      </div>
+    <main className="relative min-h-screen bg-transparent text-white overflow-x-hidden pb-24">
 
       <div className="relative z-10 pt-32 pb-16 text-center">
         <motion.div
-           initial={{ opacity: 0, y: -20 }}
-           animate={{ opacity: 1, y: 0 }}
-           transition={{ duration: 0.8 }}
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
         >
           <h1 className="mb-4 text-5xl md:text-7xl font-black text-white title-glow tracking-tighter uppercase" style={{ fontFamily: 'var(--font-orbitron)' }}>
             Our Alumni
@@ -140,7 +171,7 @@ const Alumni = () => {
               className="group"
             >
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 sm:gap-8 p-6 sm:p-8 glass-panel glass-panel-hover transition-all duration-500">
-                
+
                 {/* Profile Image & Socials */}
                 <div className="flex flex-col items-center gap-4 shrink-0">
                   <div className="relative w-32 h-32 sm:w-40 sm:h-40 rounded-lg overflow-hidden border-2 border-cyan-500/50 group-hover:border-cyan-400 transition-colors duration-500 shadow-[0_0_15px_rgba(34,211,238,0.2)] group-hover:shadow-[0_0_25px_rgba(34,211,238,0.6)]">
@@ -153,7 +184,7 @@ const Alumni = () => {
                     />
                     <div className="absolute inset-0 bg-cyan-900/20 mix-blend-overlay group-hover:bg-transparent transition-colors duration-500"></div>
                   </div>
-                  
+
                   {/* Glowing Social Connectors */}
                   <div className="flex gap-3 mt-2">
                     {alumnus.linkedin && alumnus.linkedin !== '/' && (
@@ -171,10 +202,7 @@ const Alumni = () => {
                       <div
                         className="w-10 h-10 flex items-center justify-center bg-pink-950/50 border border-pink-500/30 text-pink-500 hover:text-pink-300 hover:border-pink-400 hover:bg-pink-900/80 rounded-md transition-all duration-300 shadow-[0_0_10px_rgba(236,72,153,0.1)] hover:shadow-[0_0_15px_rgba(236,72,153,0.5)] cursor-pointer"
                         title="Copy Instagram Handle"
-                        onClick={() => {
-                          navigator.clipboard.writeText(alumnus.instagram);
-                          alert(`Instagram handle copied: ${alumnus.instagram}`);
-                        }}
+                        onClick={() => handleCopy(alumnus.instagram, `ig-${index}`)}
                       >
                         <FaInstagram className="w-5 h-5" />
                       </div>
@@ -183,10 +211,7 @@ const Alumni = () => {
                       <div
                         className="w-10 h-10 flex items-center justify-center bg-green-950/50 border border-green-500/30 text-green-500 hover:text-green-300 hover:border-green-400 hover:bg-green-900/80 rounded-md transition-all duration-300 shadow-[0_0_10px_rgba(34,197,94,0.1)] hover:shadow-[0_0_15px_rgba(34,197,94,0.5)] cursor-pointer"
                         title="Copy Email Address"
-                        onClick={() => {
-                          navigator.clipboard.writeText(alumnus.email);
-                          alert(`Email copied: ${alumnus.email}`);
-                        }}
+                        onClick={() => handleCopy(alumnus.email, `email-${index}`)}
                       >
                         <FaEnvelope className="w-5 h-5" />
                       </div>
@@ -204,11 +229,18 @@ const Alumni = () => {
                   </p>
                 </div>
               </div>
+
+              {/* Terminal style copy notification */}
+              {(copiedField === `ig-${index}` || copiedField === `email-${index}`) && (
+                <div className="absolute top-4 right-4 bg-cyan-900/80 backdrop-blur border border-cyan-400 text-cyan-100 px-3 py-1 rounded-md text-xs font-mono font-medium animate-pulse z-10">
+                  {'>'} COPIED
+                </div>
+              )}
             </motion.div>
           ))}
-        </div>
       </div>
-    </main>
+    </div>
+    </main >
   );
 };
 

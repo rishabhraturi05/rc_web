@@ -4,64 +4,11 @@ import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FaLinkedin, FaInstagram, FaEnvelope, FaNetworkWired, FaMicrochip, FaCode, FaCogs, FaBullhorn } from 'react-icons/fa' 
 import { allmembers } from '../components/Membersarray';
-import PixelCanvas from '../components/PixelCanvas';
 
 const profiles = {
-  professor: [
-    {
-      name: 'Prof. Gaurav Kumar Sharma',
-      email: 'gaurav@nitw.ac.in',
-      img: '/members/prof/gaurav.jpeg',
-      linkedin: '#',
-      instagram: '#'
-    },
-  ],
-  secretaries: [
-   {
-      name: 'Sai Sasivardhan Gampa ',
-      email: 'gs22chb0b13@student.nitw.ac.in',
-      img: '/members/gensecs/Gampa Sai Sasivardhan.jpg',
-      linkedin: 'https://in.linkedin.com/in/sai-sasivardhan-gampa-59559a254',
-      instagram: 'https://www.instagram.com/sasivardhansai'
-    },
-    {
-      name: 'Sudhakar Kumar ',
-      email: 'krsudhakar1103@gmail.com',
-      img: '/members/gensecs/_Sudhakar_photo - Sudhakar Kumar.jpg',
-      linkedin: 'https://www.linkedin.com/in/sudhakar-kumar-38a9a4282/#',
-      instagram: 'https://www.instagram.com/_sudhakar.08?igsh=MWcxeTJrb2J5OWI2bA=='
-    },
-  ],
-  addlSecretaries: [
-    {
-      name: 'Varshith Varakala',
-      email: 'varshithvarakala@gmail.com',
-      img: '/members/addsecs/Varakala Varshith.jpg',
-      linkedin: 'http://www.linkedin.com/in/varshith-varakala',
-      instagram: 'https://www.instagram.com/varshithvarakala/'
-    },
-    {
-      name: 'M. Mani Kumar ',
-      email: 'manikumarmatta999@gmail.com',
-      img: '/members/addsecs/Matta Mani Kumar.jpg',
-      linkedin: 'https://www.linkedin.com/in/m-manikumar',
-      instagram: '#'
-    },
-    {
-      name: 'Aryan Roy',
-      email: 'aryan.roy.w@gmail.com',
-      img: '/members/addsecs/Aryan Roy.jpg',
-      linkedin: 'https://www.linkedin.com/in/aryan-roy-8b0b89285?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app',
-      instagram: '#'
-    },
-    {
-      name: 'Dhanvanth Chandrasekaran ',
-      email: 'dhanvanth.chandrasekaran@gmail.com',
-      img: 'members/addsecs/DhanvanthChandrasekaran - Dhanvanth Chandrasekaran.jpg',
-      linkedin: 'https://www.linkedin.com/in/dhanvanth-chandrasekaran-271a29342?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app',
-      instagram: '#'
-    },
-  ],
+  professor: allmembers.facad,
+  secretaries: allmembers.secretaries,
+  addlSecretaries: allmembers.addlSecretaries,
 }
 const allofthemembers = allmembers;
 
@@ -164,12 +111,7 @@ const Page = () => {
   const [activeTab, setActiveTab] = useState('core');
 
   return (
-    <main className="relative min-h-screen bg-black text-white overflow-hidden pb-24">
-      
-      {/* Global Background */}
-      <div className="fixed inset-0 z-0">
-        <PixelCanvas />
-      </div>
+    <main className="relative min-h-screen bg-transparent text-white overflow-x-hidden pb-24">
 
       {/* Hero Section */}
       <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pt-32 pb-12 text-center">
