@@ -105,18 +105,18 @@ const Navbar = () => {
                     role="dialog"
                     aria-modal="true"
                     aria-label="Navigation menu"
-                    className="lg:hidden fixed inset-0 bg-black bg-opacity-95 z-50 flex items-center justify-center"
+                    className="lg:hidden fixed inset-0 bg-black bg-opacity-95 z-50 overflow-y-auto pb-10 pt-20"
                 >
                     {/* Close Button */}
                     <button
                         onClick={() => setIsMobileMenuOpen(false)}
-                        className="absolute top-4 right-4 text-white p-2 hover:text-gray-300 transition-colors duration-300 z-60"
+                        className="fixed top-4 right-4 text-white p-2 hover:text-gray-300 transition-colors duration-300 z-[60] bg-black/50 rounded-full"
                         aria-label="Close navigation menu"
                     >
                         <FaTimes size={28} />
                     </button>
 
-                    <div className="text-center">
+                    <div className="text-center w-full min-h-full flex flex-col items-center justify-start">
                         <div className="space-y-6">
                             {navLinks.map((link, index) => {
                                 const isActive = pathname === link.href;

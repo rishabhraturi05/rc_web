@@ -182,6 +182,7 @@ const Contact = () => {
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
                 >
                   <label htmlFor="otherQuery" className="block text-sm font-semibold text-cyan-400 mb-2 font-mono tracking-widest uppercase mt-4">
                     Please Specify <span className="text-red-500">*</span>
