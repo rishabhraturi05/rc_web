@@ -47,7 +47,7 @@ const Navbar = () => {
             initial={{ y: -100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.8, ease: 'easeOut' }}
-            className="fixed top-0 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-7xl h-18 flex items-center justify-between px-4 sm:px-8 py-2 glass-panel rounded-full font-mono transition-all duration-500 hover:bg-white/10"
+            className="fixed top-2 lg:top-4 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-7xl h-18 flex items-center justify-between px-4 sm:px-8 py-2 glass-panel rounded-full font-mono transition-all duration-500 hover:bg-white/10"
         >
             {/* Logo Section */}
             <div className="relative z-10 flex items-center space-x-2 sm:space-x-4">
@@ -99,46 +99,35 @@ const Navbar = () => {
                 </button>
             </div>
 
-            {/* Mobile Menu Overlay */}
+            {/* Mobile Menu Dropdown */}
             {isMobileMenuOpen && (
-                <div
-                    role="dialog"
-                    aria-modal="true"
-                    aria-label="Navigation menu"
-                    className="lg:hidden fixed inset-0 bg-black bg-opacity-95 z-50 overflow-y-auto pb-10 pt-20"
+                <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                    className="lg:hidden absolute top-full left-0 right-0 mt-3 glass-panel rounded-2xl z-50 flex flex-col overflow-hidden shadow-2xl border border-white/10"
                 >
-                    {/* Close Button */}
-                    <button
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className="fixed top-4 right-4 text-white p-2 hover:text-gray-300 transition-colors duration-300 z-[60] bg-black/50 rounded-full"
-                        aria-label="Close navigation menu"
-                    >
-                        <FaTimes size={28} />
-                    </button>
+                    <div className="flex flex-col w-full py-4 space-y-1">
+                        {navLinks.map((link) => {
+                            const isActive = pathname === link.href;
 
-                    <div className="text-center w-full min-h-full flex flex-col items-center justify-start">
-                        <div className="space-y-6">
-                            {navLinks.map((link, index) => {
-                                const isActive = pathname === link.href;
-
-                                return (
-                                    <Link
-                                        key={link.name}
-                                        href={link.href}
-                                        onClick={() => setIsMobileMenuOpen(false)}
-                                        className={`block text-2xl sm:text-3xl uppercase tracking-wide transition-all duration-300 hover:scale-110 ${
-                                            isActive ? 'text-cyan-400 font-bold' : 'text-white hover:text-blue-400'
-                                        } ${link.isFreshers ? 'text-red-400 font-bold tracking-widest' : ''}`}
-                                        style={{ animationDelay: `${index * 0.1}s` }}
-                                    >
-                                        {link.isFreshers ? '🚀 ' : ''}
-                                        {link.name}
-                                    </Link>
-                                );
-                            })}
-                        </div>
+                            return (
+                                <Link
+                                    key={link.name}
+                                    href={link.href}
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                    className={`px-6 py-3 text-base sm:text-lg uppercase tracking-wide transition-all duration-300 ${
+                                        isActive ? 'bg-white/10 text-cyan-400 font-bold' : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                                    } ${link.isFreshers ? 'text-red-400 font-bold' : ''}`}
+                                >
+                                    {link.isFreshers ? '🚀 ' : ''}
+                                    {link.name}
+                                </Link>
+                            );
+                        })}
                     </div>
-                </div>
+                </motion.div>
             )}
         </motion.nav>
     );
