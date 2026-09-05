@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { FaLinkedin, FaInstagram, FaEnvelope, FaNetworkWired, FaMicrochip, FaCode, FaCogs, FaBullhorn } from 'react-icons/fa' 
+import { FaLinkedin, FaInstagram, FaEnvelope, FaNetworkWired, FaMicrochip, FaCode, FaCogs, FaBullhorn } from 'react-icons/fa'
 import { allmembers } from '../components/Membersarray';
 
 const profiles = {
@@ -41,7 +41,7 @@ const ProfileCard = ({ person, size = 'md', index = 0 }) => {
   }
 
   return (
-    <motion.div 
+    <motion.div
       variants={cardVariants}
       initial="hidden"
       animate="visible"
@@ -51,38 +51,38 @@ const ProfileCard = ({ person, size = 'md', index = 0 }) => {
       <div className={`relative ${isExtraSmall ? 'h-50' : isSmall ? 'h-74' : 'h-68'} w-full`}>
         <img src={person.img} alt={person.name} className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
       </div>
-      
+
       {/* Cyberpunk gradient overlay */}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent opacity-80 transition-opacity duration-300 group-hover:opacity-90"></div>
-      
+
       {/* Border glow on hover */}
       <div className="absolute inset-0 border-2 border-transparent transition-colors duration-300 group-hover:border-cyan-400/50 rounded-xl pointer-events-none"></div>
 
       <div className="absolute inset-x-0 bottom-0 p-4 text-white transform transition-transform duration-300">
-          <div className="flex flex-col gap-2">
-            <p className={`${isExtraSmall ? 'text-xs' : isSmall ? 'text-sm' : 'text-base'} font-bold font-mono tracking-tight text-cyan-50`}>{person.name}</p>
-            <div className="flex gap-4 items-center">
-              <button 
-                onClick={() => copyToClipboard(person.email, 'email')} 
-                className="pointer-events-auto text-gray-400 hover:text-cyan-400 transition-colors"
-                title="Copy email"
-              >
-                <FaEnvelope size={16} />
-              </button>
-              <Link href={person.linkedin} target="_blank" rel="noreferrer" className="pointer-events-auto text-gray-400 hover:text-blue-400 transition-colors">
-                <FaLinkedin size={16} />
-              </Link>
-              <button 
-                onClick={() => copyToClipboard(person.instagram, 'instagram')} 
-                className="pointer-events-auto text-gray-400 hover:text-pink-400 transition-colors"
-                title="Copy Instagram"
-              >
-                <FaInstagram size={16} />
-              </button>
-            </div>
+        <div className="flex flex-col gap-2">
+          <p className={`${isExtraSmall ? 'text-xs' : isSmall ? 'text-sm' : 'text-base'} font-bold font-mono tracking-tight text-cyan-50`}>{person.name}</p>
+          <div className="flex gap-4 items-center">
+            <button
+              onClick={() => copyToClipboard(person.email, 'email')}
+              className="pointer-events-auto text-gray-400 hover:text-cyan-400 transition-colors"
+              title="Copy email"
+            >
+              <FaEnvelope size={16} />
+            </button>
+            <Link href={person.linkedin} target="_blank" rel="noreferrer" className="pointer-events-auto text-gray-400 hover:text-blue-400 transition-colors">
+              <FaLinkedin size={16} />
+            </Link>
+            <button
+              onClick={() => copyToClipboard(person.instagram, 'instagram')}
+              className="pointer-events-auto text-gray-400 hover:text-pink-400 transition-colors"
+              title="Copy Instagram"
+            >
+              <FaInstagram size={16} />
+            </button>
           </div>
+        </div>
       </div>
-      
+
       {/* Terminal style copy notification */}
       {copied && (
         <div className="absolute top-4 right-4 bg-cyan-900/80 backdrop-blur border border-cyan-400 text-cyan-100 px-3 py-1 rounded-md text-xs font-mono font-medium animate-pulse">
@@ -116,9 +116,9 @@ const Page = () => {
       {/* Hero Section */}
       <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pt-32 pb-12 text-center">
         <motion.div
-           initial={{ opacity: 0, y: -20 }}
-           animate={{ opacity: 1, y: 0 }}
-           transition={{ duration: 0.8 }}
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
         >
           <h1 className="mb-4 text-5xl md:text-7xl font-black text-white title-glow tracking-tighter" style={{ fontFamily: 'var(--font-orbitron)' }}>TEAM DATABASE</h1>
           <p className="text-cyan-400 font-mono text-lg max-w-2xl mx-auto bg-black/40 backdrop-blur-sm p-4 rounded-lg shadow-xl border border-white/10">
@@ -134,11 +134,10 @@ const Page = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-5 py-3 rounded-md font-mono text-xs md:text-sm uppercase tracking-widest transition-all duration-300 border-2 ${
-                activeTab === tab.id 
-                  ? 'bg-cyan-500/20 border-cyan-400 text-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.4)] scale-105' 
+              className={`flex items-center gap-2 px-5 py-3 rounded-md font-mono text-xs md:text-sm uppercase tracking-widest transition-all duration-300 border-2 ${activeTab === tab.id
+                  ? 'bg-cyan-500/20 border-cyan-400 text-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.4)] scale-105'
                   : 'bg-black/60 border-white/10 text-gray-400 hover:border-white/30 hover:text-white hover:bg-black/80'
-              } backdrop-blur-md`}
+                } backdrop-blur-md`}
             >
               {tab.icon}
               {tab.label}
@@ -172,7 +171,7 @@ const Page = () => {
               exit={{ opacity: 0, y: -20, filter: 'blur(10px)' }}
               transition={{ duration: 0.3 }}
             >
-              <Section title="Software Team" people={allofthemembers.software} cardSize="sm" />
+              <Section title="Software Team" people={allofthemembers.software} cardSize="md" />
             </motion.div>
           )}
 
@@ -184,7 +183,7 @@ const Page = () => {
               exit={{ opacity: 0, y: -20, filter: 'blur(10px)' }}
               transition={{ duration: 0.3 }}
             >
-              <Section title="Embedded Systems" people={allofthemembers.embedded} cardSize="sm" />
+              <Section title="Embedded Systems" people={allofthemembers.embedded} cardSize="md" />
             </motion.div>
           )}
 
@@ -196,7 +195,7 @@ const Page = () => {
               exit={{ opacity: 0, y: -20, filter: 'blur(10px)' }}
               transition={{ duration: 0.3 }}
             >
-              <Section title="Mechanical Team" people={allofthemembers.mechanical} cardSize="sm" />
+              <Section title="Mechanical Team" people={allofthemembers.mechanical} cardSize="md" />
             </motion.div>
           )}
 
@@ -213,7 +212,7 @@ const Page = () => {
           )}
         </AnimatePresence>
       </div>
-      
+
     </main>
   )
 }
