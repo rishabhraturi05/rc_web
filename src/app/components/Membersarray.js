@@ -42,7 +42,7 @@ export const allmembers = {
             "email": "vishnushankar0410@gmail.com",
             "img": "/members/2026/vishnu_shankar.webp",
             "linkedin": "https://www.linkedin.com/in/vishnu-shankar-075710380?utm_source=share_via&utm_content=profile&utm_medium=member_android",
-            "instagram": "https://__vishnu__087"
+            "instagram": "https://www.instagram.com/__vishnu__087"
         },
         {
             "name": "Chandaluri Mahesh",
