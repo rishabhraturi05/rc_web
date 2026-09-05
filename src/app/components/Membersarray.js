@@ -11,10 +11,17 @@ export const allmembers = {
     "embedded": [
         {
             "name": "Ibrahim Azeem",
-            "email": "ibrahim@example.com",
+            "email": "bss10i19ibrahimazeem@gmail.com",
             "img": "/members/embedded/Ibrahim Azeem.jpg",
-            "linkedin": "/",
+            "linkedin": "https://www.linkedin.com/in/ibrahim-azeem/",
             "instagram": "/"
+        },
+        {
+            "name": "Varshith Varakala",
+            "email": "varshithvarakala@gmail.com",
+            "img": "/members/2026/varshith_varakala.webp",
+            "linkedin": "https://www.linkedin.com/in/varshith-varakala",
+            "instagram": "https://www.instagram.com/varshithvarakala"
         },
         {
             "name": "Abdul Hadi",
@@ -220,13 +227,6 @@ export const allmembers = {
             "img": "/members/2026/aryan_roy.webp",
             "linkedin": "https://www.linkedin.com/in/aryan-roy-jsr",
             "instagram": "https://www.instagram.com/llamadrips?igsi=MXhtZHNza3QyYXUycw=="
-        },
-        {
-            "name": "Varshith Varakala",
-            "email": "varshithvarakala@gmail.com",
-            "img": "/members/2026/varshith_varakala.webp",
-            "linkedin": "www.linkedin.com/in/varshith-varakala",
-            "instagram": "www.instagram.com/varshithvarakala"
         },
         {
             "name": "Saarth Yawale",

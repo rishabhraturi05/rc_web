@@ -107,7 +107,7 @@ const Page = () => {
               className="px-6 py-3 glass-panel border-l-2 border-l-cyber/50 pointer-events-auto self-start bg-black/40 backdrop-blur-sm shadow-xl"
             >
               <p className="text-gray-400 text-sm font-mono italic">
-                {">"} &quot;yes we are a new club, but we ain&apos;t gonna disappoint y&apos;all tho.&quot;
+                {">"} &quot;not the oldest club on campus, just the one with the most solder burns.&quot;
               </p>
             </motion.div>
           </div>
@@ -141,7 +141,7 @@ const Page = () => {
               className="px-6 py-3 glass-panel border-r-2 border-r-cyber/50 pointer-events-auto self-end bg-black/40 backdrop-blur-sm shadow-xl max-w-sm"
             >
               <p className="text-gray-400 text-sm font-mono italic text-right">
-                {">"} &quot;we&apos;re a group of people who got a little bit of brains and we do kinda work hard (u can see it right in front of u)&quot;
+                {">"} &quot;theory is cool, but we prefer watching things actually move.&quot;
               </p>
             </motion.div>
           </div>
@@ -188,7 +188,7 @@ const Page = () => {
               className="px-8 py-4 glass-panel border-b-2 border-b-cyber/50 pointer-events-auto self-center bg-black/40 backdrop-blur-sm shadow-xl"
             >
               <p className="text-gray-400 text-base font-mono italic text-center">
-                {">"} &quot;we do wanna grow big as a community in the college&quot;
+                {">"} &quot;room for anyone curious enough to make a machine come alive.&quot;
               </p>
             </motion.div>
           </div>
