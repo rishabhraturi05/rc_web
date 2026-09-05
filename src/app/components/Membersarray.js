@@ -394,6 +394,13 @@ export const allmembers = {
             "instagram": "https://www.instagram.com/amitsarkar_5810"
         },
         {
+            "name": "Shravya Rangu",
+            "email": "rs24eeb0b51@student.nitw.ac.in",
+            "img": "/members/embedded/Shravya_Rangu.jpeg",
+            "linkedin": "https://www.linkedin.com/in/shravya-rangu-a02908261",
+            "instagram": "https://www.instagram.com/shravya__rangu"
+        },
+        {
             "name": "Mohit Senthilkumaran",
             "email": "ms24ecb1a32@student.nitw.ac.in",
             "img": "/members/2026/mohit_senthilkumaran.webp",
