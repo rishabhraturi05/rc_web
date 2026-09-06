@@ -1,18 +1,8 @@
 import { connectDB } from "@/app/lib/db";
 import FreshersRegistration from "@/app/models/FreshersRegistration";
-import { isCountdownActive } from "@/app/freshers/lib/countdownHelper";
 
 export async function POST(req) {
   try {
-    if (isCountdownActive()) {
-      return Response.json(
-        {
-          success: false,
-          msg: "SECURITY LOCKOUT: Registration is currently locked! Please wait for the countdown timer to expire.",
-        },
-        { status: 403 }
-      );
-    }
 
     const body = await req.json();
     const {

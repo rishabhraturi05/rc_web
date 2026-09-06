@@ -11,12 +11,6 @@ export const freshersEvent = {
   venue: "TBD — VENUE",
   registrationDeadline: "TBD — REGISTRATION DEADLINE",
   registrationOpen: true,
-
-  // Countdown Target Configuration
-  // Set to an ISO date string when you have the actual date (e.g. "2026-09-15T18:00:00+05:30")
-  // For testing: set to "TEST_1MIN" or leave as "TEST_1MIN" to countdown 1 minute from initial start.
-  countdownTarget: "2026-09-10T18:00:00+05:30",
-  countdownEnabled: true,
   prizes: "TBD — EXCITING PRIZES & CERTIFICATES",
   teamSize: "6 Crewmates per Team",
   eligibility: "All First-Year Students of NIT Warangal",
