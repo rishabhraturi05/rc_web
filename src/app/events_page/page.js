@@ -172,16 +172,16 @@ const EventsPage = () => {
   const events = [
     {
       id: 1,
-      title: "Fresher's Event",
-      date: "Oct 17, 2025",
-      time: "5:00 PM",
-      venue: "MME Seminar Hall",
+      title: "AMONG THE BOTS",
+      date: "Sept 27, 2026",
+      time: "TBD",
+      venue: "NAB",
       duration: "3 hours",
       fee: "-",
-      status: "completed",
+      status: "active",
       image: "/events/freshers.jpg",
-      shortDescription: "Exclusive event for freshers",
-      description: "The wait is finally OVER.\nThe heist of creativity is about to begin…\n🎭 LA CASA DE ROBOT\nHere's the Masterplan, Crew:\n🔹 Rendezvous Point: MME Seminar Hall\n🔹 Mission: Crack codes, conquer challenges, outsmart the clock\n🔹 Goal: Unleash your inner innovator 🤖\n\nAnd the spoils of this heist ? 🏆\nRobotic Kits, Refreshments, Glory, and Bragging Rights! ⚙\nThis time, we're not after gold or banks…\nWe're after something bigger —\n⚡ Innovation.Imagination.The Future of Robotics! ⚡\n",
+      shortDescription: "Exclusive robotics freshers event: Among the Bots",
+      description: "Emergency Meeting, Crewmates! Prepare for an immersive, tech-driven freshers experience inspired by Among Us.\n\n🔹 Venue: NAB\n🔹 Mission: Solve robotics puzzles, fix broken systems, identify impostors, and experience life inside the Robotics Club NITW spaceship.\n🔹 Eligibility: All First-Year Students of NIT Warangal\n🔹 Team: 6 Crewmates per Team\n\nHead over to the Freshers tab to submit your crewmate registration!",
       contact: "Contact: robotics@nitw.ac.in | Phone: +91-7661991859"
     },
     {
