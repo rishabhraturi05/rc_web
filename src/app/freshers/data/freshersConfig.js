@@ -3,11 +3,11 @@
 // Update placeholders when official event details are confirmed.
 
 export const freshersEvent = {
-  eventName: "AMONG THE BOTS",
-  eventSubtitle: "Robotics Club NIT Warangal presents the ultimate spaceship adventure!",
+  eventName: "Project Skeld",
+  eventSubtitle: "Robotics Club NIT Warangal presents Project Skeld — the ultimate spaceship adventure!",
   tagline: "EMERGENCY MEETING: JOIN THE CREW OR BE LEFT IN THE VENT",
-  eventDate: "27th September",
-  eventTime: "TBD — EVENT TIME",
+  eventDate: "26th September",
+  eventTime: "4:00 PM",
   venue: "NAB",
   registrationDeadline: "TBD — REGISTRATION DEADLINE",
   registrationOpen: true,

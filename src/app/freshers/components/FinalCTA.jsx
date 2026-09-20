@@ -10,7 +10,7 @@ export default function FinalCTA({ onRegisterClick }) {
           AIRLOCK CLOSING SOON
         </h2>
         <p className="text-yellow-400 text-sm sm:text-base max-w-xl mx-auto mb-6">
-          Do not miss the Robotics Club NITW AMONG THE BOTS Freshers Bash at NAB. Transmit your crewmate data before mission launch.
+          Do not miss the Robotics Club NITW Project Skeld Freshers Bash at NAB. Transmit your crewmate data before mission launch.
         </p>
 
         <button

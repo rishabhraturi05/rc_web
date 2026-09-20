@@ -74,7 +74,7 @@ export default function WhatsAppGroupSection({ whatsappLink: initialLink = "" })
         {/* Description Box */}
         <div className="p-4 sm:p-5 mb-6 rounded-xl bg-gray-900/90 border border-gray-800 text-center">
           <p className="text-sm sm:text-base text-gray-200 leading-relaxed font-sans max-w-2xl mx-auto">
-            Join the official Robotics Club NITW Freshers WhatsApp group to get instant mission updates, find crewmates to form teams, ask questions to seniors, and coordinate your event schedule.
+            Join the official Robotics Club NITW Project Skeld WhatsApp group to get instant mission updates, find crewmates to form teams, ask questions to seniors, and coordinate your event schedule.
           </p>
         </div>
 

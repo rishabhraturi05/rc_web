@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import AmongUsA from "./AmongUsA";
 
 export default function FreshersHero({ eventConfig, onRegisterClick }) {
   return (
@@ -13,14 +12,9 @@ export default function FreshersHero({ eventConfig, onRegisterClick }) {
       </div>
 
       {/* Main Title Header */}
-      <h1 className="text-3xl sm:text-6xl lg:text-7xl font-extrabold tracking-wider mb-3 text-white glow-white drop-shadow-[0_0_20px_rgba(255,255,255,0.4)] flex items-center justify-center flex-wrap gap-x-3 sm:gap-x-4">
-        <span className="inline-flex items-center">
-          <AmongUsA className="mr-0.5 sm:mr-1" />
-          <span className="sr-only">A</span>
-          <span>MONG</span>
-        </span>
-        <span>THE</span>
-        <span>BOTS</span>
+      <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-wider mb-2 text-white glow-white drop-shadow-[0_0_20px_rgba(255,255,255,0.4)] flex items-center justify-center flex-wrap gap-x-3 sm:gap-x-4">
+        <span>PROJECT</span>
+        <span>SKELD</span>
       </h1>
 
       {/* Subtitle */}
@@ -31,6 +25,16 @@ export default function FreshersHero({ eventConfig, onRegisterClick }) {
       <p className="text-xs sm:text-base text-gray-300 max-w-2xl mx-auto mb-6 sm:mb-8 font-sans px-2">
         {eventConfig.eventSubtitle}
       </p>
+
+      {/* Subheading */}
+      <h2 className="text-lg sm:text-2xl md:text-3xl font-bold tracking-widest text-cyan-400 font-vcr glow-cyan uppercase mb-3">
+        EXCLUSIVELY FOR FRESHERS
+      </h2>
+
+      {/* Prize Highlight
+      <p className="text-base sm:text-xl font-bold tracking-wider text-yellow-400 font-vcr glow-yellow uppercase mb-6 sm:mb-8 px-2">
+        WIN EXCITING PRIZES LIKE KEYBOARD, HEADPHONES AND MANY MORE.....
+      </p> */}
 
       {/* Event Details Badges (Date, Time, Venue) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10 max-w-4xl mx-auto">

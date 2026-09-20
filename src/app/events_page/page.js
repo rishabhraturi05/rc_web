@@ -43,7 +43,7 @@ const EventCard = ({ event, onClick, index }) => {
         style={{ backgroundImage: `url('${event.image}')` }}
       ></div>
       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent z-10"></div>
-      
+
       {getStatusBadge(event.status)}
 
       <div className="relative z-20 p-6 transform transition-transform duration-300 group-hover:-translate-y-2">
@@ -51,7 +51,7 @@ const EventCard = ({ event, onClick, index }) => {
         <p className="text-sm mb-3 font-mono text-cyan-400">{event.date}</p>
         <p className="text-sm font-mono text-gray-300 opacity-90 line-clamp-2 border-l-2 border-cyan-400 pl-3">{event.shortDescription}</p>
         <p className="mt-4 font-mono text-xs text-cyan-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-            {'>'} CLICK TO DECRYPT
+          {'>'} CLICK TO DECRYPT
         </p>
       </div>
     </motion.div>
@@ -89,7 +89,7 @@ const EventModal = ({ event, isOpen, onClose }) => {
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={onClose}
           />
-          
+
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -102,10 +102,10 @@ const EventModal = ({ event, isOpen, onClose }) => {
             <div className="relative h-48 sm:h-64 rounded-t-xl overflow-hidden">
               <div
                 className="absolute inset-0 bg-cover bg-center"
-                style={{ backgroundImage: `url('${event.image}')` }}  
+                style={{ backgroundImage: `url('${event.image}')` }}
               ></div>
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent"></div>
-              
+
               <button
                 onClick={onClose}
                 aria-label="Close dialog"
@@ -113,10 +113,10 @@ const EventModal = ({ event, isOpen, onClose }) => {
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
               </button>
-              
+
               <div className="absolute bottom-6 left-6 right-6">
                 <h2 id="event-modal-title" className="text-3xl sm:text-4xl font-bold text-white uppercase tracking-widest drop-shadow-lg" style={{ fontFamily: 'var(--font-orbitron)' }}>
-                    {event.title}
+                  {event.title}
                 </h2>
               </div>
             </div>
@@ -172,15 +172,15 @@ const EventsPage = () => {
   const events = [
     {
       id: 1,
-      title: "AMONG THE BOTS",
-      date: "Sept 27, 2026",
-      time: "TBD",
+      title: "PROJECT SKELD",
+      date: "Sept 26, 2026",
+      time: "4:00 PM",
       venue: "NAB",
       duration: "3 hours",
       fee: "-",
       status: "active",
       image: "/events/freshers.jpg",
-      shortDescription: "Exclusive robotics freshers event: Among the Bots",
+      shortDescription: "Exclusive robotics freshers event: Project Skeld",
       description: "Emergency Meeting, Crewmates! Prepare for an immersive, tech-driven freshers experience inspired by Among Us.\n\n🔹 Venue: NAB\n🔹 Mission: Solve robotics puzzles, fix broken systems, identify impostors, and experience life inside the Robotics Club NITW spaceship.\n🔹 Eligibility: All First-Year Students of NIT Warangal\n🔹 Team: 6 Crewmates per Team\n\nHead over to the Freshers tab to submit your crewmate registration!",
       contact: "Contact: robotics@nitw.ac.in | Phone: +91-7661991859"
     },
@@ -272,9 +272,9 @@ const EventsPage = () => {
       {/* Hero Section */}
       <div className="relative z-10 pt-32 pb-16 text-center">
         <motion.div
-           initial={{ opacity: 0, y: -20 }}
-           animate={{ opacity: 1, y: 0 }}
-           transition={{ duration: 0.8 }}
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
         >
           <h1 className="mb-4 text-5xl md:text-7xl font-black text-white title-glow tracking-tighter uppercase" style={{ fontFamily: 'var(--font-orbitron)' }}>
             Events

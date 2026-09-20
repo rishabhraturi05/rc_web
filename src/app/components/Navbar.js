@@ -43,7 +43,7 @@ const Navbar = () => {
     }, [isMobileMenuOpen]);
 
     return (
-        <motion.nav 
+        <motion.nav
             initial={{ y: -100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.8, ease: 'easeOut' }}
@@ -76,9 +76,8 @@ const Navbar = () => {
                         <Link
                             key={link.name}
                             href={link.href}
-                            className={`cyber-link uppercase text-xs sm:text-sm xl:text-base ${
-                                isActive ? 'text-white font-bold' : 'text-gray-300'
-                            } ${link.isFreshers ? 'text-red-400 hover:text-red-400' : ''}`}
+                            className={`cyber-link uppercase text-xs sm:text-sm xl:text-base ${isActive ? 'text-white font-bold' : 'text-gray-300'
+                                } ${link.isFreshers ? 'text-red-400 hover:text-red-400' : ''}`}
                         >
                             {link.isFreshers ? '🚀 ' : ''}
                             {link.name}
@@ -101,7 +100,7 @@ const Navbar = () => {
 
             {/* Mobile Menu Dropdown */}
             {isMobileMenuOpen && (
-                <motion.div 
+                <motion.div
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
@@ -117,9 +116,8 @@ const Navbar = () => {
                                     key={link.name}
                                     href={link.href}
                                     onClick={() => setIsMobileMenuOpen(false)}
-                                    className={`px-6 py-3 text-base sm:text-lg uppercase tracking-wide transition-all duration-300 ${
-                                        isActive ? 'bg-white/10 text-cyan-400 font-bold' : 'text-gray-300 hover:bg-white/5 hover:text-white'
-                                    } ${link.isFreshers ? 'text-red-400 font-bold' : ''}`}
+                                    className={`px-6 py-3 text-base sm:text-lg uppercase tracking-wide transition-all duration-300 ${isActive ? 'bg-white/10 text-cyan-400 font-bold' : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                                        } ${link.isFreshers ? 'text-red-400 font-bold' : ''}`}
                                 >
                                     {link.isFreshers ? '🚀 ' : ''}
                                     {link.name}

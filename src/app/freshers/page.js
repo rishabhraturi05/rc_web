@@ -5,8 +5,8 @@ import WhatsAppGroupSection from "./components/WhatsAppGroupSection";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "AMONG THE BOTS | RC NITW Freshers",
-  description: "Robotics Club NIT Warangal presents AMONG THE BOTS Freshers Event at NAB.",
+  title: "Project Skeld | RC NITW",
+  description: "Robotics Club NIT Warangal presents Project Skeld at NAB.",
 };
 
 export default function FreshersPage() {
