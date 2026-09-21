@@ -5,7 +5,7 @@ import EmergencyButton from "./EmergencyButton";
 import RegisteredFlash from "./RegisteredFlash";
 import { submitFreshersRegistration } from "../lib/registrationApi";
 
-const BRANCHES = ["CSE", "ECE", "EEE", "MECH", "CIVIL", "CHEM", "META", "BIOTECH", "CSE(AIDS)", "MNC", "ECE(VLSI)", "EEE(Electric Mobility)",];
+const BRANCHES = ["CSE", "CSE(AIDS)", "MNC", "ECE", "ECE(VLSI)", "EEE", "EEE(Electric Mobility)", "MECH", "CIVIL", "CHEM", "BIOTECH", "META", "BSC-BED", "INTEGRATED MSC"];
 
 const initialForm = {
   name: "",
@@ -43,13 +43,19 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
     if (participants.length >= 5) return;
     setParticipants((prev) => [...prev, { name: "", rollNo: "" }]);
   };
+  
   const removeParticipant = (index) => {
     if (participants.length <= 1) return;
     setParticipants((prev) => prev.filter((_, i) => i !== index));
   };
+  
   const updateParticipant = (index, field, value) => {
+    let finalValue = value;
+    if (field === "rollNo") {
+      finalValue = finalValue.toUpperCase();
+    }
     setParticipants((prev) =>
-      prev.map((p, i) => (i === index ? { ...p, [field]: value } : p))
+      prev.map((p, i) => (i === index ? { ...p, [field]: finalValue } : p))
     );
   };
 
@@ -62,9 +68,10 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
       return;
     }
 
-    const rollRegex = /^26(BTB|CEB|CHB|CSB|ECB|EEB|MEB|MMB|CYC|MAC|PHC|EDB)[0-1][A-B][0-9]{2}$/;
+    const rollRegex = /^26(CSB0A|CSB0B|CSB1A|ECB0A|ECB0B|ECB1A|EEB0A|EEB1A|MEB0A|MEB0B|CEB0A|CEB0B|CHB0A|CHB0B|BTB0A|MMB0A|CYE00|PHE00|EDI00|CDS0A|MAE00)[0-9]{2}$/i;
+    
     if (!rollRegex.test(formData.rollNo)) {
-      setErrorMessage("INVALID ROLL NUMBER FORMAT. VERIFY YOUR BRANCH CODE.");
+      setErrorMessage("INVALID LEADER ROLL NUMBER FORMAT. VERIFY YOUR BRANCH CODE.");
       return;
     }
 
@@ -83,6 +90,14 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
     const missingRoll = cleanParticipants.some((p) => !p.rollNo);
     if (missingRoll) {
       const msg = "ROLL NUMBER IS REQUIRED FOR ALL TEAM PARTICIPANTS.";
+      setErrorMessage(msg);
+      alert(`⚠️ REGISTRATION BLOCKED:\n${msg}`);
+      return;
+    }
+
+    const invalidCrewmateRoll = cleanParticipants.some((p) => !rollRegex.test(p.rollNo));
+    if (invalidCrewmateRoll) {
+      const msg = "ONE OR MORE CREWMATES HAVE AN INVALID ROLL NUMBER FORMAT.";
       setErrorMessage(msg);
       alert(`⚠️ REGISTRATION BLOCKED:\n${msg}`);
       return;
@@ -113,7 +128,6 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
       setTerminalLog("> TRANSMISSION FAILED.");
       const errorMsg = res.error || "TRANSMISSION ERROR. PLEASE RETRY.";
       setErrorMessage(errorMsg);
-      // Popup alert to inform user clearly when duplicate roll number or email is detected
       alert(`⚠️ REGISTRATION BLOCKED:\n\n${errorMsg}`);
     }
   };
@@ -215,11 +229,11 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
                 value={formData.rollNo}
                 onChange={handleChange}
                 required
-                pattern="^26(BTB|CEB|CHB|CSB|ECB|EEB|MEB|MMB|CYC|MAC|PHC|EDB)[0-1][A-B][0-9]{2}$"
+                pattern="^26(CSB0A|CSB0B|CSB1A|ECB0A|ECB0B|ECB1A|EEB0A|EEB1A|MEB0A|MEB0B|CEB0A|CEB0B|CHB0A|CHB0B|BTB0A|MMB0A|CYE00|PHE00|EDI00|CDS0A|MAE00)[0-9]{2}$"
                 title="Format must include a valid branch code (e.g., 26CSB0A09)"
                 maxLength={9}
                 disabled={submitting}
-                className="w-full px-4 py-2.5 bg-gray-900 border-2 border-gray-700 rounded-lg text-white font-vcr text-sm focus:outline-none focus:border-yellow-400 focus:shadow-[0_0_15px_rgba(245,158,11,0.3)]"
+                className="w-full px-4 py-2.5 bg-gray-900 border-2 border-gray-700 rounded-lg text-white font-vcr text-sm focus:outline-none focus:border-yellow-400 focus:shadow-[0_0_15px_rgba(245,158,11,0.3)] uppercase"
                 placeholder="26CSB0A09"
               />
             </div>
@@ -292,6 +306,9 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
                     value={participant.rollNo || ""}
                     onChange={(e) => updateParticipant(index, "rollNo", e.target.value)}
                     required
+                    pattern="^26(CSB0A|CSB0B|CSB1A|ECB0A|ECB0B|ECB1A|EEB0A|EEB1A|MEB0A|MEB0B|CEB0A|CEB0B|CHB0A|CHB0B|BTB0A|MMB0A|CYE00|PHE00|EDI00|CDS0A|MAE00)[0-9]{2}$"
+                    title="Format must include a valid branch code (e.g., 26CSB0A09)"
+                    maxLength={9}
                     disabled={submitting}
                     className="w-full sm:w-44 px-4 py-2 bg-gray-900 border border-gray-700 rounded text-sm text-white font-vcr focus:outline-none focus:border-yellow-400 uppercase"
                     placeholder="Roll No"
