@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import EmergencyButton from "./EmergencyButton";
 import RegisteredFlash from "./RegisteredFlash";
 import { submitFreshersRegistration } from "../lib/registrationApi";
@@ -19,11 +19,26 @@ const initialForm = {
 
 export default function RegistrationTerminal({ eventConfig, onSuccessComplete }) {
   const [formData, setFormData] = useState(initialForm);
-  const [participants, setParticipants] = useState([{ name: "", rollNo: "" }]);
+  const [participants, setParticipants] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [terminalLog, setTerminalLog] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [registeredData, setRegisteredData] = useState(null);
+  const [showWhatsappOverlay, setShowWhatsappOverlay] = useState(false);
+  const [whatsappLink, setWhatsappLink] = useState("");
+
+  useEffect(() => {
+    const fetchWhatsappLink = async () => {
+      try {
+        const response = await fetch("/api/whatsapp");
+        const data = await response.json();
+        if (data.link) {
+          setWhatsappLink(data.link);
+        }
+      } catch (error) {}
+    };
+    fetchWhatsappLink();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -45,7 +60,6 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
   };
   
   const removeParticipant = (index) => {
-    if (participants.length <= 1) return;
     setParticipants((prev) => prev.filter((_, i) => i !== index));
   };
   
@@ -59,6 +73,15 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
     );
   };
 
+  const handleFullReset = () => {
+    setShowWhatsappOverlay(false);
+    setFormData(initialForm);
+    setParticipants([]);
+    setSubmitting(false);
+    setTerminalLog("");
+    setErrorMessage("");
+  };
+
   const handleRegisterSubmit = async (e) => {
     if (e) e.preventDefault();
     setErrorMessage("");
@@ -68,7 +91,7 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
       return;
     }
 
-    const rollRegex = /^26(CSB0A|CSB0B|CSB1A|ECB0A|ECB0B|ECB1A|EEB0A|EEB1A|MEB0A|MEB0B|CEB0A|CEB0B|CHB0A|CHB0B|BTB0A|MMB0A|CYE00|PHE00|EDI00|CDS0A|MAE00)[0-9]{2}$/i;
+    const rollRegex = /^26(CSB0A|CSB0B|CSB1A|ECB0A|ECB0B|ECB1A|EEB0A|EEB0B|EEB1A|EMB0A|MEB0A|MEB0B|CEB0A|CEB0B|CHB0A|CHB0B|BTB0A|MMB0A|CYE00|PHE00|EDI00|DSB0A|MAE00)[0-9]{2}$/i;
     
     if (!rollRegex.test(formData.rollNo)) {
       setErrorMessage("INVALID LEADER ROLL NUMBER FORMAT. VERIFY YOUR BRANCH CODE.");
@@ -82,24 +105,17 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
       }))
       .filter((p) => p.name.length > 0);
 
-    if (cleanParticipants.length === 0) {
-      setErrorMessage("AT LEAST ONE PARTICIPANT NAME IS REQUIRED.");
-      return;
-    }
-
     const missingRoll = cleanParticipants.some((p) => !p.rollNo);
     if (missingRoll) {
-      const msg = "ROLL NUMBER IS REQUIRED FOR ALL TEAM PARTICIPANTS.";
-      setErrorMessage(msg);
-      alert(`⚠️ REGISTRATION BLOCKED:\n${msg}`);
+      setErrorMessage("ROLL NUMBER IS REQUIRED FOR ALL TEAM PARTICIPANTS.");
+      alert("⚠️ REGISTRATION BLOCKED:\nROLL NUMBER IS REQUIRED FOR ALL TEAM PARTICIPANTS.");
       return;
     }
 
     const invalidCrewmateRoll = cleanParticipants.some((p) => !rollRegex.test(p.rollNo));
     if (invalidCrewmateRoll) {
-      const msg = "ONE OR MORE CREWMATES HAVE AN INVALID ROLL NUMBER FORMAT.";
-      setErrorMessage(msg);
-      alert(`⚠️ REGISTRATION BLOCKED:\n${msg}`);
+      setErrorMessage("ONE OR MORE CREWMATES HAVE AN INVALID ROLL NUMBER FORMAT.");
+      alert("⚠️ REGISTRATION BLOCKED:\nONE OR MORE CREWMATES HAVE AN INVALID ROLL NUMBER FORMAT.");
       return;
     }
 
@@ -140,15 +156,49 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
           eventConfig={eventConfig}
           onReset={() => {
             setRegisteredData(null);
-            setFormData(initialForm);
-            setParticipants([{ name: "", rollNo: "" }]);
-            setSubmitting(false);
-            setTerminalLog("");
-            setErrorMessage("");
+            setShowWhatsappOverlay(true);
           }}
         />
       )}
-      <div className="crt-screen crt-scanlines p-6 sm:p-8 bg-gray-950/95 text-white border-2 border-red-500/70 shadow-[0_0_35px_rgba(239,68,68,0.25)]">
+      
+      <div className="relative overflow-hidden crt-screen crt-scanlines p-6 sm:p-8 bg-gray-950/95 text-white border-2 border-red-500/70 shadow-[0_0_35px_rgba(239,68,68,0.25)]">
+        
+        {showWhatsappOverlay && (
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-gray-950/95 p-6 text-center border-4 border-green-500 shadow-[inset_0_0_50px_rgba(16,185,129,0.3)]">
+            <span className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mb-6 animate-pulse border border-green-400">
+              <span className="text-4xl drop-shadow-[0_0_10px_rgba(74,222,128,1)]">💬</span>
+            </span>
+            <h2 className="text-2xl sm:text-4xl font-bold text-green-400 tracking-widest mb-4 drop-shadow-[0_0_12px_rgba(74,222,128,0.8)]">
+              REGISTRATION COMPLETE!
+            </h2>
+            <p className="text-gray-300 text-xs sm:text-sm mb-10 font-mono tracking-widest leading-relaxed max-w-lg">
+              YOU HAVE SUCCESSFULLY REGISTERED. JOIN THE WHATSAPP GROUP NOW FOR ALL MISSION UPDATES AND EVENT DETAILS.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-5 w-full sm:w-auto">
+              <a
+                href={whatsappLink || "#"}
+                target={whatsappLink ? "_blank" : "_self"}
+                rel="noopener noreferrer"
+                onClick={(e) => {
+                  if (!whatsappLink) {
+                    e.preventDefault();
+                    alert("WhatsApp group link is not detected. Please make sure you saved your env.local file with NEXT_PUBLIC_WHATSAPP_GROUP_LINK=https://chat.whatsapp.com/...");
+                  }
+                }}
+                className="px-6 py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-lg shadow-[0_0_20px_rgba(22,163,74,0.6)] transition-all flex items-center justify-center gap-2 border-2 border-green-400 text-sm sm:text-base tracking-widest"
+              >
+                JOIN WHATSAPP GROUP
+              </a>
+              <button
+                onClick={handleFullReset}
+                className="px-6 py-3 bg-red-950/80 hover:bg-red-900/80 text-red-400 font-bold border-2 border-red-800 rounded-lg transition-all text-sm sm:text-base tracking-widest shadow-[0_0_15px_rgba(153,27,27,0.5)]"
+              >
+                CLOSE TERMINAL
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center justify-between border-b-2 border-red-500/50 pb-3 mb-6">
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
@@ -229,7 +279,7 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
                 value={formData.rollNo}
                 onChange={handleChange}
                 required
-                pattern="^26(CSB0A|CSB0B|CSB1A|ECB0A|ECB0B|ECB1A|EEB0A|EEB1A|MEB0A|MEB0B|CEB0A|CEB0B|CHB0A|CHB0B|BTB0A|MMB0A|CYE00|PHE00|EDI00|CDS0A|MAE00)[0-9]{2}$"
+                pattern="^26(CSB0A|CSB0B|CSB1A|ECB0A|ECB0B|ECB1A|EEB0A|EEB0B|EEB1A|MEB0A|MEB0B|CEB0A|CEB0B|CHB0A|CHB0B|BTB0A|MMB0A|CYE00|PHE00|EDI00|CDS0A|MAE00)[0-9]{2}$"
                 title="Format must include a valid branch code (e.g., 26CSB0A09)"
                 maxLength={9}
                 disabled={submitting}
@@ -277,7 +327,7 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
           <div className="pt-2">
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs text-yellow-400 font-bold tracking-wider">
-                [!] PARTICIPANT CREWMATES ({participants.length}) *
+                [!] PARTICIPANT CREWMATES ({participants.length}) (OPTIONAL)
               </label>
               {participants.length < 5 && (
                 <button
@@ -306,23 +356,21 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
                     value={participant.rollNo || ""}
                     onChange={(e) => updateParticipant(index, "rollNo", e.target.value)}
                     required
-                    pattern="^26(CSB0A|CSB0B|CSB1A|ECB0A|ECB0B|ECB1A|EEB0A|EEB1A|MEB0A|MEB0B|CEB0A|CEB0B|CHB0A|CHB0B|BTB0A|MMB0A|CYE00|PHE00|EDI00|CDS0A|MAE00)[0-9]{2}$"
+                    pattern="^26(CSB0A|CSB0B|CSB1A|ECB0A|ECB0B|ECB1A|EEB0A|EEB0B|EEB1A|MEB0A|MEB0B|CEB0A|CEB0B|CHB0A|CHB0B|BTB0A|MMB0A|CYE00|PHE00|EDI00|CDS0A|MAE00)[0-9]{2}$"
                     title="Format must include a valid branch code (e.g., 26CSB0A09)"
                     maxLength={9}
                     disabled={submitting}
                     className="w-full sm:w-44 px-4 py-2 bg-gray-900 border border-gray-700 rounded text-sm text-white font-vcr focus:outline-none focus:border-yellow-400 uppercase"
                     placeholder="Roll No"
                   />
-                  {participants.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeParticipant(index)}
-                      disabled={submitting}
-                      className="px-3 py-2 bg-red-950 text-red-400 border border-red-800 rounded text-xs hover:bg-red-900 cursor-pointer self-end sm:self-auto"
-                    >
-                      ✕
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeParticipant(index)}
+                    disabled={submitting}
+                    className="px-3 py-2 bg-red-950 text-red-400 border border-red-800 rounded text-xs hover:bg-red-900 cursor-pointer self-end sm:self-auto"
+                  >
+                    ✕
+                  </button>
                 </div>
               ))}
             </div>
