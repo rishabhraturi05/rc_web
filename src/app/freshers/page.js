@@ -1,37 +1,28 @@
-"use client";
-
-import { useState, useEffect } from "react";
+import FreshersIntroOverlay from "./components/FreshersIntroOverlay";
 import FreshersExperience from "./components/FreshersExperience";
+import WhatsAppGroupSection from "./components/WhatsAppGroupSection";
 
-export function FreshersIntroOverlay() {
-  const [showIntro, setShowIntro] = useState(true);
+export const dynamic = "force-dynamic";
 
-  useEffect(() => {
-    const timer = setTimeout(() => setShowIntro(false), 4000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  return (
-    <>
-      {showIntro && (
-        <div className="shhh-overlay select-none">
-          <div className="shhh-character-wrapper">
-            <img src="/freshers/among-us/intro/shhh-wheel.png" alt="wheel" className="shhh-wheel" />
-            <img src="/freshers/among-us/intro/shhh-body.png" alt="body" className="shhh-body" />
-            <img src="/freshers/among-us/intro/shhh-hand.png" alt="hand" className="shhh-hand" />
-          </div>
-          <img src="/freshers/among-us/intro/Shhh-text.png" alt="SHHHHHHH!" className="shhh-text-img" />
-        </div>
-      )}
-    </>
-  );
-}
+export const metadata = {
+  title: "Project Skeld | RC NITW",
+  description: "Robotics Club NIT Warangal presents Project Skeld at NAB.",
+};
 
 export default function FreshersPage() {
+  const whatsappLink =
+    process.env.NEXT_PUBLIC_WHATSAPP_GROUP_LINK ||
+    process.env.WHATSAPP_GROUP_LINK ||
+    process.env.NEXT_PUBLIC_WHATSAPP_LINK ||
+    process.env.WHATSAPP_LINK ||
+    "";
+
   return (
     <>
       <FreshersIntroOverlay />
-      <FreshersExperience />
+      <FreshersExperience>
+        <WhatsAppGroupSection whatsappLink={whatsappLink} />
+      </FreshersExperience>
     </>
   );
 }

@@ -3,12 +3,12 @@
 // Update placeholders when official event details are confirmed.
 
 export const freshersEvent = {
-  eventName: "RC NITW FRESHERS 2026",
-  eventSubtitle: "Robotics Club NIT Warangal presents the ultimate spaceship adventure!",
+  eventName: "Project Skeld",
+  eventSubtitle: "Robotics Club NIT Warangal presents Project Skeld — the ultimate spaceship adventure!",
   tagline: "EMERGENCY MEETING: JOIN THE CREW OR BE LEFT IN THE VENT",
-  eventDate: "TBD — EVENT DATE",
-  eventTime: "TBD — EVENT TIME",
-  venue: "TBD — VENUE",
+  eventDate: "26th September",
+  eventTime: "4:00 PM",
+  venue: "NAB",
   registrationDeadline: "TBD — REGISTRATION DEADLINE",
   registrationOpen: true,
   prizes: "TBD — EXCITING PRIZES & CERTIFICATES",

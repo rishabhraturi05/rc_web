@@ -5,7 +5,7 @@ import EmergencyButton from "./EmergencyButton";
 import RegisteredFlash from "./RegisteredFlash";
 import { submitFreshersRegistration } from "../lib/registrationApi";
 
-const BRANCHES = ["CSE", "ECE", "EEE", "MECH", "CIVIL", "CHEM", "META", "BIOTECH", "Other"];
+const BRANCHES = ["CSE", "ECE", "EEE", "MECH", "CIVIL", "CHEM", "META", "BIOTECH", "CSE(AIDS)", "MNC", "ECE(VLSI)", "EEE(Electric Mobility)",];
 
 const initialForm = {
   name: "",
@@ -28,7 +28,7 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     let finalValue = type === "checkbox" ? checked : value;
-    
+
     if (name === "rollNo") {
       finalValue = finalValue.toUpperCase();
     }
@@ -39,7 +39,10 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
     }));
   };
 
-  const addParticipant = () => setParticipants((prev) => [...prev, { name: "", rollNo: "" }]);
+  const addParticipant = () => {
+    if (participants.length >= 5) return;
+    setParticipants((prev) => [...prev, { name: "", rollNo: "" }]);
+  };
   const removeParticipant = (index) => {
     if (participants.length <= 1) return;
     setParticipants((prev) => prev.filter((_, i) => i !== index));
@@ -262,14 +265,16 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
               <label className="text-xs text-yellow-400 font-bold tracking-wider">
                 [!] PARTICIPANT CREWMATES ({participants.length}) *
               </label>
-              <button
-                type="button"
-                onClick={addParticipant}
-                disabled={submitting}
-                className="text-xs text-green-400 hover:text-green-300 font-bold flex items-center gap-1 cursor-pointer"
-              >
-                + ADD CREWMATE
-              </button>
+              {participants.length < 5 && (
+                <button
+                  type="button"
+                  onClick={addParticipant}
+                  disabled={submitting}
+                  className="text-xs text-green-400 hover:text-green-300 font-bold flex items-center gap-1 cursor-pointer"
+                >
+                  + ADD CREWMATE
+                </button>
+              )}
             </div>
 
             <div className="space-y-2">

@@ -15,7 +15,7 @@ import FinalCTA from "./FinalCTA";
 import AmbientVentKill from "./AmbientVentKill";
 import WormholeRunner from "./WormholeRunner";
 
-export default function FreshersExperience() {
+export default function FreshersExperience({ children }) {
   const scrollToRegister = () => {
     const regSection = document.getElementById("register");
     if (regSection) {
@@ -33,14 +33,15 @@ export default function FreshersExperience() {
           eventConfig={freshersEvent}
           onRegisterClick={scrollToRegister}
         />
-        <EventIntel eventConfig={freshersEvent} />
-        <RegistrationTerminal eventConfig={freshersEvent} />
-        
         <div className="max-w-4xl mx-auto p-4 border border-blue-500/30 bg-blue-900/20 rounded-lg">
           <p className="text-blue-200 text-sm md:text-base font-mono text-center">
             <span className="font-bold text-blue-400">Solo or short-handed?</span> Team Formation Policy: If you are unable to form a complete team of 6 members prior to the event, do not worry. We will match and merge individual participants into a cohesive team on-site.
           </p>
         </div>
+        <EventIntel eventConfig={freshersEvent} />
+        <RegistrationTerminal eventConfig={freshersEvent} />
+        
+        {children}
 
         <RulesTerminal rules={freshersEvent.rules} />
         <SecurityMap />
