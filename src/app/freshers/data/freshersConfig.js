@@ -11,7 +11,7 @@ export const freshersEvent = {
   venue: "NAB",
   registrationDeadline: "TBD — REGISTRATION DEADLINE",
   registrationOpen: true,
-  prizes: "TBD — EXCITING PRIZES & CERTIFICATES",
+  prizes: "TBD — EXCITING PRIZES",
   teamSize: "6 Crewmates per Team",
   eligibility: "All First-Year Students of NIT Warangal",
 

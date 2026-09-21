@@ -10,7 +10,7 @@ const FreshersRegistrationSchema = new mongoose.Schema(
     branch: { type: String, required: true },
     participants: {
       type: [mongoose.Schema.Types.Mixed],
-      required: true,
+      default: [],
     },
     considerRecruitment: { type: Boolean, default: false },
     attended: { type: Boolean, default: false },

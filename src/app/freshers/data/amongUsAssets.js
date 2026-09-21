@@ -9,6 +9,7 @@ export const amongUsAssets = {
     yellow: "/freshers/among-us/crewmates/yellow.svg",
     green: "/freshers/among-us/crewmates/green.svg",
     purple: "/freshers/among-us/crewmates/purple.svg",
+    dead: "/freshers/among-us/crewmates/dead.svg",
   },
   intro: {
     crewmate: "/freshers/among-us/intro/shhh-body.png",

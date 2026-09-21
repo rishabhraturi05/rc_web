@@ -70,8 +70,7 @@ export async function POST(req) {
       !email ||
       !contactNo ||
       !rollNo ||
-      !branch ||
-      !participants?.length
+      !branch
     ) {
       return NextResponse.json(
         { success: false, message: "Missing required fields" },
@@ -79,16 +78,10 @@ export async function POST(req) {
       );
     }
 
-    const cleanedParticipants = participants
-      .map((p) => p.trim())
+    const rawParticipants = Array.isArray(participants) ? participants : [];
+    const cleanedParticipants = rawParticipants
+      .map((p) => (typeof p === "string" ? p.trim() : (p?.name || "").trim()))
       .filter(Boolean);
-
-    if (cleanedParticipants.length === 0) {
-      return NextResponse.json(
-        { success: false, message: "At least one participant is required" },
-        { status: 400 }
-      );
-    }
 
     await connectDB();
 
