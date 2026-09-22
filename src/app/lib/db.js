@@ -24,6 +24,8 @@ export async function connectDB() {
         dbName: "Rc",
         bufferCommands: false,
         serverSelectionTimeoutMS: 15000,
+        maxPoolSize: 10,
+        minPoolSize: 1,
         family: 4,
       })
       .then((mongooseInstance) => {

@@ -177,6 +177,7 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
 
   const handleRegisterSubmit = async (e) => {
     if (e) e.preventDefault();
+    if (submitting) return;
     setErrorMessage("");
 
     if (!formData.name.trim() || !formData.email.trim() || !formData.contactNo.trim() || !formData.rollNo.trim() || !formData.branch || !formData.teamName.trim()) {
@@ -520,6 +521,7 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
             <EmergencyButton
               onClick={handleRegisterSubmit}
               disabled={submitting}
+              loading={submitting}
               label={submitting ? "TRANSMITTING..." : "EMERGENCY\nMEETING"}
             />
           </div>

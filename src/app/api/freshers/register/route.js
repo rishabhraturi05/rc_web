@@ -137,6 +137,19 @@ export async function POST(req) {
   } catch (err) {
     console.error("FRESHERS REGISTER ERROR:", err);
 
+    if (err.code === 11000) {
+      const field = Object.keys(err.keyPattern || {})[0] || "entry";
+      const val = err.keyValue ? Object.values(err.keyValue)[0] : "";
+      const fieldName = field === "rollNo" ? "Roll Number" : field === "email" ? "Email" : field;
+      return Response.json(
+        {
+          success: false,
+          msg: `${fieldName} '${val}' is already registered in the system! Duplicate registrations are not allowed.`,
+        },
+        { status: 409 }
+      );
+    }
+
     const isDbError =
       err.message?.includes("connect") ||
       err.message?.includes("MONGODB_URI") ||
