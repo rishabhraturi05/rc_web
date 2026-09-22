@@ -174,7 +174,7 @@ const EventsPage = () => {
       id: 1,
       title: "PROJECT SKELD",
       date: "Sept 26, 2026",
-      time: "4:00 PM",
+      time: "5:00 PM",
       venue: "NAB",
       duration: "3 hours",
       fee: "-",
