@@ -15,6 +15,7 @@ const FreshersRegistrationSchema = new mongoose.Schema(
     considerRecruitment: { type: Boolean, default: false },
     attended: { type: Boolean, default: false },
     isWalkIn: { type: Boolean, default: false },
+    isDeleted: { type: Boolean, default: false },
   },
   {
     timestamps: true,

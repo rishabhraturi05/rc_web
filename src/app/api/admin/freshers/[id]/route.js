@@ -26,11 +26,15 @@ export async function PUT(req, { params }) {
 
     await connectDB();
     const { id } = await params;
-    const { attended } = await req.json();
+    const { attended, isDeleted } = await req.json();
+
+    const updateData = {};
+    if (attended !== undefined) updateData.attended = !!attended;
+    if (isDeleted !== undefined) updateData.isDeleted = !!isDeleted;
 
     const updated = await FreshersRegistration.findByIdAndUpdate(
       id,
-      { attended: !!attended },
+      updateData,
       { new: true }
     );
 
@@ -58,8 +62,16 @@ export async function DELETE(req, { params }) {
 
     await connectDB();
     const { id } = await params;
+    
+    const url = new URL(req.url);
+    const permanent = url.searchParams.get("permanent");
 
-    const deleted = await FreshersRegistration.findByIdAndDelete(id);
+    let deleted;
+    if (permanent === "true") {
+      deleted = await FreshersRegistration.findByIdAndDelete(id);
+    } else {
+      deleted = await FreshersRegistration.findByIdAndUpdate(id, { isDeleted: true }, { new: true });
+    }
 
     if (!deleted) {
       return NextResponse.json(

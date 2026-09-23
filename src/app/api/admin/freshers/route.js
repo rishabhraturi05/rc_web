@@ -30,13 +30,18 @@ export async function GET() {
       .sort({ createdAt: -1 })
       .lean();
 
-    const totalTeams = teams.length;
-    const totalAttended = teams.filter((t) => t.attended).length;
+    const activeTeams = teams.filter(t => !t.isDeleted);
+    const totalTeams = activeTeams.length;
+    const totalAttended = activeTeams.filter((t) => t.attended).length;
+    const totalParticipants = activeTeams.reduce(
+      (sum, t) => sum + 1 + (t.participants?.length || 0),
+      0
+    );
 
     return NextResponse.json({
       success: true,
       data: teams,
-      stats: { totalTeams, totalAttended },
+      stats: { totalTeams, totalAttended, totalParticipants },
     });
   } catch (err) {
     console.log("GET FRESHERS ERROR:", err);

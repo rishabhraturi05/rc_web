@@ -12,7 +12,9 @@ import {
   FaPlus,
   FaTimes,
   FaArrowLeft,
+  FaDownload,
 } from "react-icons/fa";
+import * as XLSX from "xlsx";
 
 const BRANCHES = ["CSE", "ECE", "EEE", "MECH", "CIVIL", "CHEM", "META", "BIOTECH", "Other"];
 
@@ -30,7 +32,8 @@ export default function AdminFreshers() {
   const router = useRouter();
   const { data: session, status } = useSession();
   const [teams, setTeams] = useState([]);
-  const [stats, setStats] = useState({ totalTeams: 0, totalAttended: 0 });
+  const [stats, setStats] = useState({ totalTeams: 0, totalAttended: 0, totalParticipants: 0 });
+  const [viewMode, setViewMode] = useState("all");
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [expandedTeam, setExpandedTeam] = useState(null);
@@ -73,9 +76,14 @@ export default function AdminFreshers() {
   }, [status, session, router, fetchTeams]);
 
   const filteredTeams = useMemo(() => {
-    if (!search.trim()) return teams;
+    let list = teams;
+    if (viewMode === "all") list = list.filter(t => !t.isDeleted);
+    else if (viewMode === "attended") list = list.filter(t => !t.isDeleted && t.attended);
+    else if (viewMode === "bin") list = list.filter(t => t.isDeleted);
+
+    if (!search.trim()) return list;
     const q = search.toLowerCase();
-    return teams.filter(
+    return list.filter(
       (t) =>
         t.teamName.toLowerCase().includes(q) ||
         t.name.toLowerCase().includes(q) ||
@@ -89,7 +97,7 @@ export default function AdminFreshers() {
           return p.toLowerCase().includes(q);
         })
     );
-  }, [teams, search]);
+  }, [teams, search, viewMode]);
 
   const handleToggleAttended = async (id, current) => {
     try {
@@ -119,25 +127,73 @@ export default function AdminFreshers() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Delete this entire team from the database? This cannot be undone.")) return;
+    if (!window.confirm("Move this team to the recycle bin?")) return;
     try {
       setDeleting(id);
       const res = await fetch(`/api/admin/freshers/${id}`, { method: "DELETE" });
       const data = await res.json();
       if (data.success) {
+        setTeams((prev) => prev.map((t) => t._id === id ? { ...t, isDeleted: true } : t));
         const removed = teams.find((t) => t._id === id);
-        setTeams((prev) => prev.filter((t) => t._id !== id));
         setStats((prev) => ({
+          ...prev,
           totalTeams: prev.totalTeams - 1,
           totalAttended: prev.totalAttended - (removed?.attended ? 1 : 0),
+          totalParticipants: prev.totalParticipants - (1 + (removed?.participants?.length || 0))
         }));
       } else {
-        alert(data.message || "Failed to delete");
+        alert(data.message || "Failed to move to bin");
       }
     } catch {
-      alert("Failed to delete team");
+      alert("Failed to move to bin");
     } finally {
       setDeleting(null);
+    }
+  };
+
+  const handlePermanentDelete = async (id) => {
+    if (!window.confirm("Permanently delete this team? This cannot be undone.")) return;
+    try {
+      setDeleting(id);
+      const res = await fetch(`/api/admin/freshers/${id}?permanent=true`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        setTeams((prev) => prev.filter((t) => t._id !== id));
+      } else {
+        alert(data.message || "Failed to delete permanently");
+      }
+    } catch {
+      alert("Failed to delete permanently");
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const handleRestore = async (id) => {
+    try {
+      setUpdating(id);
+      const res = await fetch(`/api/admin/freshers/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isDeleted: false }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setTeams((prev) => prev.map((t) => t._id === id ? { ...t, isDeleted: false } : t));
+        const restored = teams.find((t) => t._id === id);
+        setStats((prev) => ({
+          ...prev,
+          totalTeams: prev.totalTeams + 1,
+          totalAttended: prev.totalAttended + (restored?.attended ? 1 : 0),
+          totalParticipants: prev.totalParticipants + (1 + (restored?.participants?.length || 0))
+        }));
+      } else {
+        alert(data.message || "Failed to restore");
+      }
+    } catch {
+      alert("Failed to restore team");
+    } finally {
+      setUpdating(null);
     }
   };
 
@@ -178,6 +234,63 @@ export default function AdminFreshers() {
     }
   };
 
+  const handleDownloadExcel = () => {
+    if (filteredTeams.length === 0) {
+      alert("No data to download.");
+      return;
+    }
+
+    const headers = [
+      "Team Name",
+      "Leader Name",
+      "Email",
+      "Contact No",
+      "Roll No",
+      "Branch",
+      "Attended",
+      "Is Walk-In",
+      "Recruitment Interest",
+      "Participant 1",
+      "Participant 2",
+      "Participant 3",
+      "Participant 4",
+      "Participant 5"
+    ];
+
+    const dataRows = [];
+
+    filteredTeams.forEach((team) => {
+      const row = [
+        team.teamName,
+        team.name,
+        team.email,
+        team.contactNo,
+        team.rollNo,
+        team.branch,
+        team.attended ? "Yes" : "No",
+        team.isWalkIn ? "Yes" : "No",
+        team.considerRecruitment ? "Yes" : "No",
+      ];
+      
+      const maxParticipants = 5;
+      for (let i = 0; i < maxParticipants; i++) {
+        const p = team.participants[i];
+        if (p) {
+          row.push(typeof p === "object" ? `${p.name || ""} ${p.rollNo || ""}`.trim() : p);
+        } else {
+          row.push("");
+        }
+      }
+
+      dataRows.push(row);
+    });
+
+    const worksheet = XLSX.utils.aoa_to_sheet([headers, ...dataRows]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Teams");
+    XLSX.writeFile(workbook, `freshers_teams_${viewMode}.xlsx`);
+  };
+
   if (status === "loading" || loading) {
     return (
       <div className="relative min-h-screen text-white flex items-center justify-center pt-24">
@@ -208,6 +321,12 @@ export default function AdminFreshers() {
             </div>
             <div className="flex flex-wrap gap-3">
               <button
+                onClick={handleDownloadExcel}
+                className="flex items-center gap-2 px-5 py-2 border border-white text-white bg-transparent rounded hover:bg-white hover:text-black transition-colors font-mono uppercase text-sm tracking-widest"
+              >
+                <FaDownload /> [ DOWNLOAD ]
+              </button>
+              <button
                 onClick={() => setShowWalkInForm(true)}
                 className="flex items-center gap-2 px-5 py-2 border border-white text-white bg-transparent rounded hover:bg-white hover:text-black transition-colors font-mono uppercase text-sm tracking-widest"
               >
@@ -223,15 +342,41 @@ export default function AdminFreshers() {
           </div>
 
           {/* Stats */}
-          <div className="grid sm:grid-cols-2 gap-4 mb-8">
+          <div className="grid sm:grid-cols-3 gap-4 mb-8">
             <div className="glass-panel p-6 text-center">
               <p className="font-mono text-gray-400 text-sm mb-1 uppercase tracking-wider">Total Teams Registered</p>
               <p className="font-mono text-4xl text-white">{stats.totalTeams}</p>
             </div>
             <div className="glass-panel p-6 text-center">
-              <p className="font-mono text-gray-400 text-sm mb-1 uppercase tracking-wider">Teams Attended (Checked In)</p>
+              <p className="font-mono text-gray-400 text-sm mb-1 uppercase tracking-wider">Teams Attended</p>
               <p className="font-mono text-4xl text-white">{stats.totalAttended}</p>
             </div>
+            <div className="glass-panel p-6 text-center">
+              <p className="font-mono text-gray-400 text-sm mb-1 uppercase tracking-wider">Total Participants</p>
+              <p className="font-mono text-4xl text-white">{stats.totalParticipants}</p>
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex gap-6 mb-6 border-b border-white/20 pb-4 overflow-x-auto font-mono text-sm uppercase tracking-wider">
+            <button
+              onClick={() => setViewMode("all")}
+              className={`whitespace-nowrap pb-2 ${viewMode === "all" ? "text-white border-b-2 border-white" : "text-gray-500 hover:text-gray-300"}`}
+            >
+              All Teams
+            </button>
+            <button
+              onClick={() => setViewMode("attended")}
+              className={`whitespace-nowrap pb-2 ${viewMode === "attended" ? "text-white border-b-2 border-white" : "text-gray-500 hover:text-gray-300"}`}
+            >
+              Attended Teams
+            </button>
+            <button
+              onClick={() => setViewMode("bin")}
+              className={`whitespace-nowrap pb-2 ${viewMode === "bin" ? "text-white border-b-2 border-white" : "text-gray-500 hover:text-gray-300"}`}
+            >
+              Recycle Bin
+            </button>
           </div>
 
           {/* Search */}
@@ -323,28 +468,55 @@ export default function AdminFreshers() {
                   </div>
 
                   <div className="flex flex-col gap-2 shrink-0">
-                    <button
-                      onClick={() => handleToggleAttended(team._id, team.attended)}
-                      disabled={updating === team._id}
-                      title={team.attended ? "Mark as not attended" : "Mark as attended"}
-                      className={`p-3 rounded-lg transition-all ${
-                        team.attended
-                          ? "bg-green-600/30 text-green-400 border border-green-600/50"
-                          : "bg-gray-800/60 text-gray-400 border border-gray-600/50 hover:text-green-400 hover:border-green-600/50"
-                      } ${updating === team._id ? "opacity-50" : ""}`}
-                    >
-                      <FaCheck size={20} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(team._id)}
-                      disabled={deleting === team._id}
-                      className={`p-3 rounded-lg text-red-400 hover:text-red-300 border border-red-800/50 hover:border-red-600/50 transition-all ${
-                        deleting === team._id ? "opacity-50" : ""
-                      }`}
-                      title="Delete team"
-                    >
-                      <FaTrash size={18} />
-                    </button>
+                    {viewMode === "bin" ? (
+                      <>
+                        <button
+                          onClick={() => handleRestore(team._id)}
+                          disabled={updating === team._id}
+                          className={`p-3 rounded-lg bg-blue-600/30 text-blue-400 border border-blue-600/50 hover:text-blue-300 hover:border-blue-500 transition-all ${
+                            updating === team._id ? "opacity-50" : ""
+                          }`}
+                          title="Restore team"
+                        >
+                          <FaCheck size={18} />
+                        </button>
+                        <button
+                          onClick={() => handlePermanentDelete(team._id)}
+                          disabled={deleting === team._id}
+                          className={`p-3 rounded-lg text-red-400 hover:text-red-300 border border-red-800/50 hover:border-red-600/50 transition-all ${
+                            deleting === team._id ? "opacity-50" : ""
+                          }`}
+                          title="Delete permanently"
+                        >
+                          <FaTrash size={18} />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => handleToggleAttended(team._id, team.attended)}
+                          disabled={updating === team._id}
+                          title={team.attended ? "Mark as not attended" : "Mark as attended"}
+                          className={`p-3 rounded-lg transition-all ${
+                            team.attended
+                              ? "bg-green-600/30 text-green-400 border border-green-600/50"
+                              : "bg-gray-800/60 text-gray-400 border border-gray-600/50 hover:text-green-400 hover:border-green-600/50"
+                          } ${updating === team._id ? "opacity-50" : ""}`}
+                        >
+                          <FaCheck size={20} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(team._id)}
+                          disabled={deleting === team._id}
+                          className={`p-3 rounded-lg text-red-400 hover:text-red-300 border border-red-800/50 hover:border-red-600/50 transition-all ${
+                            deleting === team._id ? "opacity-50" : ""
+                          }`}
+                          title="Move to bin"
+                        >
+                          <FaTrash size={18} />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
