@@ -7,11 +7,11 @@ export const freshersEvent = {
   eventSubtitle: "Robotics Club NIT Warangal presents Project Skeld — the ultimate spaceship adventure!",
   tagline: "EMERGENCY MEETING: JOIN THE CREW OR BE LEFT IN THE VENT",
   eventDate: "26th September",
-  eventTime: "4:00 PM",
+  eventTime: "5:00 PM",
   venue: "NAB",
   registrationDeadline: "TBD — REGISTRATION DEADLINE",
   registrationOpen: true,
-  prizes: "TBD — EXCITING PRIZES & CERTIFICATES",
+  prizes: "TBD — EXCITING PRIZES",
   teamSize: "6 Crewmates per Team",
   eligibility: "All First-Year Students of NIT Warangal",
 

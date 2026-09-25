@@ -22,8 +22,7 @@ export async function POST(req) {
       !email ||
       !contactNo ||
       !rollNo ||
-      !branch ||
-      !participants?.length
+      !branch
     ) {
       return Response.json(
         { success: false, msg: "Missing required fields" },
@@ -35,24 +34,18 @@ export async function POST(req) {
     const trimmedEmail = email.trim().toLowerCase();
 
     // Clean and normalize participants data [{ name, rollNo }]
-    const cleanedParticipants = participants
+    const rawParticipants = Array.isArray(participants) ? participants : [];
+    const cleanedParticipants = rawParticipants
       .map((p) => {
         if (typeof p === "string") {
           return { name: p.trim(), rollNo: "" };
         }
         return {
-          name: p.name ? p.name.trim() : "",
-          rollNo: p.rollNo ? p.rollNo.trim().toUpperCase() : "",
+          name: p?.name ? p.name.trim() : "",
+          rollNo: p?.rollNo ? p.rollNo.trim().toUpperCase() : "",
         };
       })
       .filter((p) => p.name.length > 0);
-
-    if (cleanedParticipants.length === 0) {
-      return Response.json(
-        { success: false, msg: "At least one participant name is required" },
-        { status: 400 }
-      );
-    }
 
     // Check if any participant is missing a roll number
     const missingParticipantRoll = cleanedParticipants.some((p) => !p.rollNo);
@@ -143,6 +136,19 @@ export async function POST(req) {
     return Response.json({ success: true, data: registration }, { status: 201 });
   } catch (err) {
     console.error("FRESHERS REGISTER ERROR:", err);
+
+    if (err.code === 11000) {
+      const field = Object.keys(err.keyPattern || {})[0] || "entry";
+      const val = err.keyValue ? Object.values(err.keyValue)[0] : "";
+      const fieldName = field === "rollNo" ? "Roll Number" : field === "email" ? "Email" : field;
+      return Response.json(
+        {
+          success: false,
+          msg: `${fieldName} '${val}' is already registered in the system! Duplicate registrations are not allowed.`,
+        },
+        { status: 409 }
+      );
+    }
 
     const isDbError =
       err.message?.includes("connect") ||

@@ -1,0 +1,43 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Backpack -->
+  <rect x="18" y="52" width="16" height="34" rx="8" fill="#B91C1C" stroke="#050a14" stroke-width="4.5" />
+
+  <!-- Legs & Lower Torso Main Base -->
+  <!-- Left Leg -->
+  <rect x="30" y="72" width="20" height="24" rx="8" fill="#EF4444" stroke="#050a14" stroke-width="4.5" />
+  <!-- Right Leg -->
+  <rect x="58" y="72" width="20" height="24" rx="8" fill="#EF4444" stroke="#050a14" stroke-width="4.5" />
+
+  <!-- Lower Torso Block -->
+  <path d="M26 50 C26 50, 24 74, 32 76 C40 78, 50 78, 54 70 C58 78, 68 78, 76 76 C84 74, 82 50, 82 50 Z" fill="#EF4444" stroke="#050a14" stroke-width="4.5" stroke-linejoin="round" />
+
+  <!-- Shading on Lower Body -->
+  <path d="M26 58 C27 70, 34 76, 44 76 C38 72, 34 66, 34 58 Z" fill="#B91C1C" opacity="0.6" />
+  <path d="M64 72 C68 76, 74 76, 78 72 C80 66, 80 58, 80 58 C78 64, 72 70, 64 72 Z" fill="#B91C1C" opacity="0.6" />
+
+  <!-- Cut Waist Rim (Severed Flesh) -->
+  <ellipse cx="54" cy="50" rx="28" ry="9" fill="#991B1B" stroke="#050a14" stroke-width="4.5" />
+  <ellipse cx="54" cy="50" rx="23" ry="6" fill="#DC2626" />
+  <ellipse cx="54" cy="50" rx="16" ry="3.5" fill="#7F1D1D" />
+
+  <!-- Bone Base Ring -->
+  <ellipse cx="54" cy="49" rx="8" ry="3" fill="#E2E8F0" stroke="#050a14" stroke-width="2" />
+
+  <!-- Bone Shaft -->
+  <path d="M49 22 L49 48 L59 48 L59 22 Z" fill="#F8FAFC" stroke="#050a14" stroke-width="4" stroke-linejoin="round" />
+
+  <!-- Bone Head / Lobes -->
+  <!-- Left Lobe -->
+  <circle cx="47" cy="18" r="7.5" fill="#F8FAFC" stroke="#050a14" stroke-width="4" />
+  <!-- Right Lobe -->
+  <circle cx="61" cy="18" r="7.5" fill="#F8FAFC" stroke="#050a14" stroke-width="4" />
+
+  <!-- Bone Inner Joint Fill to remove overlapping black lines inside bone -->
+  <rect x="49.5" y="16" width="9" height="12" fill="#F8FAFC" />
+  <circle cx="47" cy="18" r="5.5" fill="#F8FAFC" />
+  <circle cx="61" cy="18" r="5.5" fill="#F8FAFC" />
+
+  <!-- Bone Highlight -->
+  <path d="M46 16 C46 14, 48 13, 50 14" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" />
+  <path d="M52 24 L52 44" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" />
+</svg>

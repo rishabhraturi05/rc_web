@@ -4,17 +4,18 @@ const FreshersRegistrationSchema = new mongoose.Schema(
   {
     teamName: { type: String, required: true },
     name: { type: String, required: true },
-    email: { type: String, required: true, index: true },
+    email: { type: String, required: true, unique: true, index: true },
     contactNo: { type: String, required: true },
-    rollNo: { type: String, required: true, index: true },
+    rollNo: { type: String, required: true, unique: true, index: true },
     branch: { type: String, required: true },
     participants: {
       type: [mongoose.Schema.Types.Mixed],
-      required: true,
+      default: [],
     },
     considerRecruitment: { type: Boolean, default: false },
     attended: { type: Boolean, default: false },
     isWalkIn: { type: Boolean, default: false },
+    isDeleted: { type: Boolean, default: false },
   },
   {
     timestamps: true,

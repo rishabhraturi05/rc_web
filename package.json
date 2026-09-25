@@ -33,7 +33,8 @@
     "sharp": "^0.35.4",
     "tailwind-merge": "^3.6.0",
     "three": "^0.185.1",
-    "tsparticles": "^3.9.1"
+    "tsparticles": "^3.9.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

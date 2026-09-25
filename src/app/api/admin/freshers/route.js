@@ -30,13 +30,18 @@ export async function GET() {
       .sort({ createdAt: -1 })
       .lean();
 
-    const totalTeams = teams.length;
-    const totalAttended = teams.filter((t) => t.attended).length;
+    const activeTeams = teams.filter(t => !t.isDeleted);
+    const totalTeams = activeTeams.length;
+    const totalAttended = activeTeams.filter((t) => t.attended).length;
+    const totalParticipants = activeTeams.reduce(
+      (sum, t) => sum + 1 + (t.participants?.length || 0),
+      0
+    );
 
     return NextResponse.json({
       success: true,
       data: teams,
-      stats: { totalTeams, totalAttended },
+      stats: { totalTeams, totalAttended, totalParticipants },
     });
   } catch (err) {
     console.log("GET FRESHERS ERROR:", err);
@@ -70,8 +75,7 @@ export async function POST(req) {
       !email ||
       !contactNo ||
       !rollNo ||
-      !branch ||
-      !participants?.length
+      !branch
     ) {
       return NextResponse.json(
         { success: false, message: "Missing required fields" },
@@ -79,16 +83,10 @@ export async function POST(req) {
       );
     }
 
-    const cleanedParticipants = participants
-      .map((p) => p.trim())
+    const rawParticipants = Array.isArray(participants) ? participants : [];
+    const cleanedParticipants = rawParticipants
+      .map((p) => (typeof p === "string" ? p.trim() : (p?.name || "").trim()))
       .filter(Boolean);
-
-    if (cleanedParticipants.length === 0) {
-      return NextResponse.json(
-        { success: false, message: "At least one participant is required" },
-        { status: 400 }
-      );
-    }
 
     await connectDB();
 
