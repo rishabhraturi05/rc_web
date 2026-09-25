@@ -5,7 +5,7 @@ import EmergencyButton from "./EmergencyButton";
 import RegisteredFlash from "./RegisteredFlash";
 import { submitFreshersRegistration } from "../lib/registrationApi";
 
-const BRANCHES = ["CSE", "CSE(AIDS)", "MNC", "ECE", "ECE(VLSI)", "EEE", "EEE(Electric Mobility)", "MECH", "CIVIL", "CHEM", "BIOTECH", "META", "BSC-BED", "INTEGRATED MSC"];
+const BRANCHES = ["CSE", "CSE(AIDS)", "MNC", "ECE", "ECE(VLSI)", "EEE", "EEE(Electric Mobility)", "MECH", "CIVIL", "CHEM", "BIOTECH", "META", "BSC-BED", "INTEGRATED MSC","OTHER"];
 
 const initialForm = {
   name: "",
@@ -185,7 +185,7 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
       return;
     }
 
-    const rollRegex = /^26(CSB0A|CSB0B|CSB1A|ECB0A|ECB0B|ECB1A|EEB0A|EEB0B|EEB1A|EMB0A|MEB0A|MEB0B|CEB0A|CEB0B|CHB0A|CHB0B|BTB0A|MMB0A|CYE00|PHE00|EDI00|DSB0A|MAE00)[0-9]{2}$/i;
+    const rollRegex = /^26(CSB0A|CSB0B|CSB1A|CSB1B|ECB0A|ECB0B|ECB1A|ECB1B|EEB0A|EEB0B|EEB1A|EEB1B|EMB0A|MEB0A|MEB0B|MEB1A|MEB1B|CEB0A|CEB0B|CEB1A|CEB1B|CHB0A|CHB0B|CHB1A|CHB1B|BTB0A|BTB1A|BTB1B|MMB0A|MMB1A|MMB1B|CYE00|PHE00|EDI00|DSB0A|MAE00)[0-9]{2}$/i;
     
     if (!rollRegex.test(formData.rollNo)) {
       setErrorMessage("INVALID LEADER ROLL NUMBER FORMAT. VERIFY YOUR BRANCH CODE.");
