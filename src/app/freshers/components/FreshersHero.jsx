@@ -2,7 +2,7 @@
 
 import React from "react";
 
-export default function FreshersHero({ eventConfig, onRegisterClick }) {
+export default function FreshersHero({ eventConfig }) {
   return (
     <section className="relative z-10 w-full max-w-5xl mx-auto px-4 pt-24 sm:pt-32 pb-8 sm:pb-12 font-vcr text-center">
       {/* Top Tagline Badge */}
@@ -31,11 +31,6 @@ export default function FreshersHero({ eventConfig, onRegisterClick }) {
         EXCLUSIVELY FOR FRESHERS
       </h2>
 
-      {/* Prize Highlight
-      <p className="text-base sm:text-xl font-bold tracking-wider text-yellow-400 font-vcr glow-yellow uppercase mb-6 sm:mb-8 px-2">
-        WIN EXCITING PRIZES LIKE KEYBOARD, HEADPHONES AND MANY MORE.....
-      </p> */}
-
       {/* Event Details Badges (Date, Time, Venue) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10 max-w-4xl mx-auto">
         <div className="p-4 rounded-xl border border-yellow-500/50 bg-gray-950/80 text-center shadow-[0_0_15px_rgba(245,158,11,0.15)]">
@@ -58,17 +53,6 @@ export default function FreshersHero({ eventConfig, onRegisterClick }) {
             {eventConfig.venue}
           </div>
         </div>
-      </div>
-
-      {/* Primary Action Button */}
-      <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-        <button
-          type="button"
-          onClick={onRegisterClick}
-          className="w-full sm:w-auto px-10 py-4 rounded-xl font-bold text-lg text-white bg-gradient-to-r from-red-600 via-red-500 to-red-700 hover:from-red-500 hover:to-red-600 border-2 border-red-400 shadow-[0_0_25px_rgba(239,68,68,0.7)] transform hover:scale-105 transition-all cursor-pointer text-center"
-        >
-          [!] REGISTER CREWMATE SQUAD
-        </button>
       </div>
     </section>
   );

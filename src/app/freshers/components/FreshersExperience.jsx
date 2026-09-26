@@ -16,10 +16,10 @@ import AmbientVentKill from "./AmbientVentKill";
 import WormholeRunner from "./WormholeRunner";
 
 export default function FreshersExperience({ children }) {
-  const scrollToRegister = () => {
-    const regSection = document.getElementById("register");
-    if (regSection) {
-      regSection.scrollIntoView({ behavior: "smooth" });
+  const scrollToResults = () => {
+    const resultsSection = document.getElementById("results");
+    if (resultsSection) {
+      resultsSection.scrollIntoView({ behavior: "smooth" });
     }
   };
 
@@ -31,22 +31,18 @@ export default function FreshersExperience({ children }) {
       <main className="relative z-10 pt-4 px-2 sm:px-6 space-y-4">
         <FreshersHero
           eventConfig={freshersEvent}
-          onRegisterClick={scrollToRegister}
+          onRegisterClick={scrollToResults}
         />
-        <div className="max-w-4xl mx-auto p-4 border border-blue-500/30 bg-blue-900/20 rounded-lg">
-          <p className="text-blue-200 text-sm md:text-base font-mono text-center">
-            <span className="font-bold text-blue-400">Solo or short-handed?</span> Team Formation Policy: If you are unable to form a complete team of 6 members prior to the event, do not worry. We will match and merge individual participants into a cohesive team on-site.
-          </p>
-        </div>
-        <EventIntel eventConfig={freshersEvent} />
+        
         <RegistrationTerminal eventConfig={freshersEvent} />
+        <EventIntel eventConfig={freshersEvent} />
         
         {children}
 
         <RulesTerminal rules={freshersEvent.rules} />
         <SecurityMap />
         <ContactCrew />
-        <FinalCTA onRegisterClick={scrollToRegister} />
+        <FinalCTA onRegisterClick={scrollToResults} />
         <div className="pb-8">
           <WormholeRunner speedSeconds={6} crewmateColor="#f59e0b" />
         </div>
