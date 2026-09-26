@@ -11,7 +11,6 @@ import RegistrationTerminal from "./RegistrationTerminal";
 import RulesTerminal from "./RulesTerminal";
 import SecurityMap from "./SecurityMap";
 import ContactCrew from "./ContactCrew";
-import FinalCTA from "./FinalCTA";
 import AmbientVentKill from "./AmbientVentKill";
 import WormholeRunner from "./WormholeRunner";
 
@@ -33,7 +32,6 @@ export default function FreshersExperience({ children }) {
           eventConfig={freshersEvent}
           onRegisterClick={scrollToResults}
         />
-        
         <RegistrationTerminal eventConfig={freshersEvent} />
         <EventIntel eventConfig={freshersEvent} />
         
@@ -42,7 +40,6 @@ export default function FreshersExperience({ children }) {
         <RulesTerminal rules={freshersEvent.rules} />
         <SecurityMap />
         <ContactCrew />
-        <FinalCTA onRegisterClick={scrollToResults} />
         <div className="pb-8">
           <WormholeRunner speedSeconds={6} crewmateColor="#f59e0b" />
         </div>

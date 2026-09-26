@@ -62,7 +62,7 @@ export default function EventDetails({ eventConfig }) {
             </div>
             <div className="text-sm font-bold text-white">{eventConfig.registrationDeadline}</div>
             <p className="text-[11px] text-gray-400 mt-1 font-sans">
-              Slots fill up fast. Submit crewmate data before airlocks close.
+              REGISTRATIONS CLOSED.
             </p>
           </div>
         </div>
