@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 
+/*
 function WhatsAppIcon({ className = "w-6 h-6" }) {
   return (
     <svg
@@ -14,8 +15,14 @@ function WhatsAppIcon({ className = "w-6 h-6" }) {
     </svg>
   );
 }
+*/
 
 export default function WhatsAppGroupSection({ whatsappLink: initialLink = "" }) {
+  // Returning null ensures the component renders nothing on the screen, 
+  // without breaking any imports in parent files.
+  return null;
+
+  /*
   const [copied, setCopied] = useState(false);
   const [whatsappLink, setWhatsappLink] = useState(
     initialLink ||
@@ -57,7 +64,6 @@ export default function WhatsAppGroupSection({ whatsappLink: initialLink = "" })
       className="relative z-10 w-full max-w-4xl mx-auto my-6 px-4 font-vcr"
     >
       <div className="crt-screen crt-scanlines p-6 sm:p-8 bg-gray-950/95 text-white border-2 border-emerald-500/70 shadow-[0_0_35px_rgba(16,185,129,0.25)]">
-        {/* Header Badge */}
         <div className="border-b-2 border-emerald-500/40 pb-3 mb-6 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-950/80 border border-emerald-500 text-emerald-400 text-xs font-bold rounded mb-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -71,14 +77,12 @@ export default function WhatsAppGroupSection({ whatsappLink: initialLink = "" })
           </p>
         </div>
 
-        {/* Description Box */}
         <div className="p-4 sm:p-5 mb-6 rounded-xl bg-gray-900/90 border border-gray-800 text-center">
           <p className="text-sm sm:text-base text-gray-200 leading-relaxed font-sans max-w-2xl mx-auto">
             Join the official Robotics Club NITW Project Skeld WhatsApp group to get instant mission updates, find crewmates to form teams, ask questions to seniors, and coordinate your event schedule.
           </p>
         </div>
 
-        {/* CTA Button */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <a
             href={whatsappLink || "#"}
@@ -117,4 +121,5 @@ export default function WhatsAppGroupSection({ whatsappLink: initialLink = "" })
       </div>
     </section>
   );
+  */
 }

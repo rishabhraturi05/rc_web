@@ -5,6 +5,7 @@ import EmergencyButton from "./EmergencyButton";
 import RegisteredFlash from "./RegisteredFlash";
 import { submitFreshersRegistration } from "../lib/registrationApi";
 
+/*
 const BRANCHES = ["CSE", "CSE(AIDS)", "MNC", "ECE", "ECE(VLSI)", "EEE", "EEE(Electric Mobility)", "MECH", "CIVIL", "CHEM", "BIOTECH", "META", "BSC-BED", "INTEGRATED MSC","OTHER"];
 
 const initialForm = {
@@ -25,15 +26,11 @@ function DeadCrewmateIcon({ className = "w-14 h-14" }) {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      {/* Backpack */}
       <rect x="18" y="52" width="16" height="34" rx="8" fill="#B91C1C" stroke="#050a14" strokeWidth="4.5" />
 
-      {/* Left Leg */}
       <rect x="30" y="72" width="20" height="24" rx="8" fill="#EF4444" stroke="#050a14" strokeWidth="4.5" />
-      {/* Right Leg */}
       <rect x="58" y="72" width="20" height="24" rx="8" fill="#EF4444" stroke="#050a14" strokeWidth="4.5" />
 
-      {/* Lower Torso Body */}
       <path
         d="M26 50 C26 50, 24 74, 32 76 C40 78, 50 78, 54 70 C58 78, 68 78, 76 76 C84 74, 82 50, 82 50 Z"
         fill="#EF4444"
@@ -42,31 +39,24 @@ function DeadCrewmateIcon({ className = "w-14 h-14" }) {
         strokeLinejoin="round"
       />
 
-      {/* Body Shadows */}
       <path d="M26 58 C27 70, 34 76, 44 76 C38 72, 34 66, 34 58 Z" fill="#B91C1C" opacity="0.6" />
       <path d="M64 72 C68 76, 74 76, 78 72 C80 66, 80 58, 80 58 C78 64, 72 70, 64 72 Z" fill="#B91C1C" opacity="0.6" />
 
-      {/* Severed Flesh / Cut Surface */}
       <ellipse cx="54" cy="50" rx="28" ry="9" fill="#991B1B" stroke="#050a14" strokeWidth="4.5" />
       <ellipse cx="54" cy="50" rx="23" ry="6" fill="#DC2626" />
       <ellipse cx="54" cy="50" rx="16" ry="3.5" fill="#7F1D1D" />
 
-      {/* Bone Base Ring */}
       <ellipse cx="54" cy="49" rx="8" ry="3" fill="#E2E8F0" stroke="#050a14" strokeWidth="2" />
 
-      {/* Bone Shaft */}
       <path d="M49 22 L49 48 L59 48 L59 22 Z" fill="#F8FAFC" stroke="#050a14" strokeWidth="4" strokeLinejoin="round" />
 
-      {/* Bone Lobes */}
       <circle cx="47" cy="18" r="7.5" fill="#F8FAFC" stroke="#050a14" strokeWidth="4" />
       <circle cx="61" cy="18" r="7.5" fill="#F8FAFC" stroke="#050a14" strokeWidth="4" />
 
-      {/* Clean Bone Center Joint */}
       <rect x="49.5" y="16" width="9" height="12" fill="#F8FAFC" />
       <circle cx="47" cy="18" r="5.5" fill="#F8FAFC" />
       <circle cx="61" cy="18" r="5.5" fill="#F8FAFC" />
 
-      {/* Bone Highlights */}
       <path d="M46 16 C46 14, 48 13, 50 14" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" />
       <path d="M52 24 L52 44" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" />
     </svg>
@@ -108,7 +98,6 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
             return;
           }
         }
-        // Fallback to /api/whatsapp if needed
         const fallbackRes = await fetch("/api/whatsapp");
         if (fallbackRes.ok) {
           const fallbackData = await fallbackRes.json();
@@ -243,289 +232,77 @@ export default function RegistrationTerminal({ eventConfig, onSuccessComplete })
   };
 
   return (
-    <section id="register" className="relative z-10 w-full max-w-3xl mx-auto my-12 px-4 font-vcr">
-      {registeredData && (
-        <RegisteredFlash
-          registrationData={registeredData}
-          eventConfig={eventConfig}
-          onReset={() => {
-            setRegisteredData(null);
-            setShowWhatsappOverlay(true);
-          }}
-        />
-      )}
+    // Previous return statement omitted
+  );
+}
+*/
 
-      {/* Full-Screen Pop-up Modal with Blurred Background */}
-      {showWhatsappOverlay && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
-          {/* Backdrop Click Dismiss */}
-          <div
-            className="absolute inset-0 cursor-pointer"
-            onClick={handleFullReset}
-            aria-hidden="true"
-          />
+export default function RegistrationTerminal() {
+  const leaderboard = [
+    { rank: 1, name: "apex among imposters - prateek", score: 25 },
+    { rank: 2, name: "heisen-bugs", score: 21 },
+    { rank: 3, name: "o2 tech", score: 21 },
+    { rank: 4, name: "Cyber criminals", score: 20 },
+    { rank: 5, name: "the sus team", score: 20 },
+    { rank: 6, name: "space beans", score: 20 },
+    { rank: 7, name: "6769", score: 18 },
+    { rank: 8, name: "quantum_bots", score: 17 }
+  ];
 
-          {/* Centered Modal Pop-up Card with Blue/Cyan Sci-Fi Styling */}
-          <div className="relative z-10 w-full max-w-lg mx-auto p-6 sm:p-8 bg-gray-950/95 rounded-2xl border-2 border-cyan-400 shadow-[0_0_45px_rgba(6,182,212,0.55),inset_0_0_30px_rgba(6,182,212,0.2)] text-center text-white crt-screen crt-scanlines">
-            {/* Top Close 'X' Button */}
-            <button
-              type="button"
-              onClick={handleFullReset}
-              className="absolute top-4 right-4 w-8 h-8 rounded-lg bg-gray-900 border border-cyan-500/50 text-cyan-400 hover:text-white hover:border-cyan-300 hover:bg-cyan-950/60 flex items-center justify-center text-sm font-mono transition-all cursor-pointer"
-              title="Close Terminal"
-            >
-              ✕
-            </button>
-
-            {/* Among Us Killed Crewmate Round Badge with Blue Sci-Fi Ring */}
-            <div className="relative mb-5 flex items-center justify-center">
-              <span className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-cyan-950/60 flex items-center justify-center animate-pulse border-2 border-cyan-400 shadow-[0_0_30px_rgba(6,182,212,0.6)]">
-                <DeadCrewmateIcon className="w-14 h-14 sm:w-16 sm:h-16 drop-shadow-[0_0_14px_rgba(239,68,68,0.9)]" />
-              </span>
-            </div>
-
-            {/* Blue / Cyan Type Header */}
-            <h2 className="text-2xl sm:text-3xl font-bold text-cyan-400 tracking-widest mb-3 drop-shadow-[0_0_15px_rgba(34,211,238,0.9)] uppercase">
-              REGISTRATION COMPLETE!
-            </h2>
-
-            <p className="text-gray-300 text-xs sm:text-sm mb-8 font-mono tracking-widest leading-relaxed max-w-md mx-auto">
-              YOU HAVE SUCCESSFULLY REGISTERED. JOIN THE WHATSAPP GROUP NOW FOR ALL MISSION UPDATES AND EVENT DETAILS.
-            </p>
-
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 w-full justify-center">
-              <a
-                href={whatsappLink || DEFAULT_WHATSAPP_LINK}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => {
-                  const targetUrl = whatsappLink || DEFAULT_WHATSAPP_LINK;
-                  if (!targetUrl) {
-                    e.preventDefault();
-                    alert("WhatsApp group link is not detected. Please verify your environment configuration.");
-                  }
-                }}
-                className="px-6 py-3.5 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl shadow-[0_0_20px_rgba(22,163,74,0.6)] transition-all flex items-center justify-center gap-2 border-2 border-green-400 text-sm sm:text-base tracking-wider cursor-pointer transform hover:scale-105 active:scale-95"
-              >
-                <WhatsAppIcon className="w-5 h-5 shrink-0" />
-                <span>JOIN WHATSAPP GROUP</span>
-              </a>
-              <button
-                type="button"
-                onClick={handleFullReset}
-                className="px-6 py-3.5 bg-red-950/80 hover:bg-red-900/80 text-red-400 font-bold border-2 border-red-800 rounded-xl transition-all text-sm sm:text-base tracking-wider shadow-[0_0_15px_rgba(153,27,27,0.5)] cursor-pointer transform hover:scale-105 active:scale-95"
-              >
-                CLOSE TERMINAL
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="relative overflow-hidden crt-screen crt-scanlines p-6 sm:p-8 bg-gray-950/95 text-white border-2 border-red-500/70 shadow-[0_0_35px_rgba(239,68,68,0.25)]">
-
-        <div className="flex items-center justify-between border-b-2 border-red-500/50 pb-3 mb-6">
+  return (
+    <section id="results" className="relative z-10 w-full max-w-3xl mx-auto my-12 px-4 font-vcr">
+      <div className="relative overflow-hidden crt-screen crt-scanlines p-6 sm:p-8 bg-gray-950/95 text-white border-2 border-cyan-500/70 shadow-[0_0_35px_rgba(6,182,212,0.25)]">
+        
+        <div className="flex items-center justify-between border-b-2 border-cyan-500/50 pb-3 mb-6">
           <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
-            <h2 className="text-2xl sm:text-4xl font-bold text-white tracking-wider glow-white">
-              REGISTER
+            <span className="w-3 h-3 rounded-full bg-cyan-500 animate-pulse" />
+            <h2 className="text-2xl sm:text-4xl font-bold text-white tracking-wider glow-white uppercase">
+              ROUND 1 RESULTS
             </h2>
           </div>
-          <span className="text-xs text-yellow-400 font-mono hidden sm:inline">CREWMATE TERMINAL</span>
+          <span className="text-xs text-cyan-400 font-mono hidden sm:inline">LEADERBOARD TERMINAL</span>
         </div>
 
-        {terminalLog && (
-          <div className="p-3 mb-6 rounded bg-gray-900 border border-green-500/60 text-xs font-mono text-green-400">
-            {terminalLog}
-          </div>
-        )}
+        <div className="mb-8 p-5 bg-gray-900 border-2 border-yellow-500 rounded-lg shadow-[0_0_15px_rgba(234,179,8,0.3)]">
+          <h3 className="text-xl text-yellow-400 font-bold mb-3 text-center tracking-widest uppercase">
+            🌟 Highlight of the Event! 🌟
+          </h3>
+          <p className="text-sm text-gray-300 leading-relaxed mb-4 text-center font-sans">
+            Apex Among Imposters were initially at 9th position, but they made the correct bet on 9th place, which ultimately propelled them to 1st position!
+          </p>
+          <p className="text-lg text-green-400 font-bold text-center tracking-wide">
+            Great hunch! 👏
+          </p>
+        </div>
 
-        {errorMessage && (
-          <div className="p-3 mb-6 rounded bg-red-950/90 border border-red-500 text-xs font-mono text-red-300">
-            🚨 ERROR: {errorMessage}
-          </div>
-        )}
-
-        <form onSubmit={handleRegisterSubmit} className="space-y-5">
-          <div>
-            <label className="block text-xs text-yellow-400 font-bold mb-1 tracking-wider">
-              [!] CREWMATE TEAM NAME *
-            </label>
-            <input
-              name="teamName"
-              value={formData.teamName}
-              onChange={handleChange}
-              required
-              disabled={submitting}
-              className="w-full px-4 py-2.5 bg-gray-900 border-2 border-gray-700 rounded-lg text-white font-vcr text-sm focus:outline-none focus:border-yellow-400 focus:shadow-[0_0_15px_rgba(245,158,11,0.3)]"
-              placeholder="e.g. CYBER_IMPOSTORS"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-yellow-400 font-bold mb-1 tracking-wider">
-                [!] TEAM LEADER NAME *
-              </label>
-              <input
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                required
-                disabled={submitting}
-                className="w-full px-4 py-2.5 bg-gray-900 border-2 border-gray-700 rounded-lg text-white font-vcr text-sm focus:outline-none focus:border-yellow-400 focus:shadow-[0_0_15px_rgba(245,158,11,0.3)]"
-                placeholder="Full Name"
-              />
+        <div className="space-y-3 mb-8">
+          {leaderboard.map((team) => (
+            <div 
+              key={team.rank} 
+              className="flex items-center p-3 bg-gray-900 border border-gray-700 rounded-lg hover:border-cyan-400 hover:shadow-[0_0_10px_rgba(6,182,212,0.3)] transition-all"
+            >
+              <div className="flex items-center justify-center w-10 h-10 rounded bg-cyan-950/80 text-cyan-300 font-bold mr-4 border border-cyan-700/50 text-lg">
+                {team.rank}
+              </div>
+              <div className="flex-1 text-sm sm:text-base uppercase tracking-wider text-gray-200 truncate pr-2">
+                {team.name}
+              </div>
+              <div className="text-xl sm:text-2xl font-bold text-cyan-400">
+                {team.score}
+              </div>
             </div>
-            <div>
-              <label className="block text-xs text-yellow-400 font-bold mb-1 tracking-wider">
-                [!] COLLEGE EMAIL *
-              </label>
-              <input
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                disabled={submitting}
-                className="w-full px-4 py-2.5 bg-gray-900 border-2 border-gray-700 rounded-lg text-white font-vcr text-sm focus:outline-none focus:border-yellow-400 focus:shadow-[0_0_15px_rgba(245,158,11,0.3)]"
-                placeholder="student@student.nitw.ac.in"
-              />
-            </div>
-          </div>
+          ))}
+        </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs text-yellow-400 font-bold mb-1 tracking-wider">
-                [!] ROLL NUMBER *
-              </label>
-              <input
-                name="rollNo"
-                value={formData.rollNo}
-                onChange={handleChange}
-                required
-                pattern="^26(CSB0A|CSB0B|CSB1A|ECB0A|ECB0B|ECB1A|EEB0A|EEB0B|EEB1A|MEB0A|MEB0B|CEB0A|CEB0B|CHB0A|CHB0B|BTB0A|MMB0A|CYE00|PHE00|EDI00|CDS0A|MAE00)[0-9]{2}$"
-                title="Format must include a valid branch code (e.g., 26CSB0A09)"
-                maxLength={9}
-                disabled={submitting}
-                className="w-full px-4 py-2.5 bg-gray-900 border-2 border-gray-700 rounded-lg text-white font-vcr text-sm focus:outline-none focus:border-yellow-400 focus:shadow-[0_0_15px_rgba(245,158,11,0.3)] uppercase"
-                placeholder="26CSB0A09"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-yellow-400 font-bold mb-1 tracking-wider">
-                [!] CONTACT NO *
-              </label>
-              <input
-                name="contactNo"
-                type="tel"
-                value={formData.contactNo}
-                onChange={handleChange}
-                required
-                disabled={submitting}
-                className="w-full px-4 py-2.5 bg-gray-900 border-2 border-gray-700 rounded-lg text-white font-vcr text-sm focus:outline-none focus:border-yellow-400 focus:shadow-[0_0_15px_rgba(245,158,11,0.3)]"
-                placeholder="10-digit Phone"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-yellow-400 font-bold mb-1 tracking-wider">
-                [!] BRANCH *
-              </label>
-              <select
-                name="branch"
-                value={formData.branch}
-                onChange={handleChange}
-                required
-                disabled={submitting}
-                className="w-full px-4 py-2.5 bg-gray-900 border-2 border-gray-700 rounded-lg text-white font-vcr text-sm focus:outline-none focus:border-yellow-400"
-              >
-                <option value="">Select Branch</option>
-                {BRANCHES.map((b) => (
-                  <option key={b} value={b}>
-                    {b}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+        <div className="p-5 bg-gray-900/60 border border-gray-800 rounded-lg text-center">
+          <p className="mb-2 text-white font-bold tracking-wider text-sm sm:text-base">
+            Congratulations to all the winning teams! 🎊🎊
+          </p>
+          <p className="text-xs sm:text-sm text-gray-400 font-sans">
+            The next steps for round 2 and further details will be communicated to the teams shortly.
+          </p>
+        </div>
 
-          <div className="pt-2">
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs text-yellow-400 font-bold tracking-wider">
-                [!] PARTICIPANT CREWMATES ({participants.length}) (OPTIONAL)
-              </label>
-              {participants.length < 5 && (
-                <button
-                  type="button"
-                  onClick={addParticipant}
-                  disabled={submitting}
-                  className="text-xs text-green-400 hover:text-green-300 font-bold flex items-center gap-1 cursor-pointer"
-                >
-                  + ADD CREWMATE
-                </button>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              {participants.map((participant, index) => (
-                <div key={index} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                  <input
-                    value={participant.name || ""}
-                    onChange={(e) => updateParticipant(index, "name", e.target.value)}
-                    required
-                    disabled={submitting}
-                    className="flex-1 px-4 py-2 bg-gray-900 border border-gray-700 rounded text-sm text-white font-vcr focus:outline-none focus:border-yellow-400"
-                    placeholder={`Crewmate ${index + 1} Name`}
-                  />
-                  <input
-                    value={participant.rollNo || ""}
-                    onChange={(e) => updateParticipant(index, "rollNo", e.target.value)}
-                    required
-                    pattern="^26(CSB0A|CSB0B|CSB1A|ECB0A|ECB0B|ECB1A|EEB0A|EEB0B|EEB1A|MEB0A|MEB0B|CEB0A|CEB0B|CHB0A|CHB0B|BTB0A|MMB0A|CYE00|PHE00|EDI00|CDS0A|MAE00)[0-9]{2}$"
-                    title="Format must include a valid branch code (e.g., 26CSB0A09)"
-                    maxLength={9}
-                    disabled={submitting}
-                    className="w-full sm:w-44 px-4 py-2 bg-gray-900 border border-gray-700 rounded text-sm text-white font-vcr focus:outline-none focus:border-yellow-400 uppercase"
-                    placeholder="Roll No"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeParticipant(index)}
-                    disabled={submitting}
-                    className="px-3 py-2 bg-red-950 text-red-400 border border-red-800 rounded text-xs hover:bg-red-900 cursor-pointer self-end sm:self-auto"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 p-3 rounded-lg border border-gray-800 bg-gray-900/60">
-            <input
-              type="checkbox"
-              id="considerRecruitment"
-              name="considerRecruitment"
-              checked={formData.considerRecruitment}
-              onChange={handleChange}
-              disabled={submitting}
-              className="w-4 h-4 accent-yellow-500 cursor-pointer"
-            />
-            <label htmlFor="considerRecruitment" className="text-xs text-gray-300 font-sans cursor-pointer">
-              Consider my team members for upcoming Robotics Club recruitment drives.
-            </label>
-          </div>
-
-          <div className="pt-4 flex justify-center">
-            <EmergencyButton
-              onClick={handleRegisterSubmit}
-              disabled={submitting}
-              loading={submitting}
-              label={submitting ? "TRANSMITTING..." : "EMERGENCY\nMEETING"}
-            />
-          </div>
-        </form>
       </div>
     </section>
   );
