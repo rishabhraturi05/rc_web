@@ -32,7 +32,7 @@ export default function RegistrationTerminal() {
               ROUND 2
             </h2>
             <h3 className="text-3xl sm:text-4xl md:text-5xl font-bold text-yellow-400 animate-pulse tracking-widest uppercase whitespace-nowrap">
-              COMING SOON!!!
+              IS HERE!!!
             </h3>
           </div>
         </div>
@@ -40,15 +40,15 @@ export default function RegistrationTerminal() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 relative z-10 max-w-2xl mx-auto">
           <div className="p-5 rounded-xl border border-red-500/40 bg-gray-900/80 text-center shadow-[0_0_15px_rgba(239,68,68,0.2)]">
             <div className="text-sm text-red-400 font-bold tracking-wider mb-2">📅 EVENT DATE</div>
-            <div className="text-base sm:text-lg font-bold text-gray-300">TBD</div>
+            <div className="text-base sm:text-lg font-bold text-gray-300">30th Sept</div>
           </div>
           <div className="p-5 rounded-xl border border-red-500/40 bg-gray-900/80 text-center shadow-[0_0_15px_rgba(239,68,68,0.2)]">
             <div className="text-sm text-red-400 font-bold tracking-wider mb-2">⏰ TIME</div>
-            <div className="text-base sm:text-lg font-bold text-gray-300">TBD</div>
+            <div className="text-base sm:text-lg font-bold text-gray-300">6pm</div>
           </div>
           <div className="p-5 rounded-xl border border-red-500/40 bg-gray-900/80 text-center shadow-[0_0_15px_rgba(239,68,68,0.2)]">
             <div className="text-sm text-red-400 font-bold tracking-wider mb-2">📍 VENUE</div>
-            <div className="text-base sm:text-lg font-bold text-gray-300">TBD</div>
+            <div className="text-base sm:text-lg font-bold text-gray-300">NAB</div>
           </div>
         </div>
       </div>
