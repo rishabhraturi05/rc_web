@@ -32,7 +32,7 @@ export default function FreshersHero({ eventConfig }) {
       </h2>
 
       {/* Event Details Badges (Date, Time, Venue) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10 max-w-4xl mx-auto">
+      {/* <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10 max-w-4xl mx-auto">
         <div className="p-4 rounded-xl border border-yellow-500/50 bg-gray-950/80 text-center shadow-[0_0_15px_rgba(245,158,11,0.15)]">
           <div className="text-xs text-yellow-400 font-bold tracking-wider mb-1">📅 EVENT DATE</div>
           <div className="text-sm sm:text-base font-bold text-white glow-white">
@@ -53,7 +53,7 @@ export default function FreshersHero({ eventConfig }) {
             {eventConfig.venue}
           </div>
         </div>
-      </div>
+      </div> */}
     </section>
   );
 }
