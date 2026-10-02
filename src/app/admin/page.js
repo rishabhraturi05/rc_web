@@ -83,6 +83,17 @@ export default function AdminDashboard() {
                 Manage team registrations, attendance, and walk-in entries
               </p>
             </Link>
+
+            <Link
+              href="/admin/recruitment"
+              className="group glass-panel p-8 glass-panel-hover flex flex-col sm:col-span-2"
+            >
+              <FaUserAstronaut className="text-3xl text-white mb-6 group-hover:scale-110 transition-transform" />
+              <h2 className="font-mono text-xl font-bold mb-2 text-white">RECRUITMENT_MANAGEMENT</h2>
+              <p className="font-mono text-gray-400 text-sm leading-relaxed">
+                Create and manage multiple recruitment forms, deadlines, departments, and applications
+              </p>
+            </Link>
           </div>
         </div>
       </div>

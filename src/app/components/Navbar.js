@@ -6,20 +6,21 @@ import { usePathname } from 'next/navigation';
 import { FaBars, FaTimes } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 
+const navLinks = [
+    { name: 'Home', href: '/', sum: 1000 },
+    { name: 'Members', href: '/members', sum: 1200 },
+    { name: 'Competitions', href: '/competitions', sum: 1500 },
+    { name: 'Events', href: '/events_page', sum: 1700 },
+    { name: 'Freshers', href: '/freshers', sum: 1850, isFreshers: true },
+    { name: 'Projects', href: '/projects', sum: 2000 },
+    { name: 'Apply to RC', href: '/recruitment', sum: 2100 },
+    { name: 'Alumni', href: '/alumni', sum: 2200 },
+    { name: 'Contact', href: '/contact', sum: 2200 },
+];
+
 const Navbar = () => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const pathname = usePathname();
-
-    const navLinks = [
-        { name: 'Home', href: '/', sum: 1000 },
-        { name: 'Members', href: '/members', sum: 1200 },
-        { name: 'Competitions', href: '/competitions', sum: 1500 },
-        { name: 'Events', href: '/events_page', sum: 1700 },
-        { name: 'Freshers', href: '/freshers', sum: 1850, isFreshers: true },
-        { name: 'Projects', href: '/projects', sum: 2000 },
-        { name: 'Alumni', href: '/alumni', sum: 2200 },
-        { name: 'Contact', href: '/contact', sum: 2200 },
-    ];
 
     const toggleMobileMenu = () => {
         setIsMobileMenuOpen(!isMobileMenuOpen);
