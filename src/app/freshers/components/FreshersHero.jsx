@@ -2,13 +2,22 @@
 
 import React from "react";
 
-export default function FreshersHero({ eventConfig }) {
+export default function FreshersHero({ eventConfig = {} }) {
+  const scrollToSection = (id) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
   return (
-    <section className="relative z-10 w-full max-w-5xl mx-auto px-4 pt-24 sm:pt-32 pb-8 sm:pb-12 font-vcr text-center">
+    <section className="relative z-10 w-full max-w-5xl mx-auto px-4 pt-24 sm:pt-32 pb-6 sm:pb-10 font-vcr text-center">
       {/* Top Tagline Badge */}
-      <div className="inline-flex max-w-full items-center justify-center gap-2 px-4 sm:px-5 py-2 rounded-full border border-red-500/70 bg-red-950/50 text-red-400 text-[11px] sm:text-sm font-bold tracking-wider glow-red mb-4 sm:mb-6 text-center leading-relaxed">
-        <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping inline-block shrink-0" />
-        <span className="truncate sm:whitespace-normal">{eventConfig.tagline || "EMERGENCY MEETING: JOIN THE CREW OR BE LEFT IN THE VENT"}</span>
+      <div className="inline-flex max-w-full items-center justify-center gap-2 px-4 sm:px-5 py-2 rounded-full border border-cyan-500/70 bg-cyan-950/60 text-cyan-300 text-[11px] sm:text-sm font-bold tracking-wider glow-cyan mb-4 sm:mb-6 text-center leading-relaxed">
+        <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping inline-block shrink-0" />
+        <span className="truncate sm:whitespace-normal">
+          {eventConfig.tagline || "MISSION ACCOMPLISHED: CREW VICTORY ARCHIVE"}
+        </span>
       </div>
 
       {/* Main Title Header */}
@@ -19,41 +28,33 @@ export default function FreshersHero({ eventConfig }) {
 
       {/* Subtitle */}
       <p className="text-base sm:text-2xl text-yellow-400 max-w-3xl mx-auto mb-2 font-vcr glow-yellow">
-        THE SPACESHIP IS READY. WELCOME, CREWMATE.
+        THE SPACESHIP HAS LANDED. VICTORY TO THE CREW.
       </p>
 
       <p className="text-xs sm:text-base text-gray-300 max-w-2xl mx-auto mb-6 sm:mb-8 font-sans px-2">
-        {eventConfig.eventSubtitle}
+        {eventConfig.eventSubtitle || "Robotics Club NIT Warangal presents the Project Skeld post-event celebration & surveillance photo archive!"}
       </p>
 
       {/* Subheading */}
-      <h2 className="text-lg sm:text-2xl md:text-3xl font-bold tracking-widest text-cyan-400 font-vcr glow-cyan uppercase mb-3">
-        EXCLUSIVELY FOR FRESHERS
+      <h2 className="text-lg sm:text-2xl md:text-3xl font-bold tracking-widest text-cyan-400 font-vcr glow-cyan uppercase mb-6">
+        POST-EVENT CELEBRATION &amp; GALLERY
       </h2>
 
-      {/* Event Details Badges (Date, Time, Venue) */}
-      {/* <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10 max-w-4xl mx-auto">
-        <div className="p-4 rounded-xl border border-yellow-500/50 bg-gray-950/80 text-center shadow-[0_0_15px_rgba(245,158,11,0.15)]">
-          <div className="text-xs text-yellow-400 font-bold tracking-wider mb-1">📅 EVENT DATE</div>
-          <div className="text-sm sm:text-base font-bold text-white glow-white">
-            {eventConfig.eventDate}
-          </div>
-        </div>
-
-        <div className="p-4 rounded-xl border border-yellow-500/50 bg-gray-950/80 text-center shadow-[0_0_15px_rgba(245,158,11,0.15)]">
-          <div className="text-xs text-yellow-400 font-bold tracking-wider mb-1">⏰ LAUNCH TIME</div>
-          <div className="text-sm sm:text-base font-bold text-white glow-white">
-            {eventConfig.eventTime}
-          </div>
-        </div>
-
-        <div className="p-4 rounded-xl border border-green-500/50 bg-gray-950/80 text-center shadow-[0_0_15px_rgba(16,185,129,0.15)]">
-          <div className="text-xs text-green-400 font-bold tracking-wider mb-1">📍 SKELD VENUE</div>
-          <div className="text-sm sm:text-base font-bold text-white glow-white">
-            {eventConfig.venue}
-          </div>
-        </div>
-      </div> */}
+      {/* Quick Nav Action Buttons */}
+      <div className="flex items-center justify-center gap-3 sm:gap-4 flex-wrap">
+        <button
+          onClick={() => scrollToSection("podium")}
+          className="px-5 py-2 rounded-lg bg-yellow-950/70 border border-yellow-500/70 hover:bg-yellow-900/80 text-yellow-300 font-bold text-xs sm:text-sm tracking-wider shadow-[0_0_15px_rgba(234,179,8,0.25)] transition-all cursor-pointer"
+        >
+          🏆 VICTORY PODIUM
+        </button>
+        <button
+          onClick={() => scrollToSection("gallery")}
+          className="px-5 py-2 rounded-lg bg-cyan-950/70 border border-cyan-500/70 hover:bg-cyan-900/80 text-cyan-300 font-bold text-xs sm:text-sm tracking-wider shadow-[0_0_15px_rgba(6,182,212,0.25)] transition-all cursor-pointer"
+        >
+          📷 SECURITY GALLERY
+        </button>
+      </div>
     </section>
   );
 }
