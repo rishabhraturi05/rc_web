@@ -26,6 +26,7 @@ const blankForm = {
   departments: [...DEFAULT_DEPARTMENT_OPTIONS],
   fields: [
     { ...blankField(), name: "name", label: "Name", type: "text", required: true },
+    { ...blankField(), name: "email", label: "Email", type: "email", required: true },
     { ...blankField(), name: "rollno", label: "Roll Number", type: "text", required: true },
   ],
 };
@@ -226,7 +227,7 @@ export default function RecruitmentAdminPage() {
 
   const removeField = (index) => {
     const field = editor.fields[index];
-    const defaultNames = new Set(["name", "department", "rollno"]);
+    const defaultNames = new Set(["name", "email", "department", "rollno"]);
     if (field && defaultNames.has(String(field.name || "").trim().toLowerCase())) {
       setMessage("The default fields cannot be removed.");
       return;
@@ -305,6 +306,7 @@ export default function RecruitmentAdminPage() {
         departments: [...DEFAULT_DEPARTMENT_OPTIONS],
         fields: [
           { ...blankField(), name: "name", label: "Name", type: "text", required: true },
+          { ...blankField(), name: "email", label: "Email", type: "email", required: true },
           { ...blankField(), name: "rollno", label: "Roll Number", type: "text", required: true },
         ],
       });
@@ -413,6 +415,16 @@ export default function RecruitmentAdminPage() {
             <p className="text-cyber font-mono text-sm uppercase tracking-[0.25em]">[ Admin ]</p>
             <h1 className="mt-2 text-4xl font-bold uppercase tracking-tight">Recruitment Dashboard</h1>
           </div>
+          <button
+            type="button"
+            onClick={() => {
+              setMessage("");
+              openEditor();
+            }}
+            className="cursor-pointer flex items-center gap-2 self-start rounded border border-cyan-400/60 bg-cyan-500/10 px-4 py-2 text-xs font-mono uppercase tracking-[0.2em] text-cyan-200 hover:bg-cyan-500/20"
+          >
+            <FaPlus /> Create New Form
+          </button>
         </div>
 
         {message && (
@@ -635,7 +647,7 @@ export default function RecruitmentAdminPage() {
                         <button
                           type="button"
                           onClick={() => removeField(index)}
-                          disabled={String(field.name || "").trim().toLowerCase() === "name" || String(field.name || "").trim().toLowerCase() === "department" || String(field.name || "").trim().toLowerCase() === "rollno"}
+                          disabled={String(field.name || "").trim().toLowerCase() === "name" || String(field.name || "").trim().toLowerCase() === "email" || String(field.name || "").trim().toLowerCase() === "department" || String(field.name || "").trim().toLowerCase() === "rollno"}
                           className="rounded border border-red-500/40 px-2 py-1 text-[10px] uppercase tracking-widest text-red-300 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           Remove Field
