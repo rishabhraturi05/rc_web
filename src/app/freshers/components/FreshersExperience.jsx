@@ -6,40 +6,33 @@ import { freshersEvent } from "../data/freshersConfig";
 import SpaceBackground from "./SpaceBackground";
 import FloatingCrewmates from "./FloatingCrewmates";
 import FreshersHero from "./FreshersHero";
-import EventIntel from "./EventDetails";
-import RegistrationTerminal from "./RegistrationTerminal";
-import RulesTerminal from "./RulesTerminal";
-import SecurityMap from "./SecurityMap";
-import ContactCrew from "./ContactCrew";
+import WinnersPodium from "./WinnersPodium";
+import SecurityGallery from "./SecurityGallery";
 import AmbientVentKill from "./AmbientVentKill";
 import WormholeRunner from "./WormholeRunner";
 
 export default function FreshersExperience({ children }) {
-  const scrollToResults = () => {
-    const resultsSection = document.getElementById("results");
-    if (resultsSection) {
-      resultsSection.scrollIntoView({ behavior: "smooth" });
-    }
-  };
-
   return (
     <div className="relative min-h-screen text-white bg-[#05070a] font-vcr overflow-x-hidden selection:bg-yellow-500 selection:text-black">
+      {/* Ambience & Background Canvases */}
       <SpaceBackground />
       <FloatingCrewmates count={7} />
       <AmbientVentKill />
-      <main className="relative z-10 pt-4 px-2 sm:px-6 space-y-4">
-        <FreshersHero
-          eventConfig={freshersEvent}
-          onRegisterClick={scrollToResults}
-        />
-        <RegistrationTerminal eventConfig={freshersEvent} />
-        <EventIntel eventConfig={freshersEvent} />
-        
+
+      {/* Main Content Area */}
+      <main className="relative z-10 pt-4 px-2 sm:px-6 space-y-12">
+        <FreshersHero eventConfig={freshersEvent} />
+
+        {/* Feature 1: "VICTORY" Winners Podium */}
+        <WinnersPodium />
+
+        {/* Feature 2 & 3: Skeld Security Gallery + Fullscreen Retro Modal Engine */}
+        <SecurityGallery />
+
+        {/* Community & WhatsApp Hub */}
         {children}
 
-        <RulesTerminal rules={freshersEvent.rules} />
-        <SecurityMap />
-        <ContactCrew />
+        {/* Celebratory Footer Runner */}
         <div className="pb-8">
           <WormholeRunner speedSeconds={6} crewmateColor="#f59e0b" />
         </div>
@@ -47,3 +40,4 @@ export default function FreshersExperience({ children }) {
     </div>
   );
 }
+

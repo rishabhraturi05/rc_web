@@ -1,44 +1,92 @@
 // Central configuration for Freshers Event
-// All event content, dates, venues, trailer links, and rules are managed here.
-// Update placeholders when official event details are confirmed.
+// Updated for Post-Event Celebration & Gallery Archive
 
 export const freshersEvent = {
   eventName: "Project Skeld",
-  eventSubtitle: "Robotics Club NIT Warangal presents Project Skeld — the ultimate spaceship adventure!",
-  tagline: "EMERGENCY MEETING: JOIN THE CREW OR BE LEFT IN THE VENT",
-  eventDate: "26th September",
-  eventTime: "5:00 PM",
-  venue: "NAB",
-  registrationDeadline: "TBD — REGISTRATION DEADLINE",
-  registrationOpen: true,
-  prizes: "TBD — EXCITING PRIZES",
-  teamSize: "6 Crewmates per Team",
-  eligibility: "All First-Year Students of NIT Warangal",
+  eventSubtitle: "Robotics Club NIT Warangal presents Project Skeld — Mission Accomplished! Relive the highlights, victory podium, and security camera archives.",
+  tagline: "MISSION ACCOMPLISHED: CREW CELEBRATION & GALLERY ARCHIVE",
 
   // Media
-  posterUrl: "/freshers/posters/event-poster.webp", // Drop asset in public/freshers/posters/
-  trailerUrl: "", // Add video URL or /freshers/trailers/event-trailer.mp4 when available
+  posterUrl: "/freshers/posters/event-poster.webp",
+  trailerUrl: "",
 
   // Mission Overview / Description
   description:
-    "Prepare for an immersive, tech-driven freshers experience inspired by Among Us! Navigate through interactive task stations, solve robotics puzzles, identify impostors, and experience life inside the Robotics Club NITW spaceship.",
+    "An unforgettable, tech-driven freshers experience inspired by Among Us! Freshers navigated through robotics task stations, solved engineering challenges, uncovered impostors, and celebrated victory inside the Robotics Club NITW spaceship.",
 
-  // Rules list for Rules Terminal
-  rules: [
-    "01. Teams must contain 6 members. Individual participants will be merged into teams.",
-    "02. Time Commitment: Expect Round 1 to take 1.5 hours. Squads that qualify for Round 2 will need at least another 30 minutes.",
-    "03. Arriving late, violating game rules, unsportsmanlike behavior, or task tampering will lead to immediate ejection.",
-    "04. Phones are strictly for scanning tasks and event verification.",
-    "05. All decisions made by the organising team are final.",
-  ],
-
-  // Task list for Task Navigation
+  // Nav shortcuts
   tasks: [
-    { id: "lobby", label: "COSMIC LOBBY", icon: "🚀", category: "OVERVIEW" },
-    { id: "register", label: "SUBMIT CREWMATE DATA", icon: "💳", category: "CRITICAL" },
-    { id: "intel", label: "EVENT INTEL", icon: "📡", category: "BRIEFING" },
-    { id: "map", label: "SECURITY MAP", icon: "🗺️", category: "NAV" },
-    { id: "rules", label: "MISSION RULES", icon: "📜", category: "ADMIN" },
-    { id: "comms", label: "COMMUNICATIONS", icon: "📻", category: "CREW" },
+    { id: "podium", label: "VICTORY PODIUM", icon: "🏆", category: "AWARDS" },
+    { id: "gallery", label: "SECURITY ARCHIVE", icon: "📷", category: "CCTV" },
   ],
 };
+
+// =========================================================================
+// OFFICIAL WINNERS CONFIGURATION (EXACTLY 6 WINNERS: 1 IMPOSTOR + 5 CREWMATES)
+// Note: Edit the winner and squad names below. No points or scores.
+// =========================================================================
+export const winnersConfig = {
+  impostor: {
+    name: "Rudra Shah",
+    team: "O2 Technicians",
+    title: "IMPOSTOR WINNER",
+    badge: "SABOTEUR MASTERMIND",
+    color: "#ef4444",
+    shadowColor: "#991b1b",
+    hat: "horns", // "crown" | "horns" | "mini" | "sprout" | "party" | "dum"
+  },
+  crewmates: [
+    {
+      id: 1,
+      number: 1,
+      name: "Dhruv",
+      team: "THE SUS TEAM",
+      badge: "CREW LEADER",
+      color: "#06b6d4", // Cyan
+      shadowColor: "#0e7490",
+      hat: "crown",
+    },
+    {
+      id: 2,
+      number: 2,
+      name: "Aishwarya",
+      team: "THE SUS TEAM",
+      badge: "TASK MASTER",
+      color: "#22c55e", // Lime / Green
+      shadowColor: "#15803d",
+      hat: "sprout",
+    },
+    {
+      id: 3,
+      number: 3,
+      name: "Pranav",
+      team: "THE SUS TEAM",
+      badge: "SECURITY CHIEF",
+      color: "#eab308", // Yellow
+      shadowColor: "#a16207",
+      hat: "mini",
+    },
+    {
+      id: 4,
+      number: 4,
+      name: "Srimedha",
+      team: "THE SUS TEAM",
+      badge: "REACTOR TECH",
+      color: "#a855f7", // Purple
+      shadowColor: "#7e22ce",
+      hat: "party",
+    },
+    {
+      id: 5,
+      number: 5,
+      name: "Keerthana",
+      team: "THE SUS TEAM",
+      badge: "MEDBAY OPERATOR",
+      color: "#ec4899", // Pink
+      shadowColor: "#be185d",
+      hat: "dum",
+    },
+  ],
+};
+
+
