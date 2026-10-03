@@ -436,7 +436,7 @@ export default function RecruitmentAdminPage() {
                             setActiveFormId(form._id);
                             await fetchApplications(form._id);
                           }}
-                          className="text-left font-mono text-sm text-white hover:text-cyan-300"
+                          className="cursor-pointer text-left font-mono text-sm text-white hover:text-cyan-300"
                         >
                           {form.departments?.join(" + ") || "Form"}
                         </button>
@@ -448,14 +448,21 @@ export default function RecruitmentAdminPage() {
                         {form.applicantCount || 0} applications
                       </p>
                       <div className="mt-3 flex flex-wrap gap-2">
-                        <button type="button" onClick={() => openEditor(form)} className="flex items-center gap-1 rounded border border-white/10 px-2 py-1 text-[10px] uppercase tracking-widest text-gray-200">
+                        <button type="button" onClick={() => openEditor(form)} className="cursor-pointer flex items-center gap-1 rounded border border-white/10 px-2 py-1 text-[10px] uppercase tracking-widest text-gray-200">
                           <FaEdit /> Edit
                         </button>
-                        <button type="button" onClick={() => fetchApplications(form._id)} className="flex items-center gap-1 rounded border border-white/10 px-2 py-1 text-[10px] uppercase tracking-widest text-gray-200">
-                          <FaDownload /> View
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setActiveFormId(form._id);
+                            await fetchApplications(form._id);
+                          }}
+                          className="cursor-pointer flex items-center gap-1 rounded border border-white/10 px-2 py-1 text-[10px] uppercase tracking-widest text-gray-200"
+                        >
+                          View
                         </button>
                         {isFormClosed(form) && (
-                          <button type="button" onClick={() => deleteForm(form._id)} className="flex items-center gap-1 rounded border border-red-500/40 px-2 py-1 text-[10px] uppercase tracking-widest text-red-300">
+                          <button type="button" onClick={() => deleteForm(form._id)} className="cursor-pointer flex items-center gap-1 rounded border border-red-500/40 px-2 py-1 text-[10px] uppercase tracking-widest text-red-300">
                             <FaTrash /> Delete
                           </button>
                         )}
@@ -481,7 +488,7 @@ export default function RecruitmentAdminPage() {
                             setActiveFormId(form._id);
                             await fetchApplications(form._id);
                           }}
-                          className="text-left font-mono text-sm text-white hover:text-cyan-300"
+                          className="cursor-pointer text-left font-mono text-sm text-white hover:text-cyan-300"
                         >
                           {form.departments?.join(" + ") || "Form"}
                         </button>
@@ -493,10 +500,17 @@ export default function RecruitmentAdminPage() {
                         {form.applicantCount || 0} applications
                       </p>
                       <div className="mt-3 flex flex-wrap gap-2">
-                        <button type="button" onClick={() => fetchApplications(form._id)} className="flex items-center gap-1 rounded border border-white/10 px-2 py-1 text-[10px] uppercase tracking-widest text-gray-200">
-                          <FaDownload /> View
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setActiveFormId(form._id);
+                            await fetchApplications(form._id);
+                          }}
+                          className="cursor-pointer flex items-center gap-1 rounded border border-white/10 px-2 py-1 text-[10px] uppercase tracking-widest text-gray-200"
+                        >
+                          View
                         </button>
-                        <button type="button" onClick={() => deleteForm(form._id)} className="flex items-center gap-1 rounded border border-red-500/40 px-2 py-1 text-[10px] uppercase tracking-widest text-red-300">
+                        <button type="button" onClick={() => deleteForm(form._id)} className="cursor-pointer flex items-center gap-1 rounded border border-red-500/40 px-2 py-1 text-[10px] uppercase tracking-widest text-red-300">
                           <FaTrash /> Delete
                         </button>
                       </div>
