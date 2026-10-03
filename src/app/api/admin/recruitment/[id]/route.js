@@ -128,13 +128,7 @@ export async function DELETE(req, { params }) {
       );
     }
 
-    if (isRecruitmentActive(form)) {
-      return NextResponse.json(
-        { success: false, message: "Open forms cannot be deleted. Close the form first." },
-        { status: 400 }
-      );
-    }
-
+    // Delete all applications belonging to this form, then delete the form itself
     await RecruitmentApplication.deleteMany({ formId: form._id });
     await RecruitmentConfig.findByIdAndDelete(id);
 

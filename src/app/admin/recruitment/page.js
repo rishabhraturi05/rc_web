@@ -3,9 +3,24 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { FaDownload, FaEdit, FaPlus, FaTrash } from "react-icons/fa";
+import Link from "next/link";
+import {
+  FaArrowLeft,
+  FaDownload,
+  FaEdit,
+  FaPlus,
+  FaTimes,
+  FaTrash,
+  FaLock,
+  FaLockOpen,
+  FaFileAlt,
+} from "react-icons/fa";
 import * as XLSX from "xlsx";
-import { DEFAULT_DEPARTMENT_OPTIONS, ensureDefaultRecruitmentFields, getVisibleApplicationFields } from "@/app/lib/recruitment";
+import {
+  DEFAULT_DEPARTMENT_OPTIONS,
+  ensureDefaultRecruitmentFields,
+  getVisibleApplicationFields,
+} from "@/app/lib/recruitment";
 
 const DEFAULT_DEADLINE = "2026-12-31T23:59";
 
@@ -87,6 +102,7 @@ export default function RecruitmentAdminPage() {
   const [selectedDepartment, setSelectedDepartment] = useState("all");
   const [editor, setEditor] = useState(blankForm);
   const [editingId, setEditingId] = useState(null);
+  const [showEditor, setShowEditor] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -110,12 +126,14 @@ export default function RecruitmentAdminPage() {
     [forms]
   );
 
-  const visibleFields = useMemo(() => {
-    const form = forms.find((item) => item._id === activeFormId);
-    return getVisibleApplicationFields(form);
-  }, [forms, activeFormId]);
+  const selectedForm = useMemo(
+    () => forms.find((form) => form._id === activeFormId) || null,
+    [forms, activeFormId]
+  );
 
-  const isFormClosed = (form) => !form?.isOpen || (form?.deadline && new Date(form.deadline) <= new Date());
+  const visibleFields = useMemo(() => {
+    return getVisibleApplicationFields(selectedForm);
+  }, [selectedForm]);
 
   const filteredApplications = useMemo(() => {
     if (!applications.length) return [];
@@ -136,12 +154,16 @@ export default function RecruitmentAdminPage() {
         return;
       }
 
-      setForms(result.data || []);
-      if (result.data?.length) {
-        const defaultForm = result.data[0];
-        setActiveFormId(defaultForm._id);
-        await fetchApplications(defaultForm._id);
+      const fetchedForms = result.data || [];
+      setForms(fetchedForms);
+
+      if (fetchedForms.length) {
+        const stillExists = fetchedForms.find((f) => f._id === activeFormId);
+        const formToSelect = stillExists || fetchedForms[0];
+        setActiveFormId(formToSelect._id);
+        await fetchApplications(formToSelect._id);
       } else {
+        setActiveFormId("");
         setApplications([]);
         setSelectedDepartment("all");
       }
@@ -175,6 +197,7 @@ export default function RecruitmentAdminPage() {
   };
 
   const openEditor = (form = null) => {
+    setMessage("");
     if (!form) {
       setEditingId(null);
       setEditor({
@@ -183,9 +206,11 @@ export default function RecruitmentAdminPage() {
         departments: [...DEFAULT_DEPARTMENT_OPTIONS],
         fields: [
           { ...blankField(), name: "name", label: "Name", type: "text", required: true },
+          { ...blankField(), name: "email", label: "Email", type: "email", required: true },
           { ...blankField(), name: "rollno", label: "Roll Number", type: "text", required: true },
         ],
       });
+      setShowEditor(true);
       return;
     }
 
@@ -207,6 +232,13 @@ export default function RecruitmentAdminPage() {
       departments: Array.isArray(form.departments) && form.departments.length ? form.departments : [...DEFAULT_DEPARTMENT_OPTIONS],
       fields: formFields,
     });
+    setShowEditor(true);
+  };
+
+  const closeEditor = () => {
+    setShowEditor(false);
+    setEditingId(null);
+    setEditor(blankForm);
   };
 
   const updateField = (index, key, value) => {
@@ -229,7 +261,7 @@ export default function RecruitmentAdminPage() {
     const field = editor.fields[index];
     const defaultNames = new Set(["name", "email", "department", "rollno"]);
     if (field && defaultNames.has(String(field.name || "").trim().toLowerCase())) {
-      setMessage("The default fields cannot be removed.");
+      setMessage("Default fields cannot be removed.");
       return;
     }
 
@@ -298,18 +330,8 @@ export default function RecruitmentAdminPage() {
         return;
       }
 
-      setMessage(editingId ? "Recruitment form updated." : "Recruitment form created.");
-      setEditingId(null);
-      setEditor({
-        ...blankForm,
-        deadline: DEFAULT_DEADLINE,
-        departments: [...DEFAULT_DEPARTMENT_OPTIONS],
-        fields: [
-          { ...blankField(), name: "name", label: "Name", type: "text", required: true },
-          { ...blankField(), name: "email", label: "Email", type: "email", required: true },
-          { ...blankField(), name: "rollno", label: "Roll Number", type: "text", required: true },
-        ],
-      });
+      setMessage(editingId ? "Recruitment form updated successfully." : "Recruitment form created successfully.");
+      closeEditor();
       await fetchForms();
     } catch (error) {
       console.error("Save recruitment form error:", error);
@@ -319,18 +341,31 @@ export default function RecruitmentAdminPage() {
     }
   };
 
-  const deleteForm = async (formId) => {
-    const targetForm = forms.find((form) => form._id === formId);
-    if (!targetForm) return;
+  const handleToggleFormStatus = async (form) => {
+    try {
+      const nextStatus = !form.isOpen;
+      const response = await fetch(`/api/admin/recruitment/${form._id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isOpen: nextStatus }),
+      });
+      const result = await response.json();
 
-    const isClosed = !targetForm.isOpen || (targetForm.deadline && new Date(targetForm.deadline) <= new Date());
-    if (!isClosed) {
-      setMessage("Open forms cannot be deleted. Close the form first, then delete it.");
-      return;
+      if (result.success) {
+        setMessage(`Form has been marked as ${nextStatus ? "open" : "closed"}.`);
+        await fetchForms();
+      } else {
+        setMessage(result.message || "Failed to update form status.");
+      }
+    } catch (error) {
+      console.error("Toggle form status error:", error);
+      setMessage("Failed to update form status.");
     }
+  };
 
+  const deleteForm = async (formId) => {
     const safe = window.confirm(
-      "Delete this closed form permanently? This will also delete all applications belonging to it. Download the Excel file first if you need a backup."
+      "Are you sure you want to permanently delete this recruitment form and all applications submitted to it? This action cannot be undone."
     );
 
     if (!safe) return;
@@ -344,7 +379,11 @@ export default function RecruitmentAdminPage() {
         return;
       }
 
-      setMessage("Closed form and its applications were deleted permanently.");
+      setMessage("Recruitment form and its applications were deleted permanently.");
+      if (activeFormId === formId) {
+        setActiveFormId("");
+        setApplications([]);
+      }
       await fetchForms();
     } catch (error) {
       console.error("Delete form error:", error);
@@ -358,7 +397,6 @@ export default function RecruitmentAdminPage() {
       return;
     }
 
-    const selectedForm = forms.find((form) => form._id === activeFormId);
     if (!selectedForm) return;
 
     const workbook = XLSX.utils.book_new();
@@ -401,363 +439,586 @@ export default function RecruitmentAdminPage() {
 
   if (status === "loading" || loading) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <p className="font-mono text-gray-300">Loading recruitment dashboard...</p>
+      <div className="relative min-h-screen text-white flex items-center justify-center pt-24">
+        <p className="font-mono text-gray-300 text-lg">Loading recruitment dashboard...</p>
       </div>
     );
   }
 
   return (
-    <div className="relative z-20 min-h-screen bg-black text-white px-4 sm:px-6 lg:px-8 py-24">
-      <div className="relative z-30 max-w-7xl mx-auto">
-        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div className="relative min-h-screen text-white">
+      <div className="relative z-10 px-4 sm:px-6 lg:px-8 pt-24 pb-12 max-w-7xl mx-auto">
+        {/* Header Section */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
           <div>
-            <p className="text-cyber font-mono text-sm uppercase tracking-[0.25em]">[ Admin ]</p>
-            <h1 className="mt-2 text-4xl font-bold uppercase tracking-tight">Recruitment Dashboard</h1>
+            <Link
+              href="/admin"
+              className="inline-flex items-center gap-2 text-gray-400 hover:text-white font-mono text-sm mb-3 transition-colors"
+            >
+              <FaArrowLeft size={12} /> Back to Admin Panel
+            </Link>
+            <h1 className="font-mono text-4xl sm:text-5xl font-bold tracking-tight mb-2 text-white">
+              {">_"} RECRUITMENT_MANAGEMENT
+            </h1>
+            <p className="font-mono text-gray-400 text-lg">
+              Manage recruitment forms, deadlines, departments, and applications
+            </p>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              setMessage("");
-              openEditor();
-            }}
-            className="cursor-pointer flex items-center gap-2 self-start rounded border border-cyan-400/60 bg-cyan-500/10 px-4 py-2 text-xs font-mono uppercase tracking-[0.2em] text-cyan-200 hover:bg-cyan-500/20"
-          >
-            <FaPlus /> Create New Form
-          </button>
+          <div className="flex flex-wrap gap-3">
+            {!showEditor && (
+              <button
+                type="button"
+                onClick={() => openEditor()}
+                className="flex items-center gap-2 px-5 py-2.5 border border-white text-white bg-transparent rounded hover:bg-white hover:text-black transition-colors font-mono uppercase text-sm tracking-widest cursor-pointer"
+              >
+                <FaPlus /> [ + CREATE NEW FORM ]
+              </button>
+            )}
+          </div>
         </div>
 
+        {/* Message Banner */}
         {message && (
-          <div className="mb-6 rounded-lg border border-cyan-400/40 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-200">
-            {message}
+          <div className="mb-6 rounded-lg border border-white/30 bg-white/10 px-4 py-3 font-mono text-sm text-white flex items-center justify-between">
+            <span>{message}</span>
+            <button
+              onClick={() => setMessage("")}
+              className="text-gray-400 hover:text-white font-mono text-xs ml-4 cursor-pointer"
+            >
+              [ dismiss ]
+            </button>
           </div>
         )}
 
-        <div className="relative z-40 grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
-          <div className="relative z-50 space-y-6">
-            <div className="glass-panel p-5">
-              <h2 className="mb-4 text-lg font-bold uppercase tracking-[0.15em] text-cyan-300">Open Forms</h2>
-              <div className="space-y-3">
-                {activeForms.length ? (
-                  activeForms.map((form) => (
-                    <div key={form._id} className="rounded-xl border border-white/10 bg-black/40 p-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            setActiveFormId(form._id);
-                            await fetchApplications(form._id);
-                          }}
-                          className="cursor-pointer text-left font-mono text-sm text-white hover:text-cyan-300"
-                        >
-                          {form.departments?.join(" + ") || "Form"}
-                        </button>
-                        <span className="rounded-full border border-green-500/50 bg-green-500/10 px-2 py-1 text-[10px] uppercase tracking-widest text-green-300">
-                          Open
-                        </span>
-                      </div>
-                      <p className="mt-2 text-xs text-gray-300">
-                        {form.applicantCount || 0} applications
-                      </p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <button type="button" onClick={() => openEditor(form)} className="cursor-pointer flex items-center gap-1 rounded border border-white/10 px-2 py-1 text-[10px] uppercase tracking-widest text-gray-200">
-                          <FaEdit /> Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            setActiveFormId(form._id);
-                            await fetchApplications(form._id);
-                          }}
-                          className="cursor-pointer flex items-center gap-1 rounded border border-white/10 px-2 py-1 text-[10px] uppercase tracking-widest text-gray-200"
-                        >
-                          View
-                        </button>
-                        {isFormClosed(form) && (
-                          <button type="button" onClick={() => deleteForm(form._id)} className="cursor-pointer flex items-center gap-1 rounded border border-red-500/40 px-2 py-1 text-[10px] uppercase tracking-widest text-red-300">
-                            <FaTrash /> Delete
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-gray-400">No active forms.</p>
-                )}
+        {/* Form Creator / Editor (Shown only when creating or editing a form) */}
+        {showEditor && (
+          <div className="mb-10 glass-panel p-6 sm:p-8 border border-white/30">
+            <div className="flex items-center justify-between gap-4 mb-6 border-b border-white/15 pb-4">
+              <div>
+                <h2 className="font-mono text-2xl font-bold uppercase tracking-wider text-white">
+                  {editingId ? "[ EDIT RECRUITMENT FORM ]" : "[ CREATE NEW RECRUITMENT FORM ]"}
+                </h2>
+                <p className="font-mono text-xs text-gray-400 mt-1">
+                  Configure form status, application deadline, eligible departments, and custom questions.
+                </p>
               </div>
+              <button
+                type="button"
+                onClick={closeEditor}
+                className="flex items-center gap-2 px-3 py-1.5 border border-white/20 text-gray-300 rounded hover:border-white hover:text-white font-mono text-xs uppercase tracking-widest transition-colors cursor-pointer"
+              >
+                <FaTimes /> Cancel
+              </button>
             </div>
 
-            <div className="glass-panel p-5">
-              <h2 className="mb-4 text-lg font-bold uppercase tracking-[0.15em] text-cyan-300">Closed Forms</h2>
-              <div className="space-y-3">
-                {closedForms.length ? (
-                  closedForms.map((form) => (
-                    <div key={form._id} className="rounded-xl border border-white/10 bg-black/40 p-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            setActiveFormId(form._id);
-                            await fetchApplications(form._id);
-                          }}
-                          className="cursor-pointer text-left font-mono text-sm text-white hover:text-cyan-300"
-                        >
-                          {form.departments?.join(" + ") || "Form"}
-                        </button>
-                        <span className="rounded-full border border-red-500/50 bg-red-500/10 px-2 py-1 text-[10px] uppercase tracking-widest text-red-300">
-                          Closed
-                        </span>
-                      </div>
-                      <p className="mt-2 text-xs text-gray-300">
-                        {form.applicantCount || 0} applications
-                      </p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            setActiveFormId(form._id);
-                            await fetchApplications(form._id);
-                          }}
-                          className="cursor-pointer flex items-center gap-1 rounded border border-white/10 px-2 py-1 text-[10px] uppercase tracking-widest text-gray-200"
-                        >
-                          View
-                        </button>
-                        <button type="button" onClick={() => deleteForm(form._id)} className="cursor-pointer flex items-center gap-1 rounded border border-red-500/40 px-2 py-1 text-[10px] uppercase tracking-widest text-red-300">
-                          <FaTrash /> Delete
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-gray-400">No closed forms.</p>
-                )}
-              </div>
-            </div>
-          </div>
+            <div className="space-y-6">
+              <label className="flex items-center gap-3 font-mono text-sm text-white cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={editor.isOpen}
+                  onChange={(event) => setEditor((previous) => ({ ...previous, isOpen: event.target.checked }))}
+                  className="h-4 w-4 accent-white rounded cursor-pointer"
+                />
+                <span>Form is open for submissions</span>
+              </label>
 
-          <div className="space-y-6">
-            <div className="glass-panel p-5">
-              <h2 className="mb-4 text-lg font-bold uppercase tracking-[0.15em] text-cyan-300">
-                {editingId ? "Edit Form" : "Create Form"}
-              </h2>
-
-              <div className="space-y-4">
-                <label className="flex items-center gap-3 text-sm text-gray-200">
-                  <input
-                    type="checkbox"
-                    checked={editor.isOpen}
-                    onChange={(event) => setEditor((previous) => ({ ...previous, isOpen: event.target.checked }))}
-                    className="h-4 w-4 accent-cyan-400"
-                  />
-                  Form is open
+              <div>
+                <label className="mb-2 block font-mono text-sm text-gray-300 uppercase tracking-wider">
+                  Submission Deadline
                 </label>
+                <input
+                  type="datetime-local"
+                  value={editor.deadline}
+                  onChange={(event) => setEditor((previous) => ({ ...previous, deadline: event.target.value }))}
+                  className="w-full sm:w-80 rounded border border-white/20 bg-black/40 px-3 py-2 font-mono text-sm text-white focus:border-white focus:outline-none"
+                />
+              </div>
 
-                <div>
-                  <label className="mb-2 block text-sm text-gray-200">Deadline</label>
-                  <input
-                    type="datetime-local"
-                    value={editor.deadline}
-                    onChange={(event) => setEditor((previous) => ({ ...previous, deadline: event.target.value }))}
-                    className="w-full rounded-lg border border-white/20 bg-black/40 px-3 py-2 text-white focus:border-cyan-400 focus:outline-none"
-                  />
+              <div>
+                <label className="mb-2 block font-mono text-sm text-gray-300 uppercase tracking-wider">
+                  Available Departments
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 rounded border border-white/20 bg-black/40 p-4">
+                  {DEFAULT_DEPARTMENT_OPTIONS.map((department) => (
+                    <label key={department} className="flex items-center gap-2 font-mono text-sm text-white cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={editor.departments.includes(department)}
+                        onChange={(event) => {
+                          const checked = event.target.checked;
+                          setEditor((previous) => {
+                            const nextDepartments = checked
+                              ? [...previous.departments, department]
+                              : previous.departments.filter((item) => item !== department);
+                            return { ...previous, departments: nextDepartments };
+                          });
+                        }}
+                        className="h-4 w-4 accent-white rounded cursor-pointer"
+                      />
+                      <span>{department}</span>
+                    </label>
+                  ))}
                 </div>
+              </div>
 
-                <div>
-                  <label className="mb-2 block text-sm text-gray-200">Departments</label>
-                  <div className="space-y-2 rounded-lg border border-white/20 bg-black/40 p-3">
-                    {DEFAULT_DEPARTMENT_OPTIONS.map((department) => (
-                      <label key={department} className="flex items-center gap-3 text-sm text-gray-200">
-                        <input
-                          type="checkbox"
-                          checked={editor.departments.includes(department)}
-                          onChange={(event) => {
-                            const checked = event.target.checked;
-                            setEditor((previous) => {
-                              const nextDepartments = checked
-                                ? [...previous.departments, department]
-                                : previous.departments.filter((item) => item !== department);
-                              return { ...previous, departments: nextDepartments };
-                            });
-                          }}
-                          className="h-4 w-4 accent-cyan-400"
-                        />
-                        <span>{department}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
+              <div>
+                <label className="mb-2 block font-mono text-sm text-gray-300 uppercase tracking-wider">
+                  Form Fields & Questions
+                </label>
+                <div className="space-y-4">
                   {editor.fields
                     .filter((field) => String(field.name || "").trim().toLowerCase() !== "department")
-                    .map((field, index) => (
-                    <div key={field.id || `${field.name || index}-field`} className="rounded-lg border border-white/10 bg-black/30 p-3">
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <input
-                          type="text"
-                          value={field.name}
-                          onChange={(event) => updateField(index, "name", event.target.value)}
-                          className="rounded-lg border border-white/20 bg-black/40 px-3 py-2 text-white focus:border-cyan-400 focus:outline-none"
-                          placeholder="Field name"
-                        />
-                        <input
-                          type="text"
-                          value={field.label}
-                          onChange={(event) => updateField(index, "label", event.target.value)}
-                          className="rounded-lg border border-white/20 bg-black/40 px-3 py-2 text-white focus:border-cyan-400 focus:outline-none"
-                          placeholder="Field label"
-                        />
-                      </div>
+                    .map((field, index) => {
+                      const isDefaultField = ["name", "email", "rollno"].includes(String(field.name || "").trim().toLowerCase());
+                      return (
+                        <div key={field.id || `${field.name || index}-field`} className="rounded border border-white/10 bg-black/30 p-4">
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div>
+                              <span className="block font-mono text-xs text-gray-400 mb-1">Field Name (ID)</span>
+                              <input
+                                type="text"
+                                value={field.name}
+                                disabled={isDefaultField}
+                                onChange={(event) => updateField(index, "name", event.target.value)}
+                                className="w-full rounded border border-white/20 bg-black/40 px-3 py-2 font-mono text-sm text-white focus:border-white focus:outline-none disabled:opacity-50"
+                                placeholder="field_name"
+                              />
+                            </div>
+                            <div>
+                              <span className="block font-mono text-xs text-gray-400 mb-1">Display Label</span>
+                              <input
+                                type="text"
+                                value={field.label}
+                                onChange={(event) => updateField(index, "label", event.target.value)}
+                                className="w-full rounded border border-white/20 bg-black/40 px-3 py-2 font-mono text-sm text-white focus:border-white focus:outline-none"
+                                placeholder="Field Label"
+                              />
+                            </div>
+                          </div>
 
-                      <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto]">
-                        <select
-                          value={field.type}
-                          onChange={(event) => updateField(index, "type", event.target.value)}
-                          className="rounded-lg border border-white/20 bg-black/40 px-3 py-2 text-white focus:border-cyan-400 focus:outline-none"
-                        >
-                          {fieldTypeOptions.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
+                          <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]">
+                            <div>
+                              <span className="block font-mono text-xs text-gray-400 mb-1">Input Type</span>
+                              <select
+                                value={field.type}
+                                disabled={isDefaultField}
+                                onChange={(event) => updateField(index, "type", event.target.value)}
+                                className="w-full rounded border border-white/20 bg-black/40 px-3 py-2 font-mono text-sm text-white focus:border-white focus:outline-none disabled:opacity-50"
+                              >
+                                {fieldTypeOptions.map((option) => (
+                                  <option key={option.value} value={option.value} className="bg-black text-white">
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
 
-                        <label className="flex items-center gap-2 rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-gray-200">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(field.required)}
-                            onChange={(event) => updateField(index, "required", event.target.checked)}
-                            className="h-4 w-4 accent-cyan-400"
-                          />
-                          Required
-                        </label>
-                      </div>
+                            <div className="flex items-end">
+                              <label className="flex items-center gap-2 rounded border border-white/15 bg-black/20 px-3 py-2 font-mono text-sm text-white cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(field.required)}
+                                  disabled={isDefaultField}
+                                  onChange={(event) => updateField(index, "required", event.target.checked)}
+                                  className="h-4 w-4 accent-white rounded cursor-pointer"
+                                />
+                                Required
+                              </label>
+                            </div>
+                          </div>
 
-                      {field.type === "select" || field.type === "radio" ? (
-                        <input
-                          type="text"
-                          value={field.options}
-                          onChange={(event) => updateField(index, "options", event.target.value)}
-                          className="mt-3 w-full rounded-lg border border-white/20 bg-black/40 px-3 py-2 text-white focus:border-cyan-400 focus:outline-none"
-                          placeholder="Options separated by commas"
-                        />
-                      ) : null}
+                          {(field.type === "select" || field.type === "radio") && (
+                            <div className="mt-3">
+                              <span className="block font-mono text-xs text-gray-400 mb-1">Options (comma-separated)</span>
+                              <input
+                                type="text"
+                                value={field.options}
+                                onChange={(event) => updateField(index, "options", event.target.value)}
+                                className="w-full rounded border border-white/20 bg-black/40 px-3 py-2 font-mono text-sm text-white focus:border-white focus:outline-none"
+                                placeholder="Option 1, Option 2, Option 3"
+                              />
+                            </div>
+                          )}
 
-                      <div className="mt-3 flex justify-end">
-                        <button
-                          type="button"
-                          onClick={() => removeField(index)}
-                          disabled={String(field.name || "").trim().toLowerCase() === "name" || String(field.name || "").trim().toLowerCase() === "email" || String(field.name || "").trim().toLowerCase() === "department" || String(field.name || "").trim().toLowerCase() === "rollno"}
-                          className="rounded border border-red-500/40 px-2 py-1 text-[10px] uppercase tracking-widest text-red-300 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          Remove Field
-                        </button>
-                      </div>
-                    </div>
-                    ))}
+                          {!isDefaultField && (
+                            <div className="mt-3 flex justify-end">
+                              <button
+                                type="button"
+                                onClick={() => removeField(index)}
+                                className="cursor-pointer font-mono text-xs text-red-400 hover:text-red-300 border border-red-500/30 rounded px-2.5 py-1 tracking-wider uppercase"
+                              >
+                                [ Remove Field ]
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                 </div>
+              </div>
 
+              <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-white/15">
                 <button
                   type="button"
                   onClick={addField}
-                  className="flex items-center gap-2 rounded border border-white/20 px-3 py-2 text-xs uppercase tracking-[0.15em] text-gray-200"
+                  className="flex items-center gap-2 px-4 py-2 border border-white/20 text-white rounded hover:border-white font-mono text-xs uppercase tracking-widest transition-colors cursor-pointer"
                 >
-                  <FaPlus /> Add Field
+                  <FaPlus /> [ + Add Custom Field ]
                 </button>
 
-                <button
-                  type="button"
-                  onClick={saveForm}
-                  disabled={saving}
-                  className="w-full rounded-lg border border-cyan-400 bg-cyan-500/10 px-4 py-3 font-mono text-xs uppercase tracking-[0.2em] text-cyan-200 disabled:opacity-60"
-                >
-                  {saving ? "Saving..." : editingId ? "Update Form" : "Save Form"}
-                </button>
-              </div>
-            </div>
-
-            <div className="glass-panel p-5">
-              <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <h2 className="text-lg font-bold uppercase tracking-[0.15em] text-cyan-300">Applications</h2>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex gap-3">
                   <button
                     type="button"
-                    onClick={exportSelectedForm}
-                    className="flex items-center gap-2 rounded border border-white/15 px-3 py-2 text-[10px] uppercase tracking-[0.15em] text-gray-200"
+                    onClick={closeEditor}
+                    className="px-5 py-2 border border-white/20 text-gray-300 rounded hover:border-white hover:text-white font-mono text-xs uppercase tracking-widest transition-colors cursor-pointer"
                   >
-                    <FaDownload /> Export Filtered
+                    Cancel
                   </button>
                   <button
                     type="button"
-                    onClick={exportAllForms}
-                    className="flex items-center gap-2 rounded border border-white/15 px-3 py-2 text-[10px] uppercase tracking-[0.15em] text-gray-200"
+                    onClick={saveForm}
+                    disabled={saving}
+                    className="px-6 py-2 border border-white bg-white text-black font-mono text-xs uppercase tracking-widest font-bold rounded hover:bg-transparent hover:text-white transition-colors cursor-pointer disabled:opacity-50"
                   >
-                    <FaDownload /> Export All
+                    {saving ? "Saving..." : editingId ? "[ UPDATE FORM ]" : "[ SAVE FORM ]"}
                   </button>
                 </div>
-              </div>
-
-              {activeFormId && forms.find((form) => form._id === activeFormId) && (
-                <div className="mb-4">
-                  <label className="mb-2 block text-sm text-gray-200">Filter by department</label>
-                  <select
-                    value={selectedDepartment}
-                    onChange={(event) => setSelectedDepartment(event.target.value)}
-                    className="w-full rounded-lg border border-white/20 bg-black/40 px-3 py-2 text-white focus:border-cyan-400 focus:outline-none"
-                  >
-                    <option value="all">All departments</option>
-                    {(forms.find((form) => form._id === activeFormId)?.departments || []).map((department) => (
-                      <option key={department} value={department}>
-                        {department}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-white/10 text-gray-300">
-                      <th className="px-2 py-2">Time</th>
-                      <th className="px-2 py-2">Department</th>
-                      {visibleFields.map((field) => (
-                        <th key={field.name} className="px-2 py-2">
-                          {field.label || field.name}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredApplications.length ? (
-                      filteredApplications.map((application) => (
-                        <tr key={application._id} className="border-b border-white/10 text-gray-200">
-                          <td className="px-2 py-2">{new Date(application.createdAt).toLocaleString()}</td>
-                          <td className="px-2 py-2">{application.department}</td>
-                          {visibleFields.map((field) => (
-                            <td key={`${application._id}-${field.name}`} className="px-2 py-2">
-                              {typeof application.responses?.[field.name] === "boolean"
-                                ? application.responses[field.name]
-                                  ? "Yes"
-                                  : "No"
-                                : application.responses?.[field.name] ?? ""}
-                            </td>
-                          ))}
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={4} className="px-2 py-6 text-center text-gray-400">
-                          No applications match the current filter.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
               </div>
             </div>
           </div>
+        )}
+
+        {/* Dashboard Overview: 3 Main Options (Create Form, Open Forms, Closed Forms) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+          {/* Option 1: Create Form Card */}
+          <div
+            onClick={() => openEditor()}
+            className="glass-panel p-6 glass-panel-hover flex flex-col justify-between cursor-pointer border border-white/20 hover:border-white transition-all group"
+          >
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <FaFileAlt className="text-3xl text-white group-hover:scale-110 transition-transform" />
+                <span className="font-mono text-xs uppercase tracking-widest text-gray-400 border border-white/10 px-2 py-0.5 rounded">
+                  ACTION
+                </span>
+              </div>
+              <h2 className="font-mono text-xl font-bold mb-2 text-white">CREATE_FORM</h2>
+              <p className="font-mono text-gray-400 text-sm leading-relaxed mb-4">
+                Set up a new recruitment drive with custom deadlines, department selections, and application questions.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="w-full mt-2 py-2 px-4 border border-white text-white rounded group-hover:bg-white group-hover:text-black font-mono text-xs uppercase tracking-widest transition-colors"
+            >
+              [ + START FORM ]
+            </button>
+          </div>
+
+          {/* Option 2: Open Forms Card */}
+          <div className="glass-panel p-6 border border-white/20 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <FaLockOpen className="text-3xl text-white" />
+                <span className="font-mono text-xs uppercase tracking-widest text-white border border-white/40 bg-white/10 px-2.5 py-0.5 rounded">
+                  {activeForms.length} OPEN
+                </span>
+              </div>
+              <h2 className="font-mono text-xl font-bold mb-2 text-white">OPEN_FORMS</h2>
+              <p className="font-mono text-gray-400 text-sm leading-relaxed mb-4">
+                Currently accepting applications from candidates.
+              </p>
+            </div>
+
+            <div className="space-y-3 mt-2 max-h-60 overflow-y-auto pr-1">
+              {activeForms.length ? (
+                activeForms.map((form) => {
+                  const isSelected = form._id === activeFormId;
+                  return (
+                    <div
+                      key={form._id}
+                      className={`p-3 rounded border transition-all ${
+                        isSelected
+                          ? "border-white bg-white/10"
+                          : "border-white/10 bg-black/40 hover:border-white/30"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setActiveFormId(form._id);
+                            await fetchApplications(form._id);
+                          }}
+                          className="text-left font-mono text-sm font-bold text-white hover:underline cursor-pointer"
+                        >
+                          {form.departments?.join(" + ") || "Recruitment Form"}
+                        </button>
+                      </div>
+                      <p className="font-mono text-xs text-gray-400 mt-1">
+                        {form.applicantCount || 0} applications • Deadline:{" "}
+                        {form.deadline ? new Date(form.deadline).toLocaleDateString() : "No deadline"}
+                      </p>
+                      <div className="flex flex-wrap gap-2 mt-3 pt-2 border-t border-white/10">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setActiveFormId(form._id);
+                            await fetchApplications(form._id);
+                          }}
+                          className="cursor-pointer font-mono text-[10px] uppercase tracking-wider text-white border border-white/20 hover:border-white rounded px-2 py-0.5"
+                        >
+                          {isSelected ? "Viewing" : "View"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openEditor(form)}
+                          className="cursor-pointer font-mono text-[10px] uppercase tracking-wider text-gray-300 hover:text-white border border-white/20 hover:border-white rounded px-2 py-0.5"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleFormStatus(form)}
+                          className="cursor-pointer font-mono text-[10px] uppercase tracking-wider text-gray-300 hover:text-white border border-white/20 hover:border-white rounded px-2 py-0.5"
+                        >
+                          Close
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteForm(form._id)}
+                          className="cursor-pointer font-mono text-[10px] uppercase tracking-wider text-red-400 hover:text-red-300 border border-red-500/30 rounded px-2 py-0.5"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="font-mono text-xs text-gray-400 py-3">No active open forms.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Option 3: Closed Forms Card */}
+          <div className="glass-panel p-6 border border-white/20 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <FaLock className="text-3xl text-gray-400" />
+                <span className="font-mono text-xs uppercase tracking-widest text-gray-400 border border-white/10 bg-white/5 px-2.5 py-0.5 rounded">
+                  {closedForms.length} CLOSED
+                </span>
+              </div>
+              <h2 className="font-mono text-xl font-bold mb-2 text-white">CLOSED_FORMS</h2>
+              <p className="font-mono text-gray-400 text-sm leading-relaxed mb-4">
+                Completed drives or paused forms. You can reopen or export data.
+              </p>
+            </div>
+
+            <div className="space-y-3 mt-2 max-h-60 overflow-y-auto pr-1">
+              {closedForms.length ? (
+                closedForms.map((form) => {
+                  const isSelected = form._id === activeFormId;
+                  return (
+                    <div
+                      key={form._id}
+                      className={`p-3 rounded border transition-all ${
+                        isSelected
+                          ? "border-white bg-white/10"
+                          : "border-white/10 bg-black/40 hover:border-white/30"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setActiveFormId(form._id);
+                            await fetchApplications(form._id);
+                          }}
+                          className="text-left font-mono text-sm font-bold text-gray-300 hover:text-white hover:underline cursor-pointer"
+                        >
+                          {form.departments?.join(" + ") || "Recruitment Form"}
+                        </button>
+                      </div>
+                      <p className="font-mono text-xs text-gray-400 mt-1">
+                        {form.applicantCount || 0} applications • Closed
+                      </p>
+                      <div className="flex flex-wrap gap-2 mt-3 pt-2 border-t border-white/10">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setActiveFormId(form._id);
+                            await fetchApplications(form._id);
+                          }}
+                          className="cursor-pointer font-mono text-[10px] uppercase tracking-wider text-white border border-white/20 hover:border-white rounded px-2 py-0.5"
+                        >
+                          {isSelected ? "Viewing" : "View"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openEditor(form)}
+                          className="cursor-pointer font-mono text-[10px] uppercase tracking-wider text-gray-300 hover:text-white border border-white/20 hover:border-white rounded px-2 py-0.5"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleFormStatus(form)}
+                          className="cursor-pointer font-mono text-[10px] uppercase tracking-wider text-gray-300 hover:text-white border border-white/20 hover:border-white rounded px-2 py-0.5"
+                        >
+                          Reopen
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteForm(form._id)}
+                          className="cursor-pointer font-mono text-[10px] uppercase tracking-wider text-red-400 hover:text-red-300 border border-red-500/30 rounded px-2 py-0.5"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="font-mono text-xs text-gray-400 py-3">No closed forms.</p>
+              )}
+            </div>
+          </div>
         </div>
+
+        {/* Applications Section for the Selected Form */}
+        {selectedForm ? (
+          <div className="glass-panel p-6 sm:p-8 border border-white/20">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-white/10">
+              <div>
+                <div className="flex items-center gap-3">
+                  <h2 className="font-mono text-2xl font-bold uppercase tracking-wide text-white">
+                    {">_"} APPLICATIONS
+                  </h2>
+                  <span className="font-mono text-xs border border-white/30 bg-white/10 px-2.5 py-0.5 rounded text-white">
+                    {selectedForm.departments?.join(" + ") || "Form"}
+                  </span>
+                  <span
+                    className={`font-mono text-xs border px-2 py-0.5 rounded ${
+                      selectedForm.isOpen
+                        ? "border-white/40 bg-white/10 text-white"
+                        : "border-white/20 bg-white/5 text-gray-400"
+                    }`}
+                  >
+                    {selectedForm.isOpen ? "OPEN" : "CLOSED"}
+                  </span>
+                </div>
+                <p className="font-mono text-sm text-gray-400 mt-1">
+                  Showing {filteredApplications.length} of {applications.length} submitted applications
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={exportSelectedForm}
+                  className="flex items-center gap-2 px-4 py-2 border border-white/30 text-white rounded hover:border-white font-mono text-xs uppercase tracking-widest transition-colors cursor-pointer"
+                >
+                  <FaDownload /> [ Export Filtered ]
+                </button>
+                <button
+                  type="button"
+                  onClick={exportAllForms}
+                  className="flex items-center gap-2 px-4 py-2 border border-white text-white rounded hover:bg-white hover:text-black font-mono text-xs uppercase tracking-widest transition-colors cursor-pointer"
+                >
+                  <FaDownload /> [ Export All Forms ]
+                </button>
+              </div>
+            </div>
+
+            {/* Department Filter */}
+            <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <label className="font-mono text-xs uppercase tracking-wider text-gray-400">
+                Filter by department:
+              </label>
+              <select
+                value={selectedDepartment}
+                onChange={(event) => setSelectedDepartment(event.target.value)}
+                className="rounded border border-white/20 bg-black/40 px-3 py-1.5 font-mono text-xs text-white focus:border-white focus:outline-none"
+              >
+                <option value="all" className="bg-black text-white">All departments ({applications.length})</option>
+                {(selectedForm.departments || []).map((department) => {
+                  const count = applications.filter((app) => app.department === department).length;
+                  return (
+                    <option key={department} value={department} className="bg-black text-white">
+                      {department} ({count})
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
+            {/* Applications Table */}
+            <div className="overflow-x-auto rounded border border-white/10">
+              <table className="min-w-full text-left font-mono text-sm">
+                <thead>
+                  <tr className="border-b border-white/15 bg-white/5 text-gray-300">
+                    <th className="px-4 py-3 text-xs uppercase tracking-wider">Timestamp</th>
+                    <th className="px-4 py-3 text-xs uppercase tracking-wider">Department</th>
+                    {visibleFields.map((field) => (
+                      <th key={field.name} className="px-4 py-3 text-xs uppercase tracking-wider">
+                        {field.label || field.name}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredApplications.length ? (
+                    filteredApplications.map((application) => (
+                      <tr
+                        key={application._id}
+                        className="border-b border-white/10 hover:bg-white/5 transition-colors text-gray-200"
+                      >
+                        <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
+                          {new Date(application.createdAt).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="border border-white/20 px-2 py-0.5 rounded text-xs text-white">
+                            {application.department}
+                          </span>
+                        </td>
+                        {visibleFields.map((field) => (
+                          <td
+                            key={`${application._id}-${field.name}`}
+                            className="px-4 py-3 max-w-xs truncate text-xs"
+                            title={String(application.responses?.[field.name] ?? "")}
+                          >
+                            {typeof application.responses?.[field.name] === "boolean"
+                              ? application.responses[field.name]
+                                ? "Yes"
+                                : "No"
+                              : application.responses?.[field.name] ?? "-"}
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={visibleFields.length + 2}
+                        className="px-4 py-8 text-center text-gray-400 font-mono text-sm"
+                      >
+                        No applications match the selected department filter.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="glass-panel p-8 text-center border border-white/20">
+            <p className="font-mono text-gray-400 text-sm">
+              No recruitment form selected or created yet. Click <span className="text-white font-bold">[ + START FORM ]</span> to create your first recruitment drive.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
