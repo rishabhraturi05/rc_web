@@ -17,6 +17,7 @@ export const DEFAULT_DEPARTMENT_OPTIONS = [
 
 export const DEFAULT_RECRUITMENT_FIELDS = [
   { name: "name", label: "Name", type: "text", required: true, options: [] },
+  { name: "email", label: "Email", type: "email", required: true, options: [] },
   { name: "rollno", label: "Roll Number", type: "text", required: true, options: [] },
 ];
 
@@ -46,7 +47,7 @@ export function ensureDefaultRecruitmentFields(fields = []) {
 
 export function getVisibleApplicationFields(form) {
   const allFields = Array.isArray(form?.fields) ? form.fields : [];
-  const names = new Set(["name", "rollno"]);
+  const names = new Set(["name", "email", "rollno"]);
 
   return allFields.filter((field) => {
     const normalizedName = normalizeFieldName(field?.name || field?.label || "");
