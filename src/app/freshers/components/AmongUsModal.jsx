@@ -172,7 +172,7 @@ export default function AmongUsModal({
         {/* Right: Animation Replay Selector & Close Button */}
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Animation Picker Dropdown */}
-          <div className="relative hidden sm:block">
+          {/* <div className="relative hidden sm:block">
             <select
               value={activeAnim}
               onChange={(e) => triggerAnimation(e.target.value)}
@@ -185,7 +185,7 @@ export default function AmongUsModal({
                 </option>
               ))}
             </select>
-          </div>
+          </div> */}
 
           {/* Quick Replay Button */}
           <button
