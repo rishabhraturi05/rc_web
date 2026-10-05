@@ -15,17 +15,43 @@ export const DEFAULT_DEPARTMENT_OPTIONS = [
   "PR",
 ];
 
+export const DEFAULT_YEAR_OPTIONS = [
+  "1st Year",
+  "2nd Year",
+  "3rd Year",
+  "4th Year",
+];
+
 export const DEFAULT_RECRUITMENT_FIELDS = [
   { name: "name", label: "Name", type: "text", required: true, options: [] },
   { name: "email", label: "Email", type: "email", required: true, options: [] },
   { name: "rollno", label: "Roll Number", type: "text", required: true, options: [] },
 ];
 
+export function isDepartmentField(field) {
+  const n = String(field?.name || "").trim().toLowerCase();
+  const l = String(field?.label || "").trim().toLowerCase();
+  return n === "department" || l === "department";
+}
+
+export function isYearField(field) {
+  const n = String(field?.name || "").trim().toLowerCase();
+  const l = String(field?.label || "").trim().toLowerCase();
+  return (
+    n === "year" ||
+    n === "year_of_study" ||
+    n === "study_year" ||
+    l === "year" ||
+    l === "year of study" ||
+    l.includes("year")
+  );
+}
+
 export function ensureDefaultRecruitmentFields(fields = []) {
   const normalized = Array.isArray(fields)
     ? fields
         .map((field, index) => normalizeField(field, index))
-        .filter((field) => String(field?.name || "").trim().toLowerCase() !== "department")
+        .filter((field) => !isDepartmentField(field) && !isYearField(field))
     : [];
 
   const defaultFields = DEFAULT_RECRUITMENT_FIELDS.map((field) => ({
@@ -72,6 +98,25 @@ export function isRecruitmentActive(config, referenceDate = new Date()) {
   return true;
 }
 
+export function getRecruitmentFormTitle(form) {
+  if (!form) return "Recruitment Form";
+
+  const rawTitle = String(form.title || "").trim();
+  if (rawTitle) {
+    return rawTitle;
+  }
+
+  const departments = Array.isArray(form.departments) && form.departments.length
+    ? form.departments.join(" + ")
+    : "Recruitment";
+
+  const years = Array.isArray(form.years) && form.years.length
+    ? form.years.join(", ")
+    : DEFAULT_YEAR_OPTIONS.join(", ");
+
+  return `${departments} (${years})`;
+}
+
 export function normalizeField(field, index = 0) {
   const type = String(field?.type || "text").trim().toLowerCase();
   const label = String(field?.label || "").trim();
@@ -111,13 +156,28 @@ export function normalizeRecruitmentConfig(payload = {}) {
     .filter(Boolean)
     .filter((department, index, list) => list.indexOf(department) === index);
 
+  const rawYears = Array.isArray(payload.years || payload.eligibleYears)
+    ? (payload.years || payload.eligibleYears)
+    : typeof (payload.years || payload.eligibleYears) === "string"
+      ? (payload.years || payload.eligibleYears).split(",")
+      : DEFAULT_YEAR_OPTIONS;
+
+  const years = rawYears
+    .map((year) => String(year).trim())
+    .filter(Boolean)
+    .filter((year, index, list) => list.indexOf(year) === index);
+
   const deadlineValue = payload.deadline ? new Date(payload.deadline) : null;
+  const customTitle = String(payload.title || "").trim();
+  const title = customTitle || getRecruitmentFormTitle({ departments, years });
 
   return {
+    title,
     isOpen: Boolean(payload.isOpen !== undefined ? payload.isOpen : true),
     deadline: deadlineValue && !Number.isNaN(deadlineValue.getTime()) ? deadlineValue : null,
     fields,
     departments: departments.length ? departments : DEFAULT_DEPARTMENT_OPTIONS,
+    years: years.length ? years : DEFAULT_YEAR_OPTIONS,
   };
 }
 

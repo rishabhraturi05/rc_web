@@ -13,7 +13,7 @@ const navLinks = [
     { name: 'Events', href: '/events_page', sum: 1700 },
     { name: 'Freshers', href: '/freshers', sum: 1850, isFreshers: true },
     { name: 'Projects', href: '/projects', sum: 2000 },
-    { name: 'Apply to RC', href: '/recruitment', sum: 2100 },
+    { name: 'JOIN RC', href: '/recruitment', sum: 2100 },
     { name: 'Alumni', href: '/alumni', sum: 2200 },
     { name: 'Contact', href: '/contact', sum: 2200 },
 ];

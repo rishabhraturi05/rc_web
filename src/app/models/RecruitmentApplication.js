@@ -9,6 +9,7 @@ const RecruitmentApplicationSchema = new mongoose.Schema(
       index: true,
     },
     department: { type: String, required: true, trim: true },
+    year: { type: String, trim: true, default: "" },
     responses: { type: Object, default: {} },
   },
   {
@@ -18,6 +19,7 @@ const RecruitmentApplicationSchema = new mongoose.Schema(
 );
 
 RecruitmentApplicationSchema.index({ formId: 1, department: 1 });
+RecruitmentApplicationSchema.index({ formId: 1, year: 1 });
 RecruitmentApplicationSchema.index({ createdAt: -1 });
 
 export default mongoose.models.RecruitmentApplication ||

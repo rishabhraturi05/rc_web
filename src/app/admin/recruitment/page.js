@@ -18,8 +18,12 @@ import {
 import * as XLSX from "xlsx";
 import {
   DEFAULT_DEPARTMENT_OPTIONS,
+  DEFAULT_YEAR_OPTIONS,
   ensureDefaultRecruitmentFields,
+  getRecruitmentFormTitle,
   getVisibleApplicationFields,
+  isDepartmentField,
+  isYearField,
 } from "@/app/lib/recruitment";
 
 const DEFAULT_DEADLINE = "2026-12-31T23:59";
@@ -36,9 +40,11 @@ const blankField = () => ({
 });
 
 const blankForm = {
+  title: "",
   isOpen: true,
   deadline: DEFAULT_DEADLINE,
   departments: [...DEFAULT_DEPARTMENT_OPTIONS],
+  years: [...DEFAULT_YEAR_OPTIONS],
   fields: [
     { ...blankField(), name: "name", label: "Name", type: "text", required: true },
     { ...blankField(), name: "email", label: "Email", type: "email", required: true },
@@ -65,7 +71,7 @@ function formatFieldOptions(rawOptions) {
 
 function buildSheetRows(form, applications) {
   const fieldHeaders = (form?.fields || [])
-    .filter((field) => String(field?.name || "").trim().toLowerCase() !== "department")
+    .filter((field) => !["department", "year"].includes(String(field?.name || "").trim().toLowerCase()))
     .map((field) => ({
       key: field.name || field.label,
       label: field.label || field.name,
@@ -75,6 +81,7 @@ function buildSheetRows(form, applications) {
     const row = {
       "Application Time": new Date(application.createdAt).toLocaleString(),
       Department: application.department,
+      Year: application.year || application.responses?.year || "",
     };
 
     (fieldHeaders || []).forEach(({ key, label }) => {
@@ -100,12 +107,20 @@ export default function RecruitmentAdminPage() {
   const [activeFormId, setActiveFormId] = useState("");
   const [applications, setApplications] = useState([]);
   const [selectedDepartment, setSelectedDepartment] = useState("all");
+  const [selectedYear, setSelectedYear] = useState("all");
   const [editor, setEditor] = useState(blankForm);
   const [editingId, setEditingId] = useState(null);
   const [showEditor, setShowEditor] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [editingApplication, setEditingApplication] = useState(null);
+  const [savingApplication, setSavingApplication] = useState(false);
+  const [applicationFormValues, setApplicationFormValues] = useState({
+    department: "",
+    year: "",
+    responses: {},
+  });
 
   useEffect(() => {
     if (status === "loading") return;
@@ -132,19 +147,28 @@ export default function RecruitmentAdminPage() {
   );
 
   const visibleFields = useMemo(() => {
-    return getVisibleApplicationFields(selectedForm);
+    return getVisibleApplicationFields(selectedForm).filter(
+      (field) => !["department", "year"].includes(String(field.name || "").trim().toLowerCase())
+    );
   }, [selectedForm]);
 
   const filteredApplications = useMemo(() => {
     if (!applications.length) return [];
-    if (selectedDepartment === "all") return applications;
-    return applications.filter((application) => application.department === selectedDepartment);
-  }, [applications, selectedDepartment]);
+    return applications.filter((application) => {
+      const matchDept = selectedDepartment === "all" || application.department === selectedDepartment;
+      const appYear = application.year || application.responses?.year;
+      const matchYear = selectedYear === "all" || appYear === selectedYear;
+      return matchDept && matchYear;
+    });
+  }, [applications, selectedDepartment, selectedYear]);
 
   const fetchForms = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/admin/recruitment");
+      const response = await fetch("/api/admin/recruitment", {
+        cache: "no-store",
+        headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" },
+      });
       const result = await response.json();
 
       if (!result.success) {
@@ -176,7 +200,10 @@ export default function RecruitmentAdminPage() {
 
   const fetchApplications = async (formId) => {
     try {
-      const response = await fetch(`/api/admin/recruitment/${formId}/applications`);
+      const response = await fetch(`/api/admin/recruitment/${formId}/applications`, {
+        cache: "no-store",
+        headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" },
+      });
       const result = await response.json();
 
       if (!result.success) {
@@ -196,14 +223,119 @@ export default function RecruitmentAdminPage() {
     }
   };
 
+  const openApplicationEditor = (application) => {
+    setEditingApplication(application);
+    setApplicationFormValues({
+      department: application.department || selectedForm?.departments?.[0] || "",
+      year: application.year || application.responses?.year || selectedForm?.years?.[0] || "",
+      responses: { ...(application.responses || {}) },
+    });
+  };
+
+  const closeApplicationEditor = () => {
+    setEditingApplication(null);
+    setApplicationFormValues({ department: "", year: "", responses: {} });
+  };
+
+  const handleApplicationResponseChange = (fieldKey, value) => {
+    setApplicationFormValues((prev) => ({
+      ...prev,
+      responses: {
+        ...prev.responses,
+        [fieldKey]: value,
+      },
+    }));
+  };
+
+  const saveApplication = async () => {
+    if (!editingApplication || !selectedForm) return;
+
+    if (!applicationFormValues.department) {
+      setMessage("Department is required.");
+      return;
+    }
+
+    if (!applicationFormValues.year) {
+      setMessage("Year of study is required.");
+      return;
+    }
+
+    setSavingApplication(true);
+    setMessage("");
+
+    try {
+      const response = await fetch(`/api/admin/recruitment/${selectedForm._id}/applications`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId: editingApplication._id,
+          department: applicationFormValues.department,
+          year: applicationFormValues.year,
+          responses: {
+            ...applicationFormValues.responses,
+            year: applicationFormValues.year,
+          },
+        }),
+      });
+
+      const result = await response.json();
+      if (!result.success) {
+        setMessage(result.message || "Failed to update response.");
+        return;
+      }
+
+      setMessage("Applicant response updated successfully.");
+      closeApplicationEditor();
+      await fetchApplications(selectedForm._id);
+    } catch (error) {
+      console.error("Save application error:", error);
+      setMessage("Error updating applicant response.");
+    } finally {
+      setSavingApplication(false);
+    }
+  };
+
+  const deleteApplication = async (applicationId) => {
+    if (!selectedForm || !applicationId) return;
+
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this applicant response? This cannot be undone."
+    );
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(
+        `/api/admin/recruitment/${selectedForm._id}/applications?applicationId=${applicationId}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const result = await response.json();
+      if (!result.success) {
+        setMessage(result.message || "Failed to delete applicant response.");
+        return;
+      }
+
+      setMessage("Applicant response deleted successfully.");
+      await fetchApplications(selectedForm._id);
+      await fetchForms();
+    } catch (error) {
+      console.error("Delete application error:", error);
+      setMessage("Error deleting applicant response.");
+    }
+  };
+
   const openEditor = (form = null) => {
     setMessage("");
     if (!form) {
       setEditingId(null);
       setEditor({
         ...blankForm,
+        title: "",
         deadline: DEFAULT_DEADLINE,
         departments: [...DEFAULT_DEPARTMENT_OPTIONS],
+        years: [...DEFAULT_YEAR_OPTIONS],
         fields: [
           { ...blankField(), name: "name", label: "Name", type: "text", required: true },
           { ...blankField(), name: "email", label: "Email", type: "email", required: true },
@@ -216,7 +348,7 @@ export default function RecruitmentAdminPage() {
 
     setEditingId(form._id);
     const formFields = ensureDefaultRecruitmentFields(form.fields || [])
-      .filter((field) => String(field?.name || "").trim().toLowerCase() !== "department")
+      .filter((field) => !["department", "year"].includes(String(field?.name || "").trim().toLowerCase()))
       .map((field) => ({
         id: createFieldId(),
         name: field.name || "",
@@ -227,9 +359,11 @@ export default function RecruitmentAdminPage() {
       }));
 
     setEditor({
+      title: form.title || "",
       isOpen: Boolean(form.isOpen),
       deadline: form.deadline ? new Date(form.deadline).toISOString().slice(0, 16) : DEFAULT_DEADLINE,
       departments: Array.isArray(form.departments) && form.departments.length ? form.departments : [...DEFAULT_DEPARTMENT_OPTIONS],
+      years: Array.isArray(form.years) && form.years.length ? form.years : [...DEFAULT_YEAR_OPTIONS],
       fields: formFields,
     });
     setShowEditor(true);
@@ -273,6 +407,7 @@ export default function RecruitmentAdminPage() {
 
   const saveForm = async () => {
     const cleanedFields = editor.fields
+      .filter((field) => !isDepartmentField(field) && !isYearField(field))
       .map((field) => ({
         id: field.id,
         name: String(field.name || "").trim(),
@@ -281,14 +416,23 @@ export default function RecruitmentAdminPage() {
         required: Boolean(field.required),
         options: formatFieldOptions(field.options),
       }))
-      .filter((field) => field.name && field.label)
-      .filter((field) => String(field.name).trim().toLowerCase() !== "department");
+      .filter((field) => field.name && field.label);
 
     const departments = Array.isArray(editor.departments)
       ? editor.departments
           .map((department) => String(department).trim())
           .filter(Boolean)
       : [];
+
+    const years = Array.isArray(editor.years)
+      ? editor.years
+          .map((year) => String(year).trim())
+          .filter(Boolean)
+      : [];
+
+    const finalTitle = editor.title && editor.title.trim()
+      ? editor.title.trim()
+      : getRecruitmentFormTitle({ departments, years });
 
     const finalFields = ensureDefaultRecruitmentFields(cleanedFields).map((field) => ({
       name: field.name,
@@ -298,8 +442,8 @@ export default function RecruitmentAdminPage() {
       options: Array.isArray(field.options) ? field.options : [],
     }));
 
-    if (!finalFields.length || !departments.length) {
-      setMessage("A form must include at least the default fields and one department.");
+    if (!finalFields.length || !departments.length || !years.length) {
+      setMessage("A form must include at least the default fields, one department, and one eligible year.");
       return;
     }
 
@@ -308,10 +452,12 @@ export default function RecruitmentAdminPage() {
 
     try {
       const payload = {
+        title: finalTitle,
         isOpen: editor.isOpen,
         deadline: editor.deadline ? new Date(editor.deadline).toISOString() : new Date(DEFAULT_DEADLINE).toISOString(),
         fields: finalFields,
         departments,
+        years,
       };
 
       const endpoint = editingId ? `/api/admin/recruitment/${editingId}` : "/api/admin/recruitment";
@@ -405,7 +551,7 @@ export default function RecruitmentAdminPage() {
     XLSX.utils.book_append_sheet(workbook, worksheet, "Recruitment");
     XLSX.writeFile(
       workbook,
-      `${selectedForm.departments?.join("_") || "recruitment"}_${selectedDepartment === "all" ? "all" : selectedDepartment}.xlsx`
+      `${getRecruitmentFormTitle(selectedForm).replace(/[^a-zA-Z0-9_-]+/g, "_")}_${selectedDepartment === "all" ? "all" : selectedDepartment}.xlsx`
     );
   };
 
@@ -499,7 +645,7 @@ export default function RecruitmentAdminPage() {
                   {editingId ? "[ EDIT RECRUITMENT FORM ]" : "[ CREATE NEW RECRUITMENT FORM ]"}
                 </h2>
                 <p className="font-mono text-xs text-gray-400 mt-1">
-                  Configure form status, application deadline, eligible departments, and custom questions.
+                  Configure form status, application deadline, eligible departments, eligible years, and custom questions.
                 </p>
               </div>
               <button
@@ -521,6 +667,23 @@ export default function RecruitmentAdminPage() {
                 />
                 <span>Form is open for submissions</span>
               </label>
+
+              <div>
+                <label className="mb-2 block font-mono text-sm text-gray-300 uppercase tracking-wider">
+                  Form Name (Custom / Manual Name)
+                </label>
+                <input
+                  type="text"
+                  value={editor.title}
+                  onChange={(event) => setEditor((previous) => ({ ...previous, title: event.target.value }))}
+                  placeholder="e.g. Software Team Recruitment (1st & 2nd Year) or any custom name"
+                  className="w-full sm:w-96 rounded border border-white/20 bg-black/40 px-3 py-2 font-mono text-sm text-white focus:border-white focus:outline-none placeholder:text-gray-500"
+                />
+                <p className="font-mono text-xs text-gray-400 mt-1.5">
+                  Display Name: <span className="text-white font-bold">{editor.title?.trim() || getRecruitmentFormTitle(editor)}</span>
+                  <span className="text-gray-500 block sm:inline sm:ml-2">(Enter any manual name above, or leave blank to auto-generate from departments & years)</span>
+                </p>
+              </div>
 
               <div>
                 <label className="mb-2 block font-mono text-sm text-gray-300 uppercase tracking-wider">
@@ -563,11 +726,38 @@ export default function RecruitmentAdminPage() {
 
               <div>
                 <label className="mb-2 block font-mono text-sm text-gray-300 uppercase tracking-wider">
+                  Eligible Years
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 rounded border border-white/20 bg-black/40 p-4">
+                  {DEFAULT_YEAR_OPTIONS.map((year) => (
+                    <label key={year} className="flex items-center gap-2 font-mono text-sm text-white cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={editor.years.includes(year)}
+                        onChange={(event) => {
+                          const checked = event.target.checked;
+                          setEditor((previous) => {
+                            const nextYears = checked
+                              ? [...previous.years, year]
+                              : previous.years.filter((item) => item !== year);
+                            return { ...previous, years: nextYears };
+                          });
+                        }}
+                        className="h-4 w-4 accent-white rounded cursor-pointer"
+                      />
+                      <span>{year}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block font-mono text-sm text-gray-300 uppercase tracking-wider">
                   Form Fields & Questions
                 </label>
                 <div className="space-y-4">
                   {editor.fields
-                    .filter((field) => String(field.name || "").trim().toLowerCase() !== "department")
+                    .filter((field) => !isDepartmentField(field) && !isYearField(field))
                     .map((field, index) => {
                       const isDefaultField = ["name", "email", "rollno"].includes(String(field.name || "").trim().toLowerCase());
                       return (
@@ -752,11 +942,11 @@ export default function RecruitmentAdminPage() {
                           }}
                           className="text-left font-mono text-sm font-bold text-white hover:underline cursor-pointer"
                         >
-                          {form.departments?.join(" + ") || "Recruitment Form"}
+                          {getRecruitmentFormTitle(form)}
                         </button>
                       </div>
                       <p className="font-mono text-xs text-gray-400 mt-1">
-                        {form.applicantCount || 0} applications • Deadline:{" "}
+                        {form.applicantCount || 0} applications • Years: {form.years?.join(", ") || "All"} • Deadline:{" "}
                         {form.deadline ? new Date(form.deadline).toLocaleDateString() : "No deadline"}
                       </p>
                       <div className="flex flex-wrap gap-2 mt-3 pt-2 border-t border-white/10">
@@ -838,11 +1028,11 @@ export default function RecruitmentAdminPage() {
                           }}
                           className="text-left font-mono text-sm font-bold text-gray-300 hover:text-white hover:underline cursor-pointer"
                         >
-                          {form.departments?.join(" + ") || "Recruitment Form"}
+                          {getRecruitmentFormTitle(form)}
                         </button>
                       </div>
                       <p className="font-mono text-xs text-gray-400 mt-1">
-                        {form.applicantCount || 0} applications • Closed
+                        {form.applicantCount || 0} applications • Years: {form.years?.join(", ") || "All"} • Closed
                       </p>
                       <div className="flex flex-wrap gap-2 mt-3 pt-2 border-t border-white/10">
                         <button
@@ -897,7 +1087,7 @@ export default function RecruitmentAdminPage() {
                     {">_"} APPLICATIONS
                   </h2>
                   <span className="font-mono text-xs border border-white/30 bg-white/10 px-2.5 py-0.5 rounded text-white">
-                    {selectedForm.departments?.join(" + ") || "Form"}
+                    {getRecruitmentFormTitle(selectedForm)}
                   </span>
                   <span
                     className={`font-mono text-xs border px-2 py-0.5 rounded ${
@@ -932,26 +1122,49 @@ export default function RecruitmentAdminPage() {
               </div>
             </div>
 
-            {/* Department Filter */}
-            <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              <label className="font-mono text-xs uppercase tracking-wider text-gray-400">
-                Filter by department:
-              </label>
-              <select
-                value={selectedDepartment}
-                onChange={(event) => setSelectedDepartment(event.target.value)}
-                className="rounded border border-white/20 bg-black/40 px-3 py-1.5 font-mono text-xs text-white focus:border-white focus:outline-none"
-              >
-                <option value="all" className="bg-black text-white">All departments ({applications.length})</option>
-                {(selectedForm.departments || []).map((department) => {
-                  const count = applications.filter((app) => app.department === department).length;
-                  return (
-                    <option key={department} value={department} className="bg-black text-white">
-                      {department} ({count})
-                    </option>
-                  );
-                })}
-              </select>
+            {/* Department and Year Filters */}
+            <div className="mb-6 flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                <label className="font-mono text-xs uppercase tracking-wider text-gray-400">
+                  Department:
+                </label>
+                <select
+                  value={selectedDepartment}
+                  onChange={(event) => setSelectedDepartment(event.target.value)}
+                  className="rounded border border-white/20 bg-black/40 px-3 py-1.5 font-mono text-xs text-white focus:border-white focus:outline-none"
+                >
+                  <option value="all" className="bg-black text-white">All departments ({applications.length})</option>
+                  {(selectedForm.departments || []).map((department) => {
+                    const count = applications.filter((app) => app.department === department).length;
+                    return (
+                      <option key={department} value={department} className="bg-black text-white">
+                        {department} ({count})
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <label className="font-mono text-xs uppercase tracking-wider text-gray-400">
+                  Year:
+                </label>
+                <select
+                  value={selectedYear}
+                  onChange={(event) => setSelectedYear(event.target.value)}
+                  className="rounded border border-white/20 bg-black/40 px-3 py-1.5 font-mono text-xs text-white focus:border-white focus:outline-none"
+                >
+                  <option value="all" className="bg-black text-white">All years</option>
+                  {(selectedForm.years || DEFAULT_YEAR_OPTIONS).map((yr) => {
+                    const count = applications.filter((app) => (app.year || app.responses?.year) === yr).length;
+                    return (
+                      <option key={yr} value={yr} className="bg-black text-white">
+                        {yr} ({count})
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
             </div>
 
             {/* Applications Table */}
@@ -961,11 +1174,13 @@ export default function RecruitmentAdminPage() {
                   <tr className="border-b border-white/15 bg-white/5 text-gray-300">
                     <th className="px-4 py-3 text-xs uppercase tracking-wider">Timestamp</th>
                     <th className="px-4 py-3 text-xs uppercase tracking-wider">Department</th>
+                    <th className="px-4 py-3 text-xs uppercase tracking-wider">Year</th>
                     {visibleFields.map((field) => (
                       <th key={field.name} className="px-4 py-3 text-xs uppercase tracking-wider">
                         {field.label || field.name}
                       </th>
                     ))}
+                    <th className="px-4 py-3 text-xs uppercase tracking-wider text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -983,6 +1198,11 @@ export default function RecruitmentAdminPage() {
                             {application.department}
                           </span>
                         </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="border border-white/20 px-2 py-0.5 rounded text-xs text-gray-300">
+                            {application.year || application.responses?.year || "-"}
+                          </span>
+                        </td>
                         {visibleFields.map((field) => (
                           <td
                             key={`${application._id}-${field.name}`}
@@ -996,15 +1216,35 @@ export default function RecruitmentAdminPage() {
                               : application.responses?.[field.name] ?? "-"}
                           </td>
                         ))}
+                        <td className="px-4 py-3 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => openApplicationEditor(application)}
+                              className="cursor-pointer font-mono text-[10px] uppercase tracking-wider text-gray-300 hover:text-white border border-white/20 hover:border-white rounded px-2.5 py-1 transition-colors"
+                              title="Edit Response"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => deleteApplication(application._id)}
+                              className="cursor-pointer font-mono text-[10px] uppercase tracking-wider text-red-400 hover:text-red-300 border border-red-500/30 hover:border-red-400 rounded px-2.5 py-1 transition-colors"
+                              title="Delete Response"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
                       <td
-                        colSpan={visibleFields.length + 2}
+                        colSpan={visibleFields.length + 4}
                         className="px-4 py-8 text-center text-gray-400 font-mono text-sm"
                       >
-                        No applications match the selected department filter.
+                        No applications match the selected filters.
                       </td>
                     </tr>
                   )}
@@ -1017,6 +1257,141 @@ export default function RecruitmentAdminPage() {
             <p className="font-mono text-gray-400 text-sm">
               No recruitment form selected or created yet. Click <span className="text-white font-bold">[ + START FORM ]</span> to create your first recruitment drive.
             </p>
+          </div>
+        )}
+
+        {/* Edit Application Response Modal */}
+        {editingApplication && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <div className="glass-panel w-full max-w-xl p-6 sm:p-8 border border-white/30 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between gap-4 mb-6 border-b border-white/15 pb-4">
+                <div>
+                  <h2 className="font-mono text-xl font-bold uppercase tracking-wider text-white">
+                    [ EDIT APPLICANT RESPONSE ]
+                  </h2>
+                  <p className="font-mono text-xs text-gray-400 mt-1">
+                    Submitted on {new Date(editingApplication.createdAt).toLocaleString()}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeApplicationEditor}
+                  className="flex items-center gap-1.5 px-3 py-1.5 border border-white/20 text-gray-300 rounded hover:border-white hover:text-white font-mono text-xs uppercase tracking-widest transition-colors cursor-pointer"
+                >
+                  <FaTimes /> Close
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Department select */}
+                <div>
+                  <label className="mb-1 block font-mono text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                    Department *
+                  </label>
+                  <select
+                    value={applicationFormValues.department}
+                    onChange={(e) => setApplicationFormValues((prev) => ({ ...prev, department: e.target.value }))}
+                    className="w-full rounded border border-white/20 bg-black/50 px-3 py-2 font-mono text-sm text-white focus:border-white focus:outline-none"
+                  >
+                    {(selectedForm?.departments || DEFAULT_DEPARTMENT_OPTIONS).map((dept) => (
+                      <option key={dept} value={dept} className="bg-black text-white">
+                        {dept}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Year select */}
+                <div>
+                  <label className="mb-1 block font-mono text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                    Year of Study *
+                  </label>
+                  <select
+                    value={applicationFormValues.year}
+                    onChange={(e) => setApplicationFormValues((prev) => ({ ...prev, year: e.target.value }))}
+                    className="w-full rounded border border-white/20 bg-black/50 px-3 py-2 font-mono text-sm text-white focus:border-white focus:outline-none"
+                  >
+                    {(selectedForm?.years || DEFAULT_YEAR_OPTIONS).map((yr) => (
+                      <option key={yr} value={yr} className="bg-black text-white">
+                        {yr}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Form fields & custom responses */}
+                {(selectedForm?.fields || [])
+                  .filter((f) => !isDepartmentField(f) && !isYearField(f))
+                  .map((field) => {
+                    const fieldKey = field.name || field.label;
+                    const curVal = applicationFormValues.responses?.[fieldKey] ?? "";
+
+                    return (
+                      <div key={fieldKey}>
+                        <label className="mb-1 block font-mono text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                          {field.label || fieldKey} {field.required ? <span className="text-red-400">*</span> : ""}
+                        </label>
+                        {field.type === "textarea" ? (
+                          <textarea
+                            rows={3}
+                            value={curVal}
+                            onChange={(e) => handleApplicationResponseChange(fieldKey, e.target.value)}
+                            className="w-full rounded border border-white/20 bg-black/50 px-3 py-2 font-mono text-sm text-white focus:border-white focus:outline-none"
+                          />
+                        ) : field.type === "checkbox" ? (
+                          <label className="flex items-center gap-2 cursor-pointer font-mono text-sm text-white">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(curVal)}
+                              onChange={(e) => handleApplicationResponseChange(fieldKey, e.target.checked)}
+                              className="accent-white cursor-pointer"
+                            />
+                            <span>Yes / No</span>
+                          </label>
+                        ) : field.type === "select" ? (
+                          <select
+                            value={curVal}
+                            onChange={(e) => handleApplicationResponseChange(fieldKey, e.target.value)}
+                            className="w-full rounded border border-white/20 bg-black/50 px-3 py-2 font-mono text-sm text-white focus:border-white focus:outline-none"
+                          >
+                            <option value="" className="bg-black text-gray-400">Select option</option>
+                            {(field.options || []).map((opt) => (
+                              <option key={opt} value={opt} className="bg-black text-white">
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type={field.type === "email" ? "email" : field.type === "number" ? "number" : "text"}
+                            value={curVal}
+                            onChange={(e) => handleApplicationResponseChange(fieldKey, e.target.value)}
+                            className="w-full rounded border border-white/20 bg-black/50 px-3 py-2 font-mono text-sm text-white focus:border-white focus:outline-none"
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+
+              <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={closeApplicationEditor}
+                  className="px-4 py-2 border border-white/20 text-gray-300 rounded font-mono text-xs uppercase tracking-wider hover:border-white hover:text-white transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={saveApplication}
+                  disabled={savingApplication}
+                  className="px-6 py-2 border border-white bg-white text-black font-mono text-xs font-bold uppercase tracking-wider rounded hover:bg-transparent hover:text-white transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {savingApplication ? "Saving..." : "[ Save Changes ]"}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

@@ -10,7 +10,7 @@ export async function POST(req, { params }) {
   try {
     const { id } = await params;
     const body = await req.json();
-    const { department, responses } = body || {};
+    const { department, year, responses } = body || {};
 
     await connectDB();
 
@@ -37,13 +37,39 @@ export async function POST(req, { params }) {
       );
     }
 
+    const availableYears =
+      Array.isArray(form.years) && form.years.length
+        ? form.years
+        : ["1st Year", "2nd Year", "3rd Year", "4th Year"];
+    const applicantYear = String(year || responses?.year || "").trim();
+
+    if (!applicantYear) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Year of study is a mandatory field. Please select your year of study.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!availableYears.includes(applicantYear)) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Year "${applicantYear}" is not allowed for this recruitment form. Allowed years: ${availableYears.join(", ")}.`,
+        },
+        { status: 403 }
+      );
+    }
+
     const cleanedResponses = responses && typeof responses === "object" ? responses : {};
     const validatedResponses = {};
     const emailFieldNames = [];
     let applicantEmail = "";
 
     for (const field of form.fields || []) {
-      if (String(field?.name || "").trim().toLowerCase() === "department") {
+      if (["department", "year"].includes(String(field?.name || "").trim().toLowerCase())) {
         continue;
       }
 
@@ -112,7 +138,11 @@ export async function POST(req, { params }) {
     const application = await RecruitmentApplication.create({
       formId: form._id,
       department: String(department).trim(),
-      responses: validatedResponses,
+      year: applicantYear,
+      responses: {
+        ...validatedResponses,
+        year: applicantYear,
+      },
     });
 
     return NextResponse.json(

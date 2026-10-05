@@ -17,19 +17,28 @@ const RecruitmentFieldSchema = new mongoose.Schema(
 
 const RecruitmentConfigSchema = new mongoose.Schema(
   {
+    title: { type: String, trim: true, default: "" },
     isOpen: { type: Boolean, default: true },
     deadline: { type: Date, default: null },
     fields: { type: [RecruitmentFieldSchema], default: [] },
     departments: { type: [String], default: [] },
+    years: {
+      type: [String],
+      default: ["1st Year", "2nd Year", "3rd Year", "4th Year"],
+    },
   },
   {
     timestamps: true,
     collection: "recruitment_configs",
+    strict: false,
   }
 );
 
 RecruitmentConfigSchema.index({ isOpen: 1, deadline: 1 });
 RecruitmentConfigSchema.index({ updatedAt: -1 });
 
-export default mongoose.models.RecruitmentConfig ||
+const RecruitmentConfig =
+  mongoose.models.RecruitmentConfig ||
   mongoose.model("RecruitmentConfig", RecruitmentConfigSchema);
+
+export default RecruitmentConfig;
