@@ -105,7 +105,7 @@ export default function AddSecDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedYear, setSelectedYear] = useState("all");
   const [evaluationFilter, setEvaluationFilter] = useState("all"); // 'all', 'evaluated', 'pending'
-  const [feedbackFilter, setFeedbackFilter] = useState("all"); // 'all', 'positive', 'negative', 'unclassified'
+  const [feedbackFilter, setFeedbackFilter] = useState("all"); // 'all', 'positive', 'waitlist', 'negative', 'unclassified'
   const [sortBy, setSortBy] = useState("newest"); // 'newest', 'oldest', 'points_desc', 'points_asc', 'name_asc'
 
   // Inline edits state: { [appId]: { points, comments, feedback, isDirty, isSaving, savedRecently } }
@@ -242,13 +242,14 @@ export default function AddSecDashboard() {
       if (evaluationFilter === "evaluated" && !isEvaluated) return false;
       if (evaluationFilter === "pending" && isEvaluated) return false;
 
-      // 3. Feedback filter (Positive / Negative / Unclassified)
+      // 3. Feedback filter (Positive / Waitlist / Negative / Unclassified)
       const currentFeedback =
         inlineEdits[app._id]?.feedback !== undefined
           ? inlineEdits[app._id]?.feedback
           : app.feedback || "";
 
       if (feedbackFilter === "positive" && currentFeedback !== "positive") return false;
+      if (feedbackFilter === "waitlist" && currentFeedback !== "waitlist") return false;
       if (feedbackFilter === "negative" && currentFeedback !== "negative") return false;
       if (feedbackFilter === "unclassified" && Boolean(currentFeedback)) return false;
 
@@ -310,6 +311,7 @@ export default function AddSecDashboard() {
     const total = applications.length;
     let evaluated = 0;
     let positiveCount = 0;
+    let waitlistCount = 0;
     let negativeCount = 0;
     let totalPoints = 0;
     let numericPointsCount = 0;
@@ -321,6 +323,7 @@ export default function AddSecDashboard() {
 
       if (p || c || fb) evaluated++;
       if (fb === "positive") positiveCount++;
+      if (fb === "waitlist") waitlistCount++;
       if (fb === "negative") negativeCount++;
 
       const num = parseFloat(p);
@@ -333,7 +336,7 @@ export default function AddSecDashboard() {
     const pending = total - evaluated;
     const avgScore = numericPointsCount > 0 ? (totalPoints / numericPointsCount).toFixed(1) : "—";
 
-    return { total, evaluated, pending, avgScore, positiveCount, negativeCount };
+    return { total, evaluated, pending, avgScore, positiveCount, waitlistCount, negativeCount };
   }, [applications, inlineEdits]);
 
   // Handle inline change
@@ -457,6 +460,8 @@ export default function AddSecDashboard() {
       row["Feedback Classification"] =
         feedbackVal === "positive"
           ? "Positive"
+          : feedbackVal === "waitlist"
+          ? "Waitlist"
           : feedbackVal === "negative"
           ? "Negative"
           : "Unclassified";
@@ -554,6 +559,8 @@ export default function AddSecDashboard() {
         row["Feedback Classification"] =
           feedbackVal === "positive"
             ? "Positive"
+            : feedbackVal === "waitlist"
+            ? "Waitlist"
             : feedbackVal === "negative"
             ? "Negative"
             : "Unclassified";
@@ -606,40 +613,48 @@ export default function AddSecDashboard() {
 
   if (status === "unauthenticated" || (status !== "loading" && session?.user?.role !== "addsec" && session?.user?.role !== "admin")) {
     return (
-      <div className="relative min-h-screen text-white flex flex-col justify-center pt-28 sm:pt-32 pb-20 px-4 sm:px-6 lg:px-8">
+      <div className="relative min-h-screen text-white flex flex-col justify-center py-16 sm:py-24 lg:py-28 px-3.5 sm:px-6 lg:px-8">
         {/* Title Header */}
-        <div className="relative z-10 text-center pb-8" data-aos="fade-up">
-          <div className="inline-block px-3 py-1 mb-3 rounded-full text-xs font-mono uppercase tracking-widest bg-white/10 text-gray-300 border border-white/20">
+        <div className="relative z-10 text-center pb-6 sm:pb-8" data-aos="fade-up">
+          <div className="inline-block px-3 py-1 mb-2.5 sm:mb-3 rounded-full text-[10px] sm:text-xs font-mono uppercase tracking-widest bg-white/10 text-gray-300 border border-white/20">
             Department Additional Secretaries Portal
           </div>
-          <h1 className="font-mono text-3xl sm:text-5xl font-bold tracking-tight mb-3 text-white">
+          <h1 className="font-mono text-2xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-2 sm:mb-3 text-white">
             {">_"} ADDSEC_LOGIN
           </h1>
-          <p className="font-mono text-gray-400 text-sm sm:text-base max-w-lg mx-auto">
+          <p className="font-mono text-gray-400 text-xs sm:text-sm lg:text-base max-w-lg mx-auto px-2">
             Sign in with your department ID to access recruitment applicant entries, scoring, and Excel reports.
           </p>
         </div>
 
         {/* 4 Department Badges with One-Click Autofill */}
-        <div className="max-w-xl mx-auto w-full mb-8">
-          <div className="text-center mb-2.5">
-            <span className="font-mono text-[11px] text-gray-400 uppercase tracking-wider">
-              [ Additional Secretary Departments ]
+        <div className="max-w-xl mx-auto w-full mb-6 sm:mb-8">
+          <div className="text-center mb-2 sm:mb-2.5">
+            <span className="font-mono text-[10px] sm:text-[11px] text-gray-400 uppercase tracking-wider">
+              [ Click department to autofill ID ]
             </span>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
             {DEPARTMENTS.map((dept) => {
               const Icon = dept.icon;
               return (
-                <div
+                <button
+                  type="button"
                   key={dept.name}
-                  className={`p-3 text-center rounded border transition-all duration-200 flex flex-col items-center justify-center space-y-1.5 glass-panel ${dept.border}`}
+                  onClick={() =>
+                    setLoginCreds((prev) => ({
+                      ...prev,
+                      username: `addsec_${dept.name.toLowerCase()}`,
+                    }))
+                  }
+                  className={`p-2.5 sm:p-3 text-center rounded border transition-all duration-200 flex flex-col items-center justify-center space-y-1 sm:space-y-1.5 glass-panel hover:scale-[1.03] active:scale-95 cursor-pointer ${dept.border}`}
+                  title={`Click to autofill ID for ${dept.name}`}
                 >
-                  <Icon className={`text-xl ${dept.color}`} />
-                  <span className="font-mono text-xs font-semibold uppercase tracking-wider text-gray-200">
+                  <Icon className={`text-lg sm:text-xl ${dept.color}`} />
+                  <span className="font-mono text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-gray-200">
                     {dept.name}
                   </span>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -649,7 +664,7 @@ export default function AddSecDashboard() {
         <div className="relative z-10 max-w-md mx-auto w-full">
           <form
             onSubmit={handleInlineLogin}
-            className="glass-panel p-6 sm:p-8 space-y-6 shadow-2xl border border-white/20"
+            className="glass-panel p-5 sm:p-8 space-y-5 sm:space-y-6 shadow-2xl border border-white/20 rounded-xl"
           >
             <div>
               <label
@@ -1005,72 +1020,82 @@ export default function AddSecDashboard() {
 
         {/* Selected Form Active Banner & Quick Stats */}
         {activeForm && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-            <div className="glass-panel p-4 border border-white/10 flex flex-col justify-between">
-              <span className="font-mono text-xs text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3.5">
+            <div className="glass-panel p-3.5 sm:p-4 border border-white/10 flex flex-col justify-between rounded-lg">
+              <span className="font-mono text-xs text-gray-400 uppercase tracking-wider flex items-center gap-1.5 font-semibold">
                 <FaUserAstronaut className="text-gray-300" /> Total
               </span>
-              <div className="font-mono text-2xl sm:text-3xl font-bold mt-2 text-white">
+              <div className="font-mono text-2xl sm:text-3xl font-bold mt-1.5 text-white">
                 {stats.total}
               </div>
-              <span className="font-mono text-[11px] text-gray-500 mt-1">In {departmentName}</span>
+              <span className="font-mono text-[10px] sm:text-[11px] text-gray-500 mt-1 truncate">In {departmentName}</span>
             </div>
 
-            <div className="glass-panel p-4 border border-emerald-500/30 bg-emerald-950/15 flex flex-col justify-between">
-              <span className="font-mono text-xs text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+            <div className="glass-panel p-3.5 sm:p-4 border border-emerald-500/30 bg-emerald-950/20 flex flex-col justify-between rounded-lg">
+              <span className="font-mono text-xs text-emerald-400 uppercase tracking-wider flex items-center gap-1.5 font-semibold">
                 <FaThumbsUp className="text-emerald-400" /> Positive
               </span>
-              <div className="font-mono text-2xl sm:text-3xl font-bold mt-2 text-emerald-400">
+              <div className="font-mono text-2xl sm:text-3xl font-bold mt-1.5 text-emerald-400">
                 {stats.positiveCount}
               </div>
-              <span className="font-mono text-[11px] text-emerald-500/70 mt-1">Green verdict</span>
+              <span className="font-mono text-[10px] sm:text-[11px] text-emerald-500/70 mt-1">Green verdict</span>
             </div>
 
-            <div className="glass-panel p-4 border border-rose-500/30 bg-rose-950/15 flex flex-col justify-between">
-              <span className="font-mono text-xs text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
+            <div className="glass-panel p-3.5 sm:p-4 border border-amber-400/40 bg-amber-950/25 flex flex-col justify-between rounded-lg shadow-[0_0_15px_rgba(251,191,36,0.1)]">
+              <span className="font-mono text-xs text-amber-300 uppercase tracking-wider flex items-center gap-1.5 font-semibold">
+                <FaClock className="text-amber-400" /> Waitlist
+              </span>
+              <div className="font-mono text-2xl sm:text-3xl font-bold mt-1.5 text-amber-300">
+                {stats.waitlistCount}
+              </div>
+              <span className="font-mono text-[10px] sm:text-[11px] text-amber-400/70 mt-1">Yellow verdict</span>
+            </div>
+
+            <div className="glass-panel p-3.5 sm:p-4 border border-rose-500/30 bg-rose-950/20 flex flex-col justify-between rounded-lg">
+              <span className="font-mono text-xs text-rose-400 uppercase tracking-wider flex items-center gap-1.5 font-semibold">
                 <FaThumbsDown className="text-rose-400" /> Negative
               </span>
-              <div className="font-mono text-2xl sm:text-3xl font-bold mt-2 text-rose-400">
+              <div className="font-mono text-2xl sm:text-3xl font-bold mt-1.5 text-rose-400">
                 {stats.negativeCount}
               </div>
-              <span className="font-mono text-[11px] text-rose-500/70 mt-1">Red verdict</span>
+              <span className="font-mono text-[10px] sm:text-[11px] text-rose-500/70 mt-1">Red verdict</span>
             </div>
 
-            <div className="glass-panel p-4 border border-white/10 flex flex-col justify-between">
-              <span className="font-mono text-xs text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+            <div className="glass-panel p-3.5 sm:p-4 border border-white/10 flex flex-col justify-between rounded-lg">
+              <span className="font-mono text-xs text-blue-400 uppercase tracking-wider flex items-center gap-1.5 font-semibold">
                 <FaCheckCircle className="text-blue-400" /> Evaluated
               </span>
-              <div className="font-mono text-2xl sm:text-3xl font-bold mt-2 text-blue-400">
+              <div className="font-mono text-2xl sm:text-3xl font-bold mt-1.5 text-blue-400">
                 {stats.evaluated}
               </div>
-              <span className="font-mono text-[11px] text-gray-500 mt-1">Notes / points given</span>
+              <span className="font-mono text-[10px] sm:text-[11px] text-gray-500 mt-1 truncate">Notes / score given</span>
             </div>
 
-            <div className="glass-panel p-4 border border-white/10 flex flex-col justify-between col-span-2 sm:col-span-1">
-              <span className="font-mono text-xs text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+            <div className="glass-panel p-3.5 sm:p-4 border border-white/10 flex flex-col justify-between rounded-lg">
+              <span className="font-mono text-xs text-amber-400 uppercase tracking-wider flex items-center gap-1.5 font-semibold">
                 <FaStar className="text-amber-400" /> Avg Score
               </span>
-              <div className="font-mono text-2xl sm:text-3xl font-bold mt-2 text-amber-400">
+              <div className="font-mono text-2xl sm:text-3xl font-bold mt-1.5 text-amber-400">
                 {stats.avgScore}
               </div>
-              <span className="font-mono text-[11px] text-gray-500 mt-1">From numeric scores</span>
+              <span className="font-mono text-[10px] sm:text-[11px] text-gray-500 mt-1 truncate">From numeric scores</span>
             </div>
           </div>
         )}
 
         {/* Filter and Search Bar */}
         {activeForm && (
-          <div className="glass-panel p-4 sm:p-5 border border-white/15 space-y-4">
+          <div className="glass-panel p-3.5 sm:p-5 border border-white/15 space-y-3.5 sm:space-y-4 rounded-xl">
             <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
               {/* Search Bar */}
-              <div className="relative flex-1">
+              <div className="relative flex-1 min-w-[200px]">
                 <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search by name, roll no, email, or any response keyword..."
-                  className="w-full pl-9 pr-4 py-2.5 bg-black/60 border border-white/20 rounded text-sm font-mono text-white placeholder-gray-500 focus:outline-none focus:border-white transition-colors"
+                  className="w-full pl-9 pr-8 py-2.5 bg-black/60 border border-white/20 rounded text-xs sm:text-sm font-mono text-white placeholder-gray-500 focus:outline-none focus:border-white transition-colors"
                 />
                 {searchQuery && (
                   <button
@@ -1082,72 +1107,76 @@ export default function AddSecDashboard() {
                 )}
               </div>
 
-              {/* Year Filter */}
-              <div className="flex items-center gap-2">
-                <label className="font-mono text-xs text-gray-400 whitespace-nowrap">Year:</label>
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(e.target.value)}
-                  className="bg-black/60 border border-white/20 rounded px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-white"
-                >
-                  <option value="all">All Years</option>
-                  {(activeForm.years || ["1st Year", "2nd Year", "3rd Year", "4th Year"]).map((yr) => (
-                    <option key={yr} value={yr}>
-                      {yr}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Responsive Dropdowns Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:flex lg:items-center gap-2 sm:gap-3">
+                {/* Year Filter */}
+                <div className="flex flex-col xs:flex-row xs:items-center gap-1 sm:gap-1.5">
+                  <label className="font-mono text-[11px] sm:text-xs text-gray-400 whitespace-nowrap">Year:</label>
+                  <select
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(e.target.value)}
+                    className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 sm:py-2 text-xs font-mono text-white focus:outline-none focus:border-white w-full"
+                  >
+                    <option value="all">All Years</option>
+                    {(activeForm.years || ["1st Year", "2nd Year", "3rd Year", "4th Year"]).map((yr) => (
+                      <option key={yr} value={yr}>
+                        {yr}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              {/* Evaluation Status Filter */}
-              <div className="flex items-center gap-2">
-                <label className="font-mono text-xs text-gray-400 whitespace-nowrap">Status:</label>
-                <select
-                  value={evaluationFilter}
-                  onChange={(e) => setEvaluationFilter(e.target.value)}
-                  className="bg-black/60 border border-white/20 rounded px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-white"
-                >
-                  <option value="all">All Status</option>
-                  <option value="evaluated">Evaluated Only</option>
-                  <option value="pending">Pending Only</option>
-                </select>
-              </div>
+                {/* Evaluation Status Filter */}
+                <div className="flex flex-col xs:flex-row xs:items-center gap-1 sm:gap-1.5">
+                  <label className="font-mono text-[11px] sm:text-xs text-gray-400 whitespace-nowrap">Status:</label>
+                  <select
+                    value={evaluationFilter}
+                    onChange={(e) => setEvaluationFilter(e.target.value)}
+                    className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 sm:py-2 text-xs font-mono text-white focus:outline-none focus:border-white w-full"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="evaluated">Evaluated Only</option>
+                    <option value="pending">Pending Only</option>
+                  </select>
+                </div>
 
-              {/* Feedback Filter */}
-              <div className="flex items-center gap-2">
-                <label className="font-mono text-xs text-gray-400 whitespace-nowrap">Feedback:</label>
-                <select
-                  value={feedbackFilter}
-                  onChange={(e) => setFeedbackFilter(e.target.value)}
-                  className="bg-black/60 border border-white/20 rounded px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-white"
-                >
-                  <option value="all">All Feedback</option>
-                  <option value="positive">👍 Positive (Green)</option>
-                  <option value="negative">👎 Negative (Red)</option>
-                  <option value="unclassified">Unclassified</option>
-                </select>
-              </div>
+                {/* Feedback Filter */}
+                <div className="flex flex-col xs:flex-row xs:items-center gap-1 sm:gap-1.5">
+                  <label className="font-mono text-[11px] sm:text-xs text-gray-400 whitespace-nowrap">Feedback:</label>
+                  <select
+                    value={feedbackFilter}
+                    onChange={(e) => setFeedbackFilter(e.target.value)}
+                    className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 sm:py-2 text-xs font-mono text-white focus:outline-none focus:border-white w-full"
+                  >
+                    <option value="all">All Feedback</option>
+                    <option value="positive">🟢 Positive (Green)</option>
+                    <option value="waitlist">🟡 Waitlist (Yellow)</option>
+                    <option value="negative">🔴 Negative (Red)</option>
+                    <option value="unclassified">Unclassified</option>
+                  </select>
+                </div>
 
-              {/* Sort By */}
-              <div className="flex items-center gap-2">
-                <label className="font-mono text-xs text-gray-400 whitespace-nowrap">Sort:</label>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="bg-black/60 border border-white/20 rounded px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-white"
-                >
-                  <option value="newest">Newest First</option>
-                  <option value="oldest">Oldest First</option>
-                  <option value="points_desc">Points: High to Low</option>
-                  <option value="points_asc">Points: Low to High</option>
-                  <option value="name_asc">Name: A to Z</option>
-                </select>
+                {/* Sort By */}
+                <div className="flex flex-col xs:flex-row xs:items-center gap-1 sm:gap-1.5">
+                  <label className="font-mono text-[11px] sm:text-xs text-gray-400 whitespace-nowrap">Sort:</label>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 sm:py-2 text-xs font-mono text-white focus:outline-none focus:border-white w-full"
+                  >
+                    <option value="newest">Newest First</option>
+                    <option value="oldest">Oldest First</option>
+                    <option value="points_desc">Points: High to Low</option>
+                    <option value="points_asc">Points: Low to High</option>
+                    <option value="name_asc">Name: A to Z</option>
+                  </select>
+                </div>
               </div>
             </div>
 
             {/* Bottom Row of Filter Bar: Count + Excel Buttons */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2 border-t border-white/10 text-xs font-mono">
-              <div className="text-gray-400">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2.5 border-t border-white/10 text-xs font-mono">
+              <div className="text-gray-400 text-[11px] sm:text-xs">
                 Showing <strong className="text-white">{filteredApplications.length}</strong> of{" "}
                 <strong className="text-white">{applications.length}</strong> candidates
                 {(searchQuery || selectedYear !== "all" || evaluationFilter !== "all" || feedbackFilter !== "all") && (
@@ -1167,256 +1196,502 @@ export default function AddSecDashboard() {
               </div>
 
               {/* Excel Download Buttons */}
-              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <div className="flex flex-col xs:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full sm:w-auto">
                 <button
                   onClick={exportFilteredView}
                   disabled={!filteredApplications.length}
-                  className="px-3.5 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 rounded font-mono text-xs uppercase tracking-wider flex items-center gap-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="px-3.5 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 rounded font-mono text-[11px] sm:text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   title="Download the current table rows as Excel"
                 >
                   <FaDownload className="text-xs" />
-                  [ Export Filtered ({filteredApplications.length}) ]
+                  <span>[ Export Filtered ({filteredApplications.length}) ]</span>
                 </button>
 
                 <button
                   onClick={exportThisForm}
                   disabled={!applications.length}
-                  className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/30 rounded font-mono text-xs uppercase tracking-wider flex items-center gap-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/30 rounded font-mono text-[11px] sm:text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   title="Download all applicants for this form"
                 >
                   <FaDownload className="text-xs" />
-                  [ Export All ({applications.length}) ]
+                  <span>[ Export All ({applications.length}) ]</span>
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Applicant Entries Table */}
+        {/* Applicant Entries Container */}
         {activeForm && (
-          <div className="glass-panel border border-white/15 overflow-hidden">
+          <div className="space-y-4">
             {loadingApps ? (
-              <div className="p-12 text-center">
+              <div className="glass-panel border border-white/15 p-12 text-center rounded-xl">
                 <p className="font-mono text-gray-400 text-sm animate-pulse">Loading applicant entries...</p>
               </div>
             ) : filteredApplications.length === 0 ? (
-              <div className="p-12 text-center space-y-2">
+              <div className="glass-panel border border-white/15 p-12 text-center space-y-2 rounded-xl">
                 <p className="font-mono text-gray-300 text-base">No applicants found matching your criteria.</p>
                 <p className="font-mono text-gray-500 text-xs">Try clearing filters or search keywords.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left font-mono text-xs">
-                  <thead className="bg-white/5 border-b border-white/15 text-gray-400 uppercase tracking-wider">
-                    <tr>
-                      <th className="py-3 px-3 w-12 text-center">#</th>
-                      <th className="py-3 px-4 min-w-[180px]">Applicant Info</th>
-                      <th className="py-3 px-3 min-w-[90px]">Year</th>
-                      <th className="py-3 px-4 min-w-[140px]">Responses Preview</th>
-                      <th className="py-3 px-3 min-w-[125px] text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <FaThumbsUp className="text-emerald-400 text-xs" />
-                          <span>/</span>
-                          <FaThumbsDown className="text-rose-400 text-xs" />
-                          <span>Feedback</span>
-                        </div>
-                      </th>
-                      <th className="py-3 px-3 min-w-[110px]">
-                        <div className="flex items-center gap-1">
-                          <FaStar className="text-amber-400 text-xs" />
-                          <span>Points</span>
-                        </div>
-                      </th>
-                      <th className="py-3 px-4 min-w-[240px]">
-                        <div className="flex items-center gap-1">
-                          <FaRegCommentDots className="text-blue-400 text-xs" />
-                          <span>Comments / Remarks</span>
-                        </div>
-                      </th>
-                      <th className="py-3 px-3 min-w-[110px] text-center">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/10">
-                    {filteredApplications.map((app, index) => {
-                      const edit = inlineEdits[app._id] || { points: "", comments: "", feedback: "" };
-                      const candidateName = app.responses?.name || app.responses?.fullName || "Applicant";
-                      const candidateRoll = app.responses?.rollno || app.responses?.rollNumber || "—";
-                      const candidateEmail = app.responses?.email || "—";
-                      const candidateYear = app.year || app.responses?.year || "—";
-                      const candidateFeedback = edit.feedback !== undefined ? edit.feedback : app.feedback || "";
+              <>
+                {/* 1. MOBILE RESPONSIVE CARDS VIEW (block on screens < md) */}
+                <div className="block md:hidden space-y-3.5">
+                  {filteredApplications.map((app, index) => {
+                    const edit = inlineEdits[app._id] || { points: "", comments: "", feedback: "" };
+                    const candidateName = app.responses?.name || app.responses?.fullName || "Applicant";
+                    const candidateRoll = app.responses?.rollno || app.responses?.rollNumber || "—";
+                    const candidateEmail = app.responses?.email || "—";
+                    const candidateYear = app.year || app.responses?.year || "—";
+                    const candidateFeedback = edit.feedback !== undefined ? edit.feedback : app.feedback || "";
 
-                      return (
-                        <tr
-                          key={app._id}
-                          className={`transition-colors group ${
-                            candidateFeedback === "positive"
-                              ? "border-l-4 border-l-emerald-500 bg-emerald-950/15 hover:bg-emerald-950/25"
-                              : candidateFeedback === "negative"
-                              ? "border-l-4 border-l-rose-500 bg-rose-950/15 hover:bg-rose-950/25"
-                              : "hover:bg-white/[0.03]"
-                          }`}
-                        >
-                          {/* Index */}
-                          <td className="py-3 px-3 text-center text-gray-500">{index + 1}</td>
-
-                          {/* Applicant Info */}
-                          <td className="py-3 px-4">
-                            <div className="font-bold text-white text-sm">{candidateName}</div>
-                            <div className="text-gray-400 text-[11px] flex items-center gap-2 mt-0.5">
-                              <span>Roll: <strong className="text-gray-300">{candidateRoll}</strong></span>
-                            </div>
-                            <div className="text-gray-500 text-[10px] truncate max-w-[200px]" title={candidateEmail}>
-                              {candidateEmail}
-                            </div>
-                          </td>
-
-                          {/* Year */}
-                          <td className="py-3 px-3">
-                            <span className="px-2 py-0.5 rounded text-[11px] bg-white/10 text-gray-300 border border-white/20 whitespace-nowrap">
-                              {candidateYear}
-                            </span>
-                          </td>
-
-                          {/* Responses Preview */}
-                          <td className="py-3 px-4">
-                            <button
-                              onClick={() => openModal(index)}
-                              className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1.5 transition-colors"
-                            >
-                              <FaEye className="text-xs" />
-                              <span>View All ({Object.keys(app.responses || {}).length})</span>
-                            </button>
-                            <div className="text-[10px] text-gray-500 mt-1">
-                              {new Date(app.createdAt).toLocaleDateString()}
-                            </div>
-                          </td>
-
-                          {/* Feedback Classification Cell */}
-                          <td className="py-3 px-3 text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const nextVal = candidateFeedback === "positive" ? "" : "positive";
-                                  handleInlineChange(app._id, "feedback", nextVal);
-                                  saveEvaluation(app._id, { ...edit, feedback: nextVal });
-                                }}
-                                className={`px-2 py-1 rounded text-[10px] font-mono font-bold uppercase transition-all flex items-center gap-1 ${
-                                  candidateFeedback === "positive"
-                                    ? "bg-emerald-500 text-black border border-emerald-300 shadow-[0_0_10px_rgba(16,185,129,0.5)] scale-105"
-                                    : "bg-white/5 hover:bg-emerald-950/40 text-gray-400 hover:text-emerald-300 border border-white/10"
-                                }`}
-                                title="Classify as Positive Feedback"
-                              >
-                                <FaThumbsUp className="text-[10px]" />
-                                <span>{candidateFeedback === "positive" ? "Pos" : "+"}</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const nextVal = candidateFeedback === "negative" ? "" : "negative";
-                                  handleInlineChange(app._id, "feedback", nextVal);
-                                  saveEvaluation(app._id, { ...edit, feedback: nextVal });
-                                }}
-                                className={`px-2 py-1 rounded text-[10px] font-mono font-bold uppercase transition-all flex items-center gap-1 ${
-                                  candidateFeedback === "negative"
-                                    ? "bg-rose-500 text-white border border-rose-300 shadow-[0_0_10px_rgba(244,63,94,0.5)] scale-105"
-                                    : "bg-white/5 hover:bg-rose-950/40 text-gray-400 hover:text-rose-300 border border-white/10"
-                                }`}
-                                title="Classify as Negative Feedback"
-                              >
-                                <FaThumbsDown className="text-[10px]" />
-                                <span>{candidateFeedback === "negative" ? "Neg" : "-"}</span>
-                              </button>
-                            </div>
-                          </td>
-
-                          {/* Editable Points / Score */}
-                          <td className="py-3 px-3">
-                            <div className="flex items-center gap-1">
-                              <input
-                                type="text"
-                                value={edit.points}
-                                onChange={(e) => handleInlineChange(app._id, "points", e.target.value)}
-                                onBlur={() => {
-                                  if (edit.isDirty) saveEvaluation(app._id);
-                                }}
-                                placeholder="e.g. 9/10"
-                                className={`w-20 px-2 py-1.5 bg-black/70 rounded text-center text-xs text-white focus:outline-none transition-colors font-bold ${
-                                  candidateFeedback === "positive"
-                                    ? "border border-emerald-500/50 focus:border-emerald-400"
-                                    : candidateFeedback === "negative"
-                                    ? "border border-rose-500/50 focus:border-rose-400"
-                                    : "border border-white/20 focus:border-amber-400"
-                                }`}
-                              />
-                            </div>
-                          </td>
-
-                          {/* Editable Comments / Remarks */}
-                          <td className="py-3 px-4">
+                    return (
+                      <div
+                        key={app._id}
+                        className={`glass-panel p-4 rounded-xl border transition-all ${
+                          candidateFeedback === "positive"
+                            ? "border-emerald-500/70 bg-emerald-950/20 shadow-[0_0_15px_rgba(16,185,129,0.15)]"
+                            : candidateFeedback === "waitlist"
+                            ? "border-amber-400/80 bg-amber-950/25 shadow-[0_0_15px_rgba(251,191,36,0.18)]"
+                            : candidateFeedback === "negative"
+                            ? "border-rose-500/70 bg-rose-950/20 shadow-[0_0_15px_rgba(244,63,94,0.15)]"
+                            : "border-white/15 bg-white/[0.02]"
+                        }`}
+                      >
+                        {/* Header: Index, Name, Year Badge */}
+                        <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-white/10">
+                          <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
-                              <textarea
-                                rows={1}
-                                value={edit.comments}
-                                onChange={(e) => handleInlineChange(app._id, "comments", e.target.value)}
-                                onBlur={() => {
-                                  if (edit.isDirty) saveEvaluation(app._id);
-                                }}
-                                placeholder="Add notes, interview review, impressions..."
-                                className={`w-full px-2.5 py-1.5 bg-black/70 rounded text-xs text-white focus:outline-none transition-colors resize-none placeholder-gray-600 ${
-                                  candidateFeedback === "positive"
-                                    ? "border border-emerald-500/50 focus:border-emerald-400"
-                                    : candidateFeedback === "negative"
-                                    ? "border border-rose-500/50 focus:border-rose-400"
-                                    : "border border-white/20 focus:border-blue-400"
-                                }`}
-                              />
+                              <span className="text-gray-500 font-mono text-xs">#{index + 1}</span>
+                              <h3 className="font-mono font-bold text-white text-sm truncate" title={candidateName}>
+                                {candidateName}
+                              </h3>
                             </div>
-                            {app.evaluatedBy && (
-                              <div className="text-[10px] text-gray-500 mt-0.5">
-                                By {app.evaluatedBy} • {app.evaluatedAt ? new Date(app.evaluatedAt).toLocaleDateString() : ""}
-                              </div>
-                            )}
-                          </td>
+                            <div className="text-gray-400 font-mono text-[11px] mt-0.5">
+                              Roll: <strong className="text-gray-200">{candidateRoll}</strong>
+                            </div>
+                          </div>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-white/10 text-gray-300 border border-white/20 whitespace-nowrap">
+                            {candidateYear}
+                          </span>
+                        </div>
 
-                          {/* Save & Review Actions */}
-                          <td className="py-3 px-3 text-center">
+                        {/* Sub-info: Email, Date, View Responses */}
+                        <div className="py-2.5 flex items-center justify-between text-xs font-mono text-gray-400 border-b border-white/10 gap-2">
+                          <div className="truncate text-[11px] text-gray-500 flex-1" title={candidateEmail}>
+                            {candidateEmail}
+                          </div>
+                          <button
+                            onClick={() => openModal(index)}
+                            className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 whitespace-nowrap font-semibold"
+                          >
+                            <FaEye className="text-[11px]" />
+                            <span>View All ({Object.keys(app.responses || {}).length})</span>
+                          </button>
+                        </div>
+
+                        {/* Verdict / Feedback: 3 Touch-Friendly Buttons */}
+                        <div className="pt-3 pb-2 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider font-semibold">
+                              Verdict Classification:
+                            </span>
+                            {candidateFeedback && (
+                              <span
+                                className={`text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+                                  candidateFeedback === "positive"
+                                    ? "text-emerald-300 bg-emerald-950/60 border border-emerald-500/40"
+                                    : candidateFeedback === "waitlist"
+                                    ? "text-amber-300 bg-amber-950/60 border border-amber-400/50"
+                                    : "text-rose-300 bg-rose-950/60 border border-rose-500/40"
+                                }`}
+                              >
+                                {candidateFeedback}
+                              </span>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {/* Positive Button */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nextVal = candidateFeedback === "positive" ? "" : "positive";
+                                handleInlineChange(app._id, "feedback", nextVal);
+                                saveEvaluation(app._id, { ...edit, feedback: nextVal });
+                              }}
+                              className={`py-2 px-1 rounded text-xs font-mono font-bold uppercase transition-all flex items-center justify-center gap-1.5 ${
+                                candidateFeedback === "positive"
+                                  ? "bg-emerald-500 text-black border border-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.5)] font-extrabold"
+                                  : "bg-white/5 hover:bg-emerald-950/40 text-gray-300 border border-white/10"
+                              }`}
+                            >
+                              <FaThumbsUp className="text-[11px]" />
+                              <span>Positive</span>
+                            </button>
+
+                            {/* Waitlist (Yellow) Button */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nextVal = candidateFeedback === "waitlist" ? "" : "waitlist";
+                                handleInlineChange(app._id, "feedback", nextVal);
+                                saveEvaluation(app._id, { ...edit, feedback: nextVal });
+                              }}
+                              className={`py-2 px-1 rounded text-xs font-mono font-bold uppercase transition-all flex items-center justify-center gap-1.5 ${
+                                candidateFeedback === "waitlist"
+                                  ? "bg-amber-400 text-black border border-amber-200 shadow-[0_0_12px_rgba(251,191,36,0.6)] font-extrabold"
+                                  : "bg-white/5 hover:bg-amber-950/40 text-gray-300 border border-white/10"
+                              }`}
+                            >
+                              <FaClock className="text-[11px]" />
+                              <span>Waitlist</span>
+                            </button>
+
+                            {/* Negative Button */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nextVal = candidateFeedback === "negative" ? "" : "negative";
+                                handleInlineChange(app._id, "feedback", nextVal);
+                                saveEvaluation(app._id, { ...edit, feedback: nextVal });
+                              }}
+                              className={`py-2 px-1 rounded text-xs font-mono font-bold uppercase transition-all flex items-center justify-center gap-1.5 ${
+                                candidateFeedback === "negative"
+                                  ? "bg-rose-500 text-white border border-rose-300 shadow-[0_0_12px_rgba(244,63,94,0.5)] font-extrabold"
+                                  : "bg-white/5 hover:bg-rose-950/40 text-gray-300 border border-white/10"
+                              }`}
+                            >
+                              <FaThumbsDown className="text-[11px]" />
+                              <span>Negative</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Inline Score & Remarks */}
+                        <div className="pt-2 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <label className="text-[11px] font-mono text-gray-400 w-16 whitespace-nowrap">Score:</label>
+                            <input
+                              type="text"
+                              value={edit.points}
+                              onChange={(e) => handleInlineChange(app._id, "points", e.target.value)}
+                              onBlur={() => {
+                                if (edit.isDirty) saveEvaluation(app._id);
+                              }}
+                              placeholder="e.g. 8.5/10"
+                              className={`flex-1 px-2.5 py-1.5 bg-black/70 rounded text-xs text-white focus:outline-none font-mono font-bold transition-colors ${
+                                candidateFeedback === "positive"
+                                  ? "border border-emerald-500/50 focus:border-emerald-400"
+                                  : candidateFeedback === "waitlist"
+                                  ? "border border-amber-400/60 focus:border-amber-300"
+                                  : candidateFeedback === "negative"
+                                  ? "border border-rose-500/50 focus:border-rose-400"
+                                  : "border border-white/20 focus:border-white"
+                              }`}
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <textarea
+                              rows={2}
+                              value={edit.comments}
+                              onChange={(e) => handleInlineChange(app._id, "comments", e.target.value)}
+                              onBlur={() => {
+                                if (edit.isDirty) saveEvaluation(app._id);
+                              }}
+                              placeholder="Remarks, interview feedback..."
+                              className={`w-full px-2.5 py-1.5 bg-black/70 rounded text-xs text-white focus:outline-none resize-none placeholder-gray-600 font-mono transition-colors ${
+                                candidateFeedback === "positive"
+                                  ? "border border-emerald-500/50 focus:border-emerald-400"
+                                  : candidateFeedback === "waitlist"
+                                  ? "border border-amber-400/60 focus:border-amber-300"
+                                  : candidateFeedback === "negative"
+                                  ? "border border-rose-500/50 focus:border-rose-400"
+                                  : "border border-white/20 focus:border-white"
+                              }`}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Card Actions Footer */}
+                        <div className="pt-2.5 flex items-center justify-between text-xs font-mono border-t border-white/10 mt-2">
+                          <div className="text-[10px] text-gray-500">
+                            {app.evaluatedBy ? `Evaluated by ${app.evaluatedBy}` : "Not yet evaluated"}
+                          </div>
+                          <div>
+                            {edit.isSaving ? (
+                              <span className="text-[11px] text-amber-400 animate-pulse font-mono font-bold">
+                                Saving...
+                              </span>
+                            ) : edit.savedRecently ? (
+                              <span className="text-[11px] text-emerald-400 font-mono flex items-center gap-1 font-bold">
+                                <FaCheckCircle className="text-xs" /> Saved
+                              </span>
+                            ) : edit.isDirty ? (
+                              <button
+                                onClick={() => saveEvaluation(app._id)}
+                                className="px-3 py-1 bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/50 rounded text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1 transition-colors"
+                              >
+                                <FaSave className="text-xs" /> Save
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => openModal(index)}
+                                className="px-3 py-1 bg-white/5 hover:bg-white/15 text-gray-300 hover:text-white border border-white/20 rounded text-xs font-mono uppercase tracking-wider transition-colors"
+                              >
+                                Review
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* 2. DESKTOP & TABLET HIGH-DENSITY DATA TABLE (hidden on mobile, visible on md and up) */}
+                <div className="hidden md:block glass-panel border border-white/15 overflow-hidden rounded-xl">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left font-mono text-xs">
+                      <thead className="bg-white/5 border-b border-white/15 text-gray-400 uppercase tracking-wider">
+                        <tr>
+                          <th className="py-3 px-3 w-12 text-center">#</th>
+                          <th className="py-3 px-4 min-w-[180px]">Applicant Info</th>
+                          <th className="py-3 px-3 min-w-[85px]">Year</th>
+                          <th className="py-3 px-4 min-w-[140px]">Responses Preview</th>
+                          <th className="py-3 px-3 min-w-[170px] text-center">
                             <div className="flex items-center justify-center gap-1.5">
-                              {edit.isSaving ? (
-                                <span className="text-[11px] text-amber-400 animate-pulse font-mono">
-                                  Saving...
+                              <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" title="Positive"></span>
+                              <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" title="Waitlist"></span>
+                              <span className="w-2 h-2 rounded-full bg-rose-400 inline-block" title="Negative"></span>
+                              <span>Verdict</span>
+                            </div>
+                          </th>
+                          <th className="py-3 px-3 min-w-[110px]">
+                            <div className="flex items-center gap-1">
+                              <FaStar className="text-amber-400 text-xs" />
+                              <span>Points</span>
+                            </div>
+                          </th>
+                          <th className="py-3 px-4 min-w-[240px]">
+                            <div className="flex items-center gap-1">
+                              <FaRegCommentDots className="text-blue-400 text-xs" />
+                              <span>Comments / Remarks</span>
+                            </div>
+                          </th>
+                          <th className="py-3 px-3 min-w-[110px] text-center">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/10">
+                        {filteredApplications.map((app, index) => {
+                          const edit = inlineEdits[app._id] || { points: "", comments: "", feedback: "" };
+                          const candidateName = app.responses?.name || app.responses?.fullName || "Applicant";
+                          const candidateRoll = app.responses?.rollno || app.responses?.rollNumber || "—";
+                          const candidateEmail = app.responses?.email || "—";
+                          const candidateYear = app.year || app.responses?.year || "—";
+                          const candidateFeedback = edit.feedback !== undefined ? edit.feedback : app.feedback || "";
+
+                          return (
+                            <tr
+                              key={app._id}
+                              className={`transition-colors group ${
+                                candidateFeedback === "positive"
+                                  ? "border-l-4 border-l-emerald-500 bg-emerald-950/15 hover:bg-emerald-950/25"
+                                  : candidateFeedback === "waitlist"
+                                  ? "border-l-4 border-l-amber-400 bg-amber-950/20 hover:bg-amber-950/30"
+                                  : candidateFeedback === "negative"
+                                  ? "border-l-4 border-l-rose-500 bg-rose-950/15 hover:bg-rose-950/25"
+                                  : "hover:bg-white/[0.03]"
+                              }`}
+                            >
+                              {/* Index */}
+                              <td className="py-3 px-3 text-center text-gray-500">{index + 1}</td>
+
+                              {/* Applicant Info */}
+                              <td className="py-3 px-4">
+                                <div className="font-bold text-white text-sm">{candidateName}</div>
+                                <div className="text-gray-400 text-[11px] flex items-center gap-2 mt-0.5">
+                                  <span>Roll: <strong className="text-gray-300">{candidateRoll}</strong></span>
+                                </div>
+                                <div className="text-gray-500 text-[10px] truncate max-w-[200px]" title={candidateEmail}>
+                                  {candidateEmail}
+                                </div>
+                              </td>
+
+                              {/* Year */}
+                              <td className="py-3 px-3">
+                                <span className="px-2 py-0.5 rounded text-[11px] bg-white/10 text-gray-300 border border-white/20 whitespace-nowrap">
+                                  {candidateYear}
                                 </span>
-                              ) : edit.savedRecently ? (
-                                <span className="text-[11px] text-emerald-400 font-mono flex items-center gap-1">
-                                  <FaCheckCircle className="text-xs" /> Saved
-                                </span>
-                              ) : edit.isDirty ? (
-                                <button
-                                  onClick={() => saveEvaluation(app._id)}
-                                  className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/50 rounded text-[11px] font-mono uppercase tracking-wider flex items-center gap-1 transition-colors"
-                                  title="Save changes to Mongo"
-                                >
-                                  <FaSave className="text-xs" /> Save
-                                </button>
-                              ) : (
+                              </td>
+
+                              {/* Responses Preview */}
+                              <td className="py-3 px-4">
                                 <button
                                   onClick={() => openModal(index)}
-                                  className="px-2.5 py-1 bg-white/5 hover:bg-white/15 text-gray-300 hover:text-white border border-white/20 rounded text-[11px] font-mono uppercase tracking-wider transition-colors"
-                                  title="Open candidate detailed review modal"
+                                  className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1.5 transition-colors font-medium"
                                 >
-                                  Review
+                                  <FaEye className="text-xs" />
+                                  <span>View All ({Object.keys(app.responses || {}).length})</span>
                                 </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                                <div className="text-[10px] text-gray-500 mt-1">
+                                  {new Date(app.createdAt).toLocaleDateString()}
+                                </div>
+                              </td>
+
+                              {/* Feedback Classification Cell: Pos (Green), Waitlist (Yellow), Neg (Red) */}
+                              <td className="py-3 px-3 text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  {/* Positive / Green */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const nextVal = candidateFeedback === "positive" ? "" : "positive";
+                                      handleInlineChange(app._id, "feedback", nextVal);
+                                      saveEvaluation(app._id, { ...edit, feedback: nextVal });
+                                    }}
+                                    className={`px-2 py-1 rounded text-[10px] font-mono font-bold uppercase transition-all flex items-center gap-1 ${
+                                      candidateFeedback === "positive"
+                                        ? "bg-emerald-500 text-black border border-emerald-300 shadow-[0_0_10px_rgba(16,185,129,0.5)] scale-105"
+                                        : "bg-white/5 hover:bg-emerald-950/40 text-gray-400 hover:text-emerald-300 border border-white/10"
+                                    }`}
+                                    title="Classify as Positive Feedback (Green)"
+                                  >
+                                    <FaThumbsUp className="text-[10px]" />
+                                    <span>{candidateFeedback === "positive" ? "Pos" : "+"}</span>
+                                  </button>
+
+                                  {/* Waitlist / Yellow */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const nextVal = candidateFeedback === "waitlist" ? "" : "waitlist";
+                                      handleInlineChange(app._id, "feedback", nextVal);
+                                      saveEvaluation(app._id, { ...edit, feedback: nextVal });
+                                    }}
+                                    className={`px-2 py-1 rounded text-[10px] font-mono font-bold uppercase transition-all flex items-center gap-1 ${
+                                      candidateFeedback === "waitlist"
+                                        ? "bg-amber-400 text-black border border-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.6)] scale-105"
+                                        : "bg-white/5 hover:bg-amber-950/40 text-gray-400 hover:text-amber-300 border border-white/10"
+                                    }`}
+                                    title="Classify as Waitlist (Yellow)"
+                                  >
+                                    <FaClock className="text-[10px]" />
+                                    <span>{candidateFeedback === "waitlist" ? "Wait" : "~"}</span>
+                                  </button>
+
+                                  {/* Negative / Red */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const nextVal = candidateFeedback === "negative" ? "" : "negative";
+                                      handleInlineChange(app._id, "feedback", nextVal);
+                                      saveEvaluation(app._id, { ...edit, feedback: nextVal });
+                                    }}
+                                    className={`px-2 py-1 rounded text-[10px] font-mono font-bold uppercase transition-all flex items-center gap-1 ${
+                                      candidateFeedback === "negative"
+                                        ? "bg-rose-500 text-white border border-rose-300 shadow-[0_0_10px_rgba(244,63,94,0.5)] scale-105"
+                                        : "bg-white/5 hover:bg-rose-950/40 text-gray-400 hover:text-rose-300 border border-white/10"
+                                    }`}
+                                    title="Classify as Negative Feedback (Red)"
+                                  >
+                                    <FaThumbsDown className="text-[10px]" />
+                                    <span>{candidateFeedback === "negative" ? "Neg" : "-"}</span>
+                                  </button>
+                                </div>
+                              </td>
+
+                              {/* Editable Points / Score */}
+                              <td className="py-3 px-3">
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    type="text"
+                                    value={edit.points}
+                                    onChange={(e) => handleInlineChange(app._id, "points", e.target.value)}
+                                    onBlur={() => {
+                                      if (edit.isDirty) saveEvaluation(app._id);
+                                    }}
+                                    placeholder="e.g. 9/10"
+                                    className={`w-20 px-2 py-1.5 bg-black/70 rounded text-center text-xs text-white focus:outline-none transition-colors font-bold ${
+                                      candidateFeedback === "positive"
+                                        ? "border border-emerald-500/50 focus:border-emerald-400"
+                                        : candidateFeedback === "waitlist"
+                                        ? "border border-amber-400/60 focus:border-amber-300"
+                                        : candidateFeedback === "negative"
+                                        ? "border border-rose-500/50 focus:border-rose-400"
+                                        : "border border-white/20 focus:border-white"
+                                    }`}
+                                  />
+                                </div>
+                              </td>
+
+                              {/* Editable Comments / Remarks */}
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-2">
+                                  <textarea
+                                    rows={1}
+                                    value={edit.comments}
+                                    onChange={(e) => handleInlineChange(app._id, "comments", e.target.value)}
+                                    onBlur={() => {
+                                      if (edit.isDirty) saveEvaluation(app._id);
+                                    }}
+                                    placeholder="Add notes, interview review, impressions..."
+                                    className={`w-full px-2.5 py-1.5 bg-black/70 rounded text-xs text-white focus:outline-none transition-colors resize-none placeholder-gray-600 ${
+                                      candidateFeedback === "positive"
+                                        ? "border border-emerald-500/50 focus:border-emerald-400"
+                                        : candidateFeedback === "waitlist"
+                                        ? "border border-amber-400/60 focus:border-amber-300"
+                                        : candidateFeedback === "negative"
+                                        ? "border border-rose-500/50 focus:border-rose-400"
+                                        : "border border-white/20 focus:border-white"
+                                    }`}
+                                  />
+                                </div>
+                                {app.evaluatedBy && (
+                                  <div className="text-[10px] text-gray-500 mt-0.5">
+                                    By {app.evaluatedBy} • {app.evaluatedAt ? new Date(app.evaluatedAt).toLocaleDateString() : ""}
+                                  </div>
+                                )}
+                              </td>
+
+                              {/* Save & Review Actions */}
+                              <td className="py-3 px-3 text-center">
+                                <div className="flex items-center justify-center gap-1.5">
+                                  {edit.isSaving ? (
+                                    <span className="text-[11px] text-amber-400 animate-pulse font-mono font-bold">
+                                      Saving...
+                                    </span>
+                                  ) : edit.savedRecently ? (
+                                    <span className="text-[11px] text-emerald-400 font-mono flex items-center gap-1 font-bold">
+                                      <FaCheckCircle className="text-xs" /> Saved
+                                    </span>
+                                  ) : edit.isDirty ? (
+                                    <button
+                                      onClick={() => saveEvaluation(app._id)}
+                                      className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/50 rounded text-[11px] font-mono uppercase tracking-wider flex items-center gap-1 transition-colors font-bold"
+                                      title="Save changes to Mongo"
+                                    >
+                                      <FaSave className="text-xs" /> Save
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => openModal(index)}
+                                      className="px-2.5 py-1 bg-white/5 hover:bg-white/15 text-gray-300 hover:text-white border border-white/20 rounded text-[11px] font-mono uppercase tracking-wider transition-colors"
+                                      title="Open candidate detailed review modal"
+                                    >
+                                      Review
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         )}
@@ -1426,24 +1701,24 @@ export default function AddSecDashboard() {
 
       {/* Detailed Candidate Review Modal */}
       {modalOpen && currentModalApp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-sm">
-          <div className="glass-panel w-full max-w-3xl max-h-[92vh] overflow-y-auto border border-white/25 shadow-2xl flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 md:p-6 bg-black/85 backdrop-blur-sm">
+          <div className="glass-panel w-full max-w-3xl max-h-[94vh] sm:max-h-[90vh] overflow-y-auto border border-white/25 shadow-2xl flex flex-col rounded-xl">
             {/* Modal Header */}
-            <div className="p-5 border-b border-white/15 flex items-center justify-between sticky top-0 bg-black/90 backdrop-blur z-10">
-              <div>
-                <span className="text-[10px] font-mono uppercase tracking-widest text-gray-400">
+            <div className="p-3.5 sm:p-5 border-b border-white/15 flex items-center justify-between sticky top-0 bg-black/95 backdrop-blur z-20 gap-2">
+              <div className="min-w-0 flex-1 pr-2">
+                <span className="text-[10px] font-mono uppercase tracking-widest text-gray-400 block truncate">
                   Applicant Review ({modalAppIndex + 1} of {filteredApplications.length})
                 </span>
-                <h2 className="font-mono text-xl sm:text-2xl font-bold text-white mt-0.5">
+                <h2 className="font-mono text-base sm:text-xl md:text-2xl font-bold text-white mt-0.5 truncate" title={currentModalApp.responses?.name || currentModalApp.responses?.fullName || "Candidate Profile"}>
                   {currentModalApp.responses?.name || currentModalApp.responses?.fullName || "Candidate Profile"}
                 </h2>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                 <button
                   onClick={prevModalApp}
                   disabled={modalAppIndex === 0}
-                  className="p-2 glass-panel border border-white/20 text-gray-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed rounded"
+                  className="p-2 sm:p-2.5 glass-panel border border-white/20 text-gray-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed rounded"
                   title="Previous Applicant"
                 >
                   <FaChevronLeft className="text-xs" />
@@ -1451,14 +1726,15 @@ export default function AddSecDashboard() {
                 <button
                   onClick={nextModalApp}
                   disabled={modalAppIndex === filteredApplications.length - 1}
-                  className="p-2 glass-panel border border-white/20 text-gray-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed rounded"
+                  className="p-2 sm:p-2.5 glass-panel border border-white/20 text-gray-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed rounded"
                   title="Next Applicant"
                 >
                   <FaChevronRight className="text-xs" />
                 </button>
                 <button
                   onClick={closeModal}
-                  className="p-2 text-gray-400 hover:text-white rounded ml-2"
+                  className="p-2 sm:p-2.5 text-gray-400 hover:text-white rounded ml-1"
+                  title="Close Modal"
                 >
                   <FaTimes className="text-sm" />
                 </button>
@@ -1466,38 +1742,38 @@ export default function AddSecDashboard() {
             </div>
 
             {/* Modal Body */}
-            <div className="p-5 sm:p-6 space-y-6">
+            <div className="p-3.5 sm:p-6 space-y-4 sm:space-y-6">
               {/* Quick Info Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs">
-                <div className="bg-white/5 p-3 rounded border border-white/10">
-                  <span className="text-gray-500 block">Roll Number</span>
-                  <span className="text-white font-bold text-sm mt-0.5 block">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 font-mono text-xs">
+                <div className="bg-white/5 p-2.5 sm:p-3 rounded border border-white/10">
+                  <span className="text-gray-500 block text-[11px]">Roll Number</span>
+                  <span className="text-white font-bold text-xs sm:text-sm mt-0.5 block truncate">
                     {currentModalApp.responses?.rollno || currentModalApp.responses?.rollNumber || "—"}
                   </span>
                 </div>
-                <div className="bg-white/5 p-3 rounded border border-white/10">
-                  <span className="text-gray-500 block">Department</span>
-                  <span className="text-white font-bold text-sm mt-0.5 block">
+                <div className="bg-white/5 p-2.5 sm:p-3 rounded border border-white/10">
+                  <span className="text-gray-500 block text-[11px]">Department</span>
+                  <span className="text-white font-bold text-xs sm:text-sm mt-0.5 block truncate">
                     {currentModalApp.department}
                   </span>
                 </div>
-                <div className="bg-white/5 p-3 rounded border border-white/10">
-                  <span className="text-gray-500 block">Year of Study</span>
-                  <span className="text-white font-bold text-sm mt-0.5 block">
+                <div className="bg-white/5 p-2.5 sm:p-3 rounded border border-white/10">
+                  <span className="text-gray-500 block text-[11px]">Year of Study</span>
+                  <span className="text-white font-bold text-xs sm:text-sm mt-0.5 block truncate">
                     {currentModalApp.year || currentModalApp.responses?.year || "—"}
                   </span>
                 </div>
-                <div className="bg-white/5 p-3 rounded border border-white/10">
-                  <span className="text-gray-500 block">Submitted At</span>
-                  <span className="text-white font-bold text-xs mt-1 block">
+                <div className="bg-white/5 p-2.5 sm:p-3 rounded border border-white/10">
+                  <span className="text-gray-500 block text-[11px]">Submitted At</span>
+                  <span className="text-white font-bold text-xs sm:text-sm mt-0.5 block truncate">
                     {new Date(currentModalApp.createdAt).toLocaleDateString()}
                   </span>
                 </div>
               </div>
 
               {/* Email & Contact */}
-              <div className="font-mono text-xs bg-white/5 p-3 rounded border border-white/10 flex items-center justify-between">
-                <div>
+              <div className="font-mono text-xs bg-white/5 p-2.5 sm:p-3 rounded border border-white/10 flex items-center justify-between">
+                <div className="truncate">
                   <span className="text-gray-500">Contact Email: </span>
                   <a
                     href={`mailto:${currentModalApp.responses?.email || ""}`}
@@ -1509,11 +1785,11 @@ export default function AddSecDashboard() {
               </div>
 
               {/* All Custom Form Responses */}
-              <div className="space-y-4">
-                <h3 className="font-mono text-xs uppercase tracking-wider text-gray-400 border-b border-white/10 pb-1.5">
+              <div className="space-y-3 sm:space-y-4">
+                <h3 className="font-mono text-xs uppercase tracking-wider text-gray-400 border-b border-white/10 pb-1.5 font-semibold">
                   Form Question Responses
                 </h3>
-                <div className="space-y-3">
+                <div className="space-y-2.5 sm:space-y-3">
                   {(activeForm?.fields || [])
                     .filter((f) => !["name", "email", "rollno", "department", "year"].includes(String(f.name || "").toLowerCase()))
                     .map((field) => {
@@ -1533,12 +1809,12 @@ export default function AddSecDashboard() {
                       return (
                         <div
                           key={key}
-                          className="bg-black/50 p-3.5 rounded border border-white/10 font-mono space-y-1"
+                          className="bg-black/50 p-3 sm:p-3.5 rounded border border-white/10 font-mono space-y-1"
                         >
                           <label className="text-xs text-gray-400 block font-semibold">
                             {label}
                           </label>
-                          <div className="text-xs text-gray-100 whitespace-pre-wrap leading-relaxed">
+                          <div className="text-xs text-gray-100 whitespace-pre-wrap leading-relaxed break-words">
                             {isUrl ? (
                               <a
                                 href={formattedVal}
@@ -1568,9 +1844,11 @@ export default function AddSecDashboard() {
 
                 return (
                   <div
-                    className={`p-4 sm:p-5 rounded-xl transition-all duration-300 space-y-4 ${
+                    className={`p-3.5 sm:p-5 rounded-xl transition-all duration-300 space-y-3.5 sm:space-y-4 ${
                       modalFeedback === "positive"
                         ? "bg-emerald-950/25 border-2 border-emerald-500 shadow-[0_0_25px_rgba(16,185,129,0.35)]"
+                        : modalFeedback === "waitlist"
+                        ? "bg-amber-950/25 border-2 border-amber-400 shadow-[0_0_25px_rgba(251,191,36,0.35)]"
                         : modalFeedback === "negative"
                         ? "bg-rose-950/25 border-2 border-rose-500 shadow-[0_0_25px_rgba(244,63,94,0.35)]"
                         : "bg-white/5 border border-white/20"
@@ -1582,6 +1860,8 @@ export default function AddSecDashboard() {
                           className={`font-mono text-xs uppercase tracking-wider font-bold flex items-center gap-1.5 ${
                             modalFeedback === "positive"
                               ? "text-emerald-300"
+                              : modalFeedback === "waitlist"
+                              ? "text-amber-300"
                               : modalFeedback === "negative"
                               ? "text-rose-300"
                               : "text-amber-300"
@@ -1595,6 +1875,11 @@ export default function AddSecDashboard() {
                             <FaThumbsUp className="text-[9px]" /> Positive Feedback
                           </span>
                         )}
+                        {modalFeedback === "waitlist" && (
+                          <span className="px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400 flex items-center gap-1">
+                            <FaClock className="text-[9px]" /> Waitlist
+                          </span>
+                        )}
                         {modalFeedback === "negative" && (
                           <span className="px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500 flex items-center gap-1">
                             <FaThumbsDown className="text-[9px]" /> Negative Feedback
@@ -1602,9 +1887,9 @@ export default function AddSecDashboard() {
                         )}
                       </div>
 
-                      {/* Feedback Classification Buttons */}
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs text-gray-400 uppercase tracking-wider">
+                      {/* Feedback Classification Buttons: Positive, Waitlist, Negative */}
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                        <span className="font-mono text-[11px] sm:text-xs text-gray-400 uppercase tracking-wider mr-1">
                           Verdict:
                         </span>
                         <button
@@ -1616,7 +1901,7 @@ export default function AddSecDashboard() {
                               modalFeedback === "positive" ? "" : "positive"
                             )
                           }
-                          className={`px-3 py-1.5 rounded font-mono text-xs uppercase tracking-wider font-bold flex items-center gap-1.5 transition-all ${
+                          className={`px-2.5 sm:px-3 py-1.5 rounded font-mono text-xs uppercase tracking-wider font-bold flex items-center gap-1.5 transition-all ${
                             modalFeedback === "positive"
                               ? "bg-emerald-500 text-black border-2 border-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.5)] scale-105"
                               : "bg-emerald-950/40 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-900/50"
@@ -1631,10 +1916,28 @@ export default function AddSecDashboard() {
                             handleInlineChange(
                               currentModalApp._id,
                               "feedback",
+                              modalFeedback === "waitlist" ? "" : "waitlist"
+                            )
+                          }
+                          className={`px-2.5 sm:px-3 py-1.5 rounded font-mono text-xs uppercase tracking-wider font-bold flex items-center gap-1.5 transition-all ${
+                            modalFeedback === "waitlist"
+                              ? "bg-amber-400 text-black border-2 border-amber-200 shadow-[0_0_15px_rgba(251,191,36,0.6)] scale-105"
+                              : "bg-amber-950/40 text-amber-300 border border-amber-500/40 hover:bg-amber-900/50"
+                          }`}
+                        >
+                          <FaClock className="text-xs" /> Waitlist
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleInlineChange(
+                              currentModalApp._id,
+                              "feedback",
                               modalFeedback === "negative" ? "" : "negative"
                             )
                           }
-                          className={`px-3 py-1.5 rounded font-mono text-xs uppercase tracking-wider font-bold flex items-center gap-1.5 transition-all ${
+                          className={`px-2.5 sm:px-3 py-1.5 rounded font-mono text-xs uppercase tracking-wider font-bold flex items-center gap-1.5 transition-all ${
                             modalFeedback === "negative"
                               ? "bg-rose-500 text-white border-2 border-rose-300 shadow-[0_0_15px_rgba(244,63,94,0.5)] scale-105"
                               : "bg-rose-950/40 text-rose-300 border border-rose-500/40 hover:bg-rose-900/50"
@@ -1658,6 +1961,8 @@ export default function AddSecDashboard() {
                           className={`w-full px-3 py-2 bg-black/70 rounded text-sm font-mono text-white focus:outline-none transition-colors ${
                             modalFeedback === "positive"
                               ? "border border-emerald-500/50 focus:border-emerald-400"
+                              : modalFeedback === "waitlist"
+                              ? "border border-amber-400/60 focus:border-amber-300"
                               : modalFeedback === "negative"
                               ? "border border-rose-500/50 focus:border-rose-400"
                               : "border border-white/20 focus:border-amber-400"
@@ -1677,6 +1982,8 @@ export default function AddSecDashboard() {
                           className={`w-full px-3 py-2 bg-black/70 rounded text-xs font-mono text-white focus:outline-none transition-colors ${
                             modalFeedback === "positive"
                               ? "border border-emerald-500/50 focus:border-emerald-400"
+                              : modalFeedback === "waitlist"
+                              ? "border border-amber-400/60 focus:border-amber-300"
                               : modalFeedback === "negative"
                               ? "border border-rose-500/50 focus:border-rose-400"
                               : "border border-white/20 focus:border-blue-400"
@@ -1698,9 +2005,11 @@ export default function AddSecDashboard() {
                       <button
                         onClick={() => saveEvaluation(currentModalApp._id)}
                         disabled={modalEdit.isSaving}
-                        className={`px-5 py-2.5 font-bold rounded font-mono text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-lg ${
+                        className={`w-full sm:w-auto px-5 py-2.5 font-bold rounded font-mono text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-lg ${
                           modalFeedback === "positive"
                             ? "bg-emerald-500 text-black hover:bg-emerald-400"
+                            : modalFeedback === "waitlist"
+                            ? "bg-amber-400 text-black hover:bg-amber-300 shadow-[0_0_15px_rgba(251,191,36,0.4)]"
                             : modalFeedback === "negative"
                             ? "bg-rose-500 text-white hover:bg-rose-400"
                             : "bg-white text-black hover:bg-gray-200"
@@ -1716,13 +2025,13 @@ export default function AddSecDashboard() {
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-white/10 bg-black/80 flex items-center justify-between font-mono text-xs">
-              <span className="text-gray-500">
-                Use arrows above or keyboard to cycle through candidates.
+            <div className="p-3 sm:p-4 border-t border-white/10 bg-black/80 flex items-center justify-between font-mono text-xs">
+              <span className="text-gray-500 text-[11px] sm:text-xs truncate pr-2">
+                Use arrows above to cycle through candidates.
               </span>
               <button
                 onClick={closeModal}
-                className="px-4 py-1.5 glass-panel border border-white/20 text-gray-300 hover:text-white rounded"
+                className="px-4 py-1.5 glass-panel border border-white/20 text-gray-300 hover:text-white rounded flex-shrink-0"
               >
                 Close
               </button>

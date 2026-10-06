@@ -86,40 +86,48 @@ export default function AddSecLogin() {
   };
 
   return (
-    <div className="relative min-h-screen text-white flex flex-col justify-center pt-28 sm:pt-32 pb-20 px-4 sm:px-6 lg:px-8">
+    <div className="relative min-h-screen text-white flex flex-col justify-center py-16 sm:py-24 lg:py-28 px-3.5 sm:px-6 lg:px-8">
       {/* Title Header */}
-      <div className="relative z-10 text-center pb-8" data-aos="fade-up">
-        <div className="inline-block px-3 py-1 mb-3 rounded-full text-xs font-mono uppercase tracking-widest bg-white/10 text-gray-300 border border-white/20">
+      <div className="relative z-10 text-center pb-6 sm:pb-8" data-aos="fade-up">
+        <div className="inline-block px-3 py-1 mb-2.5 sm:mb-3 rounded-full text-[10px] sm:text-xs font-mono uppercase tracking-widest bg-white/10 text-gray-300 border border-white/20">
           Department Additional Secretaries Portal
         </div>
-        <h1 className="font-mono text-3xl sm:text-5xl font-bold tracking-tight mb-3 text-white">
+        <h1 className="font-mono text-2xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-2 sm:mb-3 text-white">
           {">_"} ADDSEC_LOGIN
         </h1>
-        <p className="font-mono text-gray-400 text-sm sm:text-base max-w-lg mx-auto">
+        <p className="font-mono text-gray-400 text-xs sm:text-sm lg:text-base max-w-lg mx-auto px-2">
           Sign in with your department ID to access recruitment applicant entries, scoring, and Excel reports.
         </p>
       </div>
 
-      {/* 4 Department Badges */}
-      <div className="max-w-xl mx-auto w-full mb-8">
-        <div className="text-center mb-2.5">
-          <span className="font-mono text-[11px] text-gray-400 uppercase tracking-wider">
-            [ Additional Secretary Departments ]
+      {/* 4 Department Badges with Quick Autofill */}
+      <div className="max-w-xl mx-auto w-full mb-6 sm:mb-8">
+        <div className="text-center mb-2 sm:mb-2.5">
+          <span className="font-mono text-[10px] sm:text-[11px] text-gray-400 uppercase tracking-wider">
+            [ Click department to autofill ID ]
           </span>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
           {DEPARTMENTS.map((dept) => {
             const Icon = dept.icon;
             return (
-              <div
+              <button
+                type="button"
                 key={dept.name}
-                className={`p-3 text-center rounded border transition-all duration-200 flex flex-col items-center justify-center space-y-1.5 glass-panel ${dept.border}`}
+                onClick={() =>
+                  setCredentials((prev) => ({
+                    ...prev,
+                    username: `addsec_${dept.name.toLowerCase()}`,
+                  }))
+                }
+                className={`p-2.5 sm:p-3 text-center rounded border transition-all duration-200 flex flex-col items-center justify-center space-y-1 sm:space-y-1.5 glass-panel hover:scale-[1.03] active:scale-95 cursor-pointer ${dept.border}`}
+                title={`Click to autofill ID for ${dept.name}`}
               >
-                <Icon className={`text-xl ${dept.color}`} />
-                <span className="font-mono text-xs font-semibold uppercase tracking-wider text-gray-200">
+                <Icon className={`text-lg sm:text-xl ${dept.color}`} />
+                <span className="font-mono text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-gray-200">
                   {dept.name}
                 </span>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -129,7 +137,7 @@ export default function AddSecLogin() {
       <div className="relative z-10 max-w-md mx-auto w-full">
         <form
           onSubmit={handleSubmit}
-          className="glass-panel p-6 sm:p-8 space-y-6 shadow-2xl border border-white/20"
+          className="glass-panel p-5 sm:p-8 space-y-5 sm:space-y-6 shadow-2xl border border-white/20 rounded-xl"
         >
           <div>
             <label
