@@ -2,6 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { getRecruitmentFormTitle, isDepartmentField, isYearField } from "@/app/lib/recruitment";
+import {
+  FaWhatsapp,
+  FaCheckCircle,
+  FaArrowRight,
+  FaShieldAlt,
+} from "react-icons/fa";
 
 const defaultFormState = {};
 
@@ -93,6 +99,30 @@ export default function RecruitmentPage() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
 
+  // Registration success state for showing anti-copy WhatsApp group invite
+  const [submittedSuccess, setSubmittedSuccess] = useState(false);
+  const [submittedDept, setSubmittedDept] = useState("");
+  const [submittedYear, setSubmittedYear] = useState("");
+  const [whatsappGroupLink, setWhatsappGroupLink] = useState(
+    process.env.NEXT_PUBLIC_RECRUITMENT_WHATSAPP_LINK || ""
+  );
+
+  const handleJoinWhatsApp = (e) => {
+    e.preventDefault();
+    try {
+      // Dynamic WhatsApp invite link from env / API without exposing raw plaintext in DOM
+      const targetUrl =
+        whatsappGroupLink ||
+        selectedForm?.whatsappLink ||
+        process.env.NEXT_PUBLIC_RECRUITMENT_WHATSAPP_LINK ||
+        "https://chat.whatsapp.com/FoMYMW3X0DnK4EpoeSO9Em?s=sw&p=a&mlu=4&ilr=4";
+
+      window.open(targetUrl, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      console.error("Open WhatsApp error:", err);
+    }
+  };
+
   useEffect(() => {
     async function fetchForms() {
       try {
@@ -110,6 +140,9 @@ export default function RecruitmentPage() {
             setSelectedForm(firstForm);
             setDepartment(firstForm.departments?.[0] || "");
             setYear("");
+            if (firstForm.whatsappLink) {
+              setWhatsappGroupLink(firstForm.whatsappLink);
+            }
           }
         }
       } catch (error) {
@@ -193,14 +226,36 @@ export default function RecruitmentPage() {
       const result = await response.json();
 
       if (!result.success) {
+        if (result.alreadyApplied || result.message?.toLowerCase().includes("already")) {
+          setSubmittedSuccess(true);
+          setSubmittedDept(result.department || department || "Robotics Club");
+          setSubmittedYear(result.year || year || "");
+          if (result.whatsappLink) {
+            setWhatsappGroupLink(result.whatsappLink);
+          }
+          setMessage(result.message || "You are already registered. Join the WhatsApp group below.");
+          if (typeof window !== "undefined") {
+            window.scrollTo({ top: 120, behavior: "smooth" });
+          }
+          return;
+        }
         setMessage(result.message || "Failed to submit application.");
         return;
       }
 
+      setSubmittedSuccess(true);
+      setSubmittedDept(result.department || department);
+      setSubmittedYear(result.year || year);
+      if (result.whatsappLink) {
+        setWhatsappGroupLink(result.whatsappLink);
+      }
       setMessage("Application submitted successfully.");
       setFormValues({});
       setDepartment(selectedForm.departments?.[0] || "");
       setYear("");
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 120, behavior: "smooth" });
+      }
     } catch (error) {
       console.error("Submit recruitment application error:", error);
       setMessage("Something went wrong while submitting your application.");
@@ -275,6 +330,11 @@ export default function RecruitmentPage() {
                     setSelectedForm(form);
                     setDepartment(form.departments?.[0] || "");
                     setYear("");
+                    setSubmittedSuccess(false);
+                    setMessage("");
+                    if (form.whatsappLink) {
+                      setWhatsappGroupLink(form.whatsappLink);
+                    }
                   }}
                   className={`w-full text-left rounded-xl border p-5 transition-all cursor-pointer ${
                     isSelected
@@ -304,7 +364,85 @@ export default function RecruitmentPage() {
 
           {/* Right Side: Form Panel */}
           <div className="glass-panel relative z-10 p-6 md:p-8 border border-white/20">
-            {selectedForm && (
+            {submittedSuccess ? (
+              <div
+                className="space-y-6 select-none py-4 sm:py-6"
+                onContextMenu={(e) => e.preventDefault()}
+                onCopy={(e) => e.preventDefault()}
+                onCut={(e) => e.preventDefault()}
+                style={{ userSelect: "none", WebkitUserSelect: "none" }}
+              >
+                {/* Glowing Green Success Header */}
+                <div className="flex flex-col items-center justify-center text-center space-y-3 pb-4 border-b border-white/10">
+                  <div className="w-16 h-16 rounded-full bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center text-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.35)]">
+                    <FaCheckCircle className="text-3xl" />
+                  </div>
+                  <span className="font-mono text-xs uppercase tracking-widest text-emerald-400 font-bold">
+                    [ REGISTRATION SUCCESSFUL ]
+                  </span>
+                  <h2
+                    className="text-2xl md:text-3xl font-black text-white uppercase tracking-wider"
+                    style={{ fontFamily: 'var(--font-orbitron)' }}
+                  >
+                    Application Received!
+                  </h2>
+                  <p className="font-mono text-gray-300 text-xs sm:text-sm max-w-md mx-auto leading-relaxed">
+                    Your application for <strong className="text-white">{submittedDept} Department</strong> ({submittedYear}) has been submitted successfully.
+                  </p>
+                </div>
+
+                {/* WhatsApp Group Dedicated Card */}
+                <div
+                  className="p-5 sm:p-6 rounded-xl border border-emerald-500/40 bg-emerald-950/25 space-y-4 text-left shadow-2xl relative overflow-hidden"
+                  onContextMenu={(e) => e.preventDefault()}
+                  onCopy={(e) => e.preventDefault()}
+                >
+                  <div className="flex items-center justify-between gap-2 border-b border-emerald-500/20 pb-3">
+                    <div className="flex items-center gap-2">
+                      <FaWhatsapp className="text-2xl text-emerald-400" />
+                      <span className="font-mono text-sm sm:text-base font-bold text-white uppercase tracking-wider">
+                        Official WhatsApp Group
+                      </span>
+                    </div>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      MANDATORY JOIN
+                    </span>
+                  </div>
+
+                  <p className="font-mono text-xs sm:text-sm text-gray-300 leading-relaxed">
+                    All interview slots, schedule updates, assignment tasks, and announcements will be shared exclusively inside the official applicants WhatsApp group. Please join immediately:
+                  </p>
+
+                  <div className="p-3 rounded-lg bg-black/60 border border-white/10 flex items-center gap-2.5 text-gray-400 font-mono text-[11px] leading-relaxed">
+                    <FaShieldAlt className="text-amber-400 text-sm flex-shrink-0" />
+                    <span>
+                      Security protocol: Direct access link for registered applicants only. Copying or forwarding the URL is disabled.
+                    </span>
+                  </div>
+
+                  {/* Anti-copy WhatsApp Button */}
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={handleJoinWhatsApp}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        return false;
+                      }}
+                      draggable={false}
+                      onDragStart={(e) => e.preventDefault()}
+                      onCopy={(e) => e.preventDefault()}
+                      className="w-full py-4 px-6 rounded-lg bg-[#25D366] hover:bg-[#1EBE5D] text-black font-mono font-bold text-sm sm:text-base uppercase tracking-wider flex items-center justify-center gap-3 transition-all duration-300 shadow-[0_0_25px_rgba(37,211,102,0.35)] hover:shadow-[0_0_35px_rgba(37,211,102,0.5)] cursor-pointer select-none"
+                      style={{ userSelect: "none", WebkitUserSelect: "none" }}
+                    >
+                      <FaWhatsapp className="text-2xl text-black" />
+                      <span>[ JOIN WHATSAPP GROUP ]</span>
+                      <FaArrowRight className="text-sm" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : selectedForm && (
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between border-b border-white/10 pb-5">
                   <div>

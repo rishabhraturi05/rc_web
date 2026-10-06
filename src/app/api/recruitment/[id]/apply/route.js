@@ -126,11 +126,24 @@ export async function POST(req, { params }) {
         $or: emailFieldNames.map((fieldName) => ({ [`responses.${fieldName}`]: applicantEmail })),
       };
 
+      const whatsappLink =
+        process.env.NEXT_PUBLIC_RECRUITMENT_WHATSAPP_LINK ||
+        process.env.RECRUITMENT_WHATSAPP_LINK ||
+        "https://chat.whatsapp.com/FoMYMW3X0DnK4EpoeSO9Em?s=sw&p=a&mlu=4&ilr=4";
+
       const existingApplication = await RecruitmentApplication.findOne(duplicateQuery).lean();
       if (existingApplication) {
         return NextResponse.json(
-          { success: false, message: "You have already applied for this form." },
-          { status: 409 }
+          {
+            success: true,
+            alreadyApplied: true,
+            message: "You are already registered for this recruitment drive.",
+            department: existingApplication.department || department,
+            year: existingApplication.year || applicantYear,
+            data: existingApplication,
+            whatsappLink,
+          },
+          { status: 200 }
         );
       }
     }
@@ -145,8 +158,13 @@ export async function POST(req, { params }) {
       },
     });
 
+    const whatsappLink =
+      process.env.NEXT_PUBLIC_RECRUITMENT_WHATSAPP_LINK ||
+      process.env.RECRUITMENT_WHATSAPP_LINK ||
+      "https://chat.whatsapp.com/FoMYMW3X0DnK4EpoeSO9Em?s=sw&p=a&mlu=4&ilr=4";
+
     return NextResponse.json(
-      { success: true, data: application },
+      { success: true, data: application, whatsappLink },
       { status: 201 }
     );
   } catch (error) {

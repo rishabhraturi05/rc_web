@@ -14,22 +14,21 @@ if (!cached) {
 }
 
 export async function connectDB() {
-  if (cached.conn) {
+  if (cached.conn && mongoose.connection.readyState === 1) {
     return cached.conn;
   }
 
-  if (!cached.promise) {
+  if (!cached.promise || mongoose.connection.readyState === 0) {
+    const opts = {
+      bufferCommands: false,
+      serverSelectionTimeoutMS: 15000,
+      maxPoolSize: 10,
+    };
+
     cached.promise = mongoose
-      .connect(MONGODB_URI, {
-        dbName: "Rc",
-        bufferCommands: false,
-        serverSelectionTimeoutMS: 15000,
-        maxPoolSize: 10,
-        minPoolSize: 1,
-        family: 4,
-      })
+      .connect(MONGODB_URI, opts)
       .then((mongooseInstance) => {
-        console.log("Connected DB:", mongooseInstance.connection.name);
+        console.log("[MongoDB] Connected successfully to DB:", mongooseInstance.connection.name);
         return mongooseInstance;
       });
   }
@@ -38,7 +37,8 @@ export async function connectDB() {
     cached.conn = await cached.promise;
   } catch (err) {
     cached.promise = null;
-    console.error("MongoDB connection error:", err.message);
+    cached.conn = null;
+    console.error("[MongoDB] Connection error:", err.message);
     throw err;
   }
 

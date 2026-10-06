@@ -3,31 +3,30 @@ import { NextResponse } from "next/server";
 
 export default withAuth(
   function middleware(req) {
+    const pathname = req.nextUrl.pathname;
+    const token = req.nextauth.token;
+
+    // Route protections for /admin
+    if (pathname.startsWith("/admin") && !pathname.startsWith("/admin/login")) {
+      if (!token || token.role !== "admin") {
+        const loginUrl = new URL("/admin/login", req.url);
+        return NextResponse.redirect(loginUrl);
+      }
+    }
+
     return NextResponse.next();
   },
   {
+    secret: process.env.NEXTAUTH_SECRET || process.env.JWT_SECRET,
     callbacks: {
-      authorized: ({ token, req }) => {
-        const pathname = req.nextUrl.pathname;
-
-        // Allow access to login page
-        if (pathname.startsWith("/admin/login")) {
-          return true;
-        }
-
-        // Allow access if user has admin role (JWT token contains role)
-        return !!token && token.role === "admin";
-      },
-    },
-    pages: {
-      signIn: "/admin/login",
+      authorized: () => true, // Let the middleware function above handle path-specific redirects
     },
   }
 );
 
 export const config = {
   matcher: [
-    "/admin/:path*", // Protect ALL admin pages
+    "/admin/:path*", // Protect admin pages
   ],
 };
 

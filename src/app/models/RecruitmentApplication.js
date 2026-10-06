@@ -11,10 +11,16 @@ const RecruitmentApplicationSchema = new mongoose.Schema(
     department: { type: String, required: true, trim: true },
     year: { type: String, trim: true, default: "" },
     responses: { type: Object, default: {} },
+    points: { type: String, default: "", trim: true },
+    comments: { type: String, default: "", trim: true },
+    feedback: { type: String, default: "", trim: true }, // "positive" | "negative" | ""
+    evaluatedBy: { type: String, default: "" },
+    evaluatedAt: { type: Date, default: null },
   },
   {
     timestamps: true,
     collection: "recruitment_applications",
+    strict: false,
   }
 );
 

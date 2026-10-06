@@ -11,9 +11,9 @@ const navLinks = [
     { name: 'Members', href: '/members', sum: 1200 },
     { name: 'Competitions', href: '/competitions', sum: 1500 },
     { name: 'Events', href: '/events_page', sum: 1700 },
-    { name: 'Freshers', href: '/freshers', sum: 1850, isFreshers: true },
+    { name: 'Freshers', href: '/freshers', sum: 1850 },
     { name: 'Projects', href: '/projects', sum: 2000 },
-    { name: 'JOIN RC', href: '/recruitment', sum: 2100 },
+    { name: 'JOIN RC', href: '/recruitment', sum: 2100, isHighlight: true },
     { name: 'Alumni', href: '/alumni', sum: 2200 },
     { name: 'Contact', href: '/contact', sum: 2200 },
 ];
@@ -78,9 +78,8 @@ const Navbar = () => {
                             key={link.name}
                             href={link.href}
                             className={`cyber-link uppercase text-xs sm:text-sm xl:text-base ${isActive ? 'text-white font-bold' : 'text-gray-300'
-                                } ${link.isFreshers ? 'text-red-400 hover:text-red-400' : ''}`}
+                                } ${link.isHighlight ? 'text-red-400 hover:text-red-300 font-bold' : ''}`}
                         >
-                            {link.isFreshers ? '🚀 ' : ''}
                             {link.name}
                         </Link>
                     );
@@ -118,9 +117,8 @@ const Navbar = () => {
                                     href={link.href}
                                     onClick={() => setIsMobileMenuOpen(false)}
                                     className={`px-6 py-3 text-base sm:text-lg uppercase tracking-wide transition-all duration-300 ${isActive ? 'bg-white/10 text-cyan-400 font-bold' : 'text-gray-300 hover:bg-white/5 hover:text-white'
-                                        } ${link.isFreshers ? 'text-red-400 font-bold' : ''}`}
+                                        } ${link.isHighlight ? 'text-red-400 font-bold' : ''}`}
                                 >
-                                    {link.isFreshers ? '🚀 ' : ''}
                                     {link.name}
                                 </Link>
                             );

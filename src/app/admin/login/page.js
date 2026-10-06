@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
@@ -30,7 +31,7 @@ const Login = () => {
 
     try {
       const result = await signIn("credentials", {
-        username,
+        username: username.trim(),
         password,
         redirect: false,
       });
@@ -122,7 +123,7 @@ const Login = () => {
               </div>
             )}
 
-            <div className="pt-2">
+            <div className="pt-2 space-y-3">
               <button
                 type="submit"
                 disabled={isSubmitting}
@@ -130,6 +131,15 @@ const Login = () => {
               >
                 {isSubmitting ? "[ AUTHENTICATING... ]" : "[ INITIATE_LOGIN ]"}
               </button>
+
+              <div className="text-center pt-2">
+                <Link
+                  href="/internal"
+                  className="inline-flex items-center gap-1.5 font-mono text-xs text-gray-400 hover:text-white transition-colors underline underline-offset-4"
+                >
+                  &larr; [ Back to Internal Gateway ]
+                </Link>
+              </div>
             </div>
 
           </form>

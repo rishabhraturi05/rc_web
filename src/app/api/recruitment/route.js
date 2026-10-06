@@ -32,6 +32,10 @@ export async function GET() {
           ...form,
           years,
           title,
+          whatsappLink:
+            process.env.NEXT_PUBLIC_RECRUITMENT_WHATSAPP_LINK ||
+            process.env.RECRUITMENT_WHATSAPP_LINK ||
+            "https://chat.whatsapp.com/FoMYMW3X0DnK4EpoeSO9Em?s=sw&p=a&mlu=4&ilr=4",
           fields: ensureDefaultRecruitmentFields(form.fields || []),
         };
       });
@@ -49,7 +53,11 @@ export async function GET() {
   } catch (error) {
     console.error("GET ACTIVE RECRUITMENT FORMS ERROR:", error);
     return NextResponse.json(
-      { success: false, message: "Server error" },
+      {
+        success: false,
+        message: error.message || "Server error",
+        error: error.toString(),
+      },
       { status: 500 }
     );
   }
