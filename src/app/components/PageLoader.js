@@ -79,7 +79,7 @@ const PageLoader = () => {
     }
 
     return () => window.removeEventListener('load', finishLoading);
-  }, []);
+  }, [pathname]);
 
   // Show loader again whenever the user refreshes/navigates away
   useEffect(() => {

@@ -799,7 +799,7 @@ export default function AddSecDashboard() {
             <div className="glass-panel p-6 sm:p-8 border border-white/20 space-y-6">
               <div className="border-b border-white/10 pb-4">
                 <span className="text-xs font-mono text-gray-400 uppercase tracking-widest block mb-1">
-                  // SELECT_RECRUITMENT
+                  {"// SELECT_RECRUITMENT"}
                 </span>
                 <h2 className="font-mono text-xl sm:text-2xl font-bold text-white">
                   Recruitment
