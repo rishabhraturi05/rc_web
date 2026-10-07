@@ -6,7 +6,7 @@ const RecruitmentFieldSchema = new mongoose.Schema(
     label: { type: String, required: true, trim: true },
     type: {
       type: String,
-      enum: ["text", "email", "number", "textarea", "select", "radio", "checkbox"],
+      enum: ["text", "email", "number", "textarea", "select", "radio", "checkbox", "file", "pdf"],
       required: true,
     },
     required: { type: Boolean, default: false },

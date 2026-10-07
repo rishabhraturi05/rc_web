@@ -6,6 +6,8 @@ export const VALID_RECRUITMENT_TYPES = [
   "select",
   "radio",
   "checkbox",
+  "file",
+  "pdf",
 ];
 
 export const DEFAULT_DEPARTMENT_OPTIONS = [
@@ -184,6 +186,22 @@ export function normalizeRecruitmentConfig(payload = {}) {
 export function validateRecruitmentFieldValue(field, value) {
   if (!field || !field.name) return { valid: true, value };
 
+  if (field.type === "file" || field.type === "pdf") {
+    const isObj = value && typeof value === "object";
+    const hasObjFile = isObj && Boolean(value.url || value.fileId);
+    const hasStrFile = typeof value === "string" && value.trim() !== "";
+    const hasFile = hasObjFile || hasStrFile;
+
+    if (field.required && !hasFile) {
+      return {
+        valid: false,
+        message: `Please upload your ${field.label || "PDF file"}.`,
+      };
+    }
+
+    return { valid: true, value: hasFile ? value : null };
+  }
+
   const trimmedValue = value === undefined || value === null ? "" : String(value).trim();
 
   if (field.type === "checkbox") {
@@ -216,3 +234,83 @@ export function validateRecruitmentFieldValue(field, value) {
 
   return { valid: true, value: trimmedValue, message: "" };
 }
+
+/**
+ * Extracts resume/PDF info from applicant responses
+ */
+export function getApplicantResumeInfo(responses = {}, formFields = []) {
+  if (!responses || typeof responses !== "object") {
+    return { hasResume: false, url: "", filename: "", label: "" };
+  }
+
+  // 1. Look for configured file/pdf fields in the form
+  if (Array.isArray(formFields) && formFields.length > 0) {
+    for (const field of formFields) {
+      if (field.type === "file" || field.type === "pdf") {
+        const val = responses[field.name] ?? responses[field.label];
+        if (val) {
+          if (typeof val === "object" && val.url) {
+            return {
+              hasResume: true,
+              url: val.url,
+              filename: val.filename || val.name || `${field.label || "Resume"}.pdf`,
+              label: field.label || "Resume",
+            };
+          }
+          if (typeof val === "string" && val.trim()) {
+            return {
+              hasResume: true,
+              url: val.trim(),
+              filename: `${field.label || "Resume"}.pdf`,
+              label: field.label || "Resume",
+            };
+          }
+        }
+      }
+    }
+  }
+
+  // 2. Look by common resume field names / labels
+  const resumeKeys = ["resume", "cv", "resume_pdf", "pdf_resume", "resume_link", "portfolio_pdf"];
+  for (const [key, val] of Object.entries(responses)) {
+    const normalizedKey = key.toLowerCase();
+    const isResumeKey = resumeKeys.some((rk) => normalizedKey.includes(rk));
+
+    if (val && (isResumeKey || (typeof val === "object" && val.url))) {
+      if (typeof val === "object" && val.url) {
+        return {
+          hasResume: true,
+          url: val.url,
+          filename: val.filename || val.name || "Resume.pdf",
+          label: key,
+        };
+      }
+      if (typeof val === "string" && val.trim()) {
+        const s = val.trim();
+        if (s.startsWith("http://") || s.startsWith("https://") || s.startsWith("/api/recruitment/files/")) {
+          return {
+            hasResume: true,
+            url: s,
+            filename: "Resume.pdf",
+            label: key,
+          };
+        }
+      }
+    }
+  }
+
+  // 3. Fallback: Check any value ending with .pdf or starting with /api/recruitment/files/
+  for (const [key, val] of Object.entries(responses)) {
+    if (typeof val === "string" && (val.includes("/api/recruitment/files/") || val.toLowerCase().endsWith(".pdf"))) {
+      return {
+        hasResume: true,
+        url: val,
+        filename: "Resume.pdf",
+        label: key,
+      };
+    }
+  }
+
+  return { hasResume: false, url: "", filename: "", label: "" };
+}
+

@@ -7,13 +7,211 @@ import {
   FaCheckCircle,
   FaArrowRight,
   FaShieldAlt,
+  FaFilePdf,
+  FaUpload,
+  FaTrash,
+  FaEye,
+  FaSpinner,
 } from "react-icons/fa";
 
 const defaultFormState = {};
 
+function formatBytes(bytes) {
+  if (!bytes || Number.isNaN(Number(bytes))) return "";
+  const b = Number(bytes);
+  if (b < 1024) return `${b} B`;
+  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+  return `${(b / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function PdfUploadField({ field, value, onChange }) {
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const fileData = typeof value === "object" && value !== null ? value : null;
+  const fileUrl = fileData?.url || (typeof value === "string" ? value : "");
+  const fileName = fileData?.filename || fileData?.name || (fileUrl ? "Uploaded Resume.pdf" : "");
+  const fileSize = fileData?.size ? formatBytes(fileData.size) : "";
+
+  const handleFileUpload = async (file) => {
+    if (!file) return;
+
+    const originalName = file.name || "";
+    const isPdf =
+      (file.type || "").toLowerCase().includes("pdf") ||
+      originalName.toLowerCase().endsWith(".pdf");
+
+    if (!isPdf) {
+      setUploadError("Only PDF documents (.pdf) are allowed.");
+      return;
+    }
+
+    if (file.size > 500 * 1024) {
+      setUploadError("File size exceeds 500 KB limit. Please upload a PDF under 500 KB.");
+      return;
+    }
+
+    setUploading(true);
+    setUploadError("");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/recruitment/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        setUploadError(result.message || "Failed to upload file.");
+        return;
+      }
+
+      onChange({
+        fileId: result.fileId,
+        filename: result.filename,
+        url: result.url,
+        size: result.size,
+      });
+    } catch (err) {
+      console.error("PDF upload error:", err);
+      setUploadError("An error occurred while uploading. Please try again.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const onDrop = (e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (e.dataTransfer?.files?.[0]) {
+      handleFileUpload(e.dataTransfer.files[0]);
+    }
+  };
+
+  if (fileUrl) {
+    return (
+      <div className="space-y-2">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 rounded-lg border border-emerald-500/40 bg-emerald-950/20 font-mono">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-lg bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 flex-shrink-0">
+              <FaFilePdf className="text-xl" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-xs sm:text-sm font-bold text-white truncate max-w-xs block" title={fileName}>
+                  {fileName}
+                </span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 uppercase font-semibold">
+                  Uploaded
+                </span>
+              </div>
+              {fileSize && (
+                <span className="text-[11px] text-gray-400 block mt-0.5">{fileSize}</span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <a
+              href={fileUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="px-3 py-1.5 rounded border border-white/20 bg-white/5 hover:bg-white/10 text-gray-200 text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Preview PDF in new tab"
+            >
+              <FaEye className="text-xs" />
+              <span>Preview</span>
+            </a>
+            <button
+              type="button"
+              onClick={() => onChange(null)}
+              className="px-3 py-1.5 rounded border border-rose-500/30 bg-rose-950/20 hover:bg-rose-900/40 text-rose-300 text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Remove or replace this file"
+            >
+              <FaTrash className="text-xs" />
+              <span>Remove</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <label
+        onDragOver={(e) => {
+          e.preventDefault();
+          setIsDragOver(true);
+        }}
+        onDragLeave={() => setIsDragOver(false)}
+        onDrop={onDrop}
+        className={`relative flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg cursor-pointer transition-all ${
+          isDragOver
+            ? "border-emerald-400 bg-emerald-950/20"
+            : "border-white/20 bg-black/40 hover:border-white/40 hover:bg-white/5"
+        }`}
+      >
+        <input
+          type="file"
+          accept=".pdf,application/pdf"
+          disabled={uploading}
+          onChange={(e) => {
+            if (e.target.files?.[0]) {
+              handleFileUpload(e.target.files[0]);
+            }
+          }}
+          className="sr-only"
+        />
+
+        {uploading ? (
+          <div className="flex flex-col items-center gap-2 text-center py-2">
+            <FaSpinner className="text-2xl text-white animate-spin" />
+            <span className="font-mono text-xs text-gray-300">Uploading PDF document...</span>
+            <span className="font-mono text-[10px] text-gray-500">Please wait while the file is saved</span>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2 text-center">
+            <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-gray-300 group-hover:text-white">
+              <FaFilePdf className="text-2xl text-rose-400" />
+            </div>
+            <div>
+              <p className="font-mono text-xs sm:text-sm font-semibold text-white">
+                <span className="text-emerald-400 underline underline-offset-4">Click to upload</span> or drag &amp; drop PDF
+              </p>
+              <p className="font-mono text-xs text-gray-300 mt-1 flex items-center justify-center gap-1.5 flex-wrap">
+                <span>PDF format only</span>
+                <span className="text-gray-500">•</span>
+                <span className="px-2 py-0.5 rounded bg-amber-400/15 text-amber-300 border border-amber-400/30 font-bold">
+                  Max file size: 500 KB
+                </span>
+              </p>
+            </div>
+          </div>
+        )}
+      </label>
+
+      {uploadError && (
+        <p className="font-mono text-xs text-rose-400 bg-rose-950/30 border border-rose-500/30 rounded p-2">
+          {uploadError}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function renderFieldInput(field, value, onChange) {
   const commonClassName =
     "w-full rounded-lg border border-white/20 bg-black/40 px-3.5 py-2.5 font-mono text-sm text-white placeholder:text-gray-500 focus:border-white focus:outline-none transition-colors";
+
+  if (field.type === "file" || field.type === "pdf") {
+    return <PdfUploadField field={field} value={value} onChange={onChange} />;
+  }
 
   if (field.type === "textarea") {
     return (
@@ -204,6 +402,19 @@ export default function RecruitmentPage() {
     if (!allowedYears.includes(year)) {
       setMessage(`Year "${year}" is not eligible for this recruitment. Allowed years: ${allowedYears.join(", ")}`);
       return;
+    }
+
+    for (const field of selectedForm.fields || []) {
+      if (field.type === "file" || field.type === "pdf") {
+        if (field.required) {
+          const val = formValues[field.name];
+          const hasVal = val && (typeof val === "object" ? Boolean(val.url || val.fileId) : Boolean(String(val).trim()));
+          if (!hasVal) {
+            setMessage(`Please upload your ${field.label || "Resume / PDF file"}.`);
+            return;
+          }
+        }
+      }
     }
 
     setSubmitting(true);

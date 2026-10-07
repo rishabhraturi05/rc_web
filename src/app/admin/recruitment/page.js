@@ -26,6 +26,9 @@ import {
   FaStar,
   FaThumbsUp,
   FaThumbsDown,
+  FaFilePdf,
+  FaColumns,
+  FaExternalLinkAlt,
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import {
@@ -36,6 +39,7 @@ import {
   getVisibleApplicationFields,
   isDepartmentField,
   isYearField,
+  getApplicantResumeInfo,
 } from "@/app/lib/recruitment";
 
 const DEFAULT_DEADLINE = "2026-12-31T23:59";
@@ -72,6 +76,7 @@ const fieldTypeOptions = [
   { label: "Select", value: "select" },
   { label: "Radio", value: "radio" },
   { label: "Checkbox", value: "checkbox" },
+  { label: "PDF / Resume Upload (Max 500 KB)", value: "file" },
 ];
 
 function formatFieldOptions(rawOptions) {
@@ -188,6 +193,8 @@ function buildSheetRows(form, applications, inlineEdits = {}) {
           ? rawValue ? "Yes" : "No"
           : rawValue === undefined || rawValue === null
             ? ""
+            : typeof rawValue === "object" && rawValue?.url
+            ? rawValue.url
             : String(rawValue);
     });
 
@@ -231,6 +238,7 @@ export default function RecruitmentAdminPage() {
   // Review Modal state
   const [modalAppIndex, setModalAppIndex] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [showResumeSplit, setShowResumeSplit] = useState(true);
   const [newPositiveInput, setNewPositiveInput] = useState("");
   const [newNegativeInput, setNewNegativeInput] = useState("");
 
@@ -600,10 +608,13 @@ export default function RecruitmentAdminPage() {
   };
 
   // Modal navigation
-  const openModal = (index) => {
+  const openModal = (index, forceSplit = true) => {
     setModalAppIndex(index);
     setNewPositiveInput("");
     setNewNegativeInput("");
+    if (forceSplit) {
+      setShowResumeSplit(true);
+    }
     setModalOpen(true);
   };
 
@@ -1323,6 +1334,13 @@ export default function RecruitmentAdminPage() {
                             </div>
                           )}
 
+                          {(field.type === "file" || field.type === "pdf") && (
+                            <div className="mt-3 p-2.5 rounded bg-white/5 border border-white/10 font-mono text-xs text-emerald-400/90 flex items-center gap-2">
+                              <FaFilePdf className="text-rose-400 text-sm flex-shrink-0" />
+                              <span>Applicant will be prompted to upload a PDF file (e.g. Resume / CV, max size 500 KB).</span>
+                            </div>
+                          )}
+
                           {!isDefaultField && (
                             <div className="mt-3 flex justify-end">
                               <button
@@ -1851,6 +1869,7 @@ export default function RecruitmentAdminPage() {
                     const candidateRoll = app.responses?.rollno || app.responses?.rollNumber || "—";
                     const candidateEmail = app.responses?.email || "—";
                     const candidateYear = app.year || app.responses?.year || "—";
+                    const appResume = getApplicantResumeInfo(app.responses, selectedForm?.fields);
 
                     return (
                       <div
@@ -1950,6 +1969,16 @@ export default function RecruitmentAdminPage() {
                             {app.evaluatedBy ? `By ${app.evaluatedBy}` : "Not evaluated"}
                           </div>
                           <div className="flex items-center gap-1.5">
+                            {appResume.hasResume && (
+                              <button
+                                type="button"
+                                onClick={() => openModal(index, true)}
+                                className="px-2.5 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 rounded text-xs font-mono uppercase tracking-wider flex items-center gap-1 cursor-pointer font-bold"
+                                title="Open resume in parallel view & grade"
+                              >
+                                <FaFilePdf className="text-xs" /> Resume
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => openModal(index)}
@@ -2011,6 +2040,7 @@ export default function RecruitmentAdminPage() {
                           const candidateRoll = app.responses?.rollno || app.responses?.rollNumber || "—";
                           const candidateEmail = app.responses?.email || "—";
                           const candidateYear = app.year || app.responses?.year || "—";
+                          const appResume = getApplicantResumeInfo(app.responses, selectedForm?.fields);
 
                           // Color-code department badges
                           const deptLower = String(app.department || "").toLowerCase();
@@ -2123,6 +2153,16 @@ export default function RecruitmentAdminPage() {
                               {/* Actions */}
                               <td className="py-3 px-3 text-right whitespace-nowrap">
                                 <div className="flex items-center justify-end gap-1.5">
+                                  {appResume.hasResume && (
+                                    <button
+                                      type="button"
+                                      onClick={() => openModal(index, true)}
+                                      className="cursor-pointer font-mono text-[10px] uppercase tracking-wider text-rose-300 hover:text-white border border-rose-500/40 hover:border-rose-400 bg-rose-950/30 rounded px-2.5 py-1 transition-colors font-bold flex items-center gap-1"
+                                      title="Open resume in parallel view & grade"
+                                    >
+                                      <FaFilePdf className="text-[10px]" /> Resume
+                                    </button>
+                                  )}
                                   <button
                                     type="button"
                                     onClick={() => openModal(index)}
@@ -2302,55 +2342,146 @@ export default function RecruitmentAdminPage() {
           </div>
         )}
         {/* Detailed Candidate Review Modal (matching AddSec dashboard) */}
-        {modalOpen && currentModalApp && (
-          <div className="fixed inset-0 z-[100] flex items-start justify-center pt-24 sm:pt-28 pb-8 px-2.5 sm:px-4 md:px-6 bg-black/85 backdrop-blur-sm overflow-y-auto">
-            <div className="glass-panel w-full max-w-3xl max-h-[calc(100vh-7.5rem)] sm:max-h-[calc(100vh-8.5rem)] overflow-y-auto border border-white/25 shadow-2xl flex flex-col rounded-xl my-auto">
-              {/* Modal Header */}
-              <div className="p-3.5 sm:p-5 border-b border-white/15 flex items-center justify-between sticky top-0 bg-black/95 backdrop-blur z-20 gap-2">
-                <div className="min-w-0 flex-1 pr-2">
-                  <span className="text-[10px] font-mono uppercase tracking-widest text-gray-400 block truncate">
-                    Candidate Review ({modalAppIndex + 1} of {filteredApplications.length})
-                  </span>
-                  <h2
-                    className="font-mono text-base sm:text-xl md:text-2xl font-bold text-white mt-0.5 truncate"
-                    title={currentModalApp.responses?.name || currentModalApp.responses?.fullName || "Candidate Profile"}
-                  >
-                    {currentModalApp.responses?.name || currentModalApp.responses?.fullName || "Candidate Profile"}
-                  </h2>
+        {modalOpen && currentModalApp && (() => {
+          const resumeInfo = getApplicantResumeInfo(currentModalApp.responses, selectedForm?.fields);
+          const hasResume = resumeInfo.hasResume;
+          const isSplit = hasResume && showResumeSplit;
+
+          return (
+            <div className={`fixed inset-0 z-[100] flex ${isSplit ? "items-center justify-center p-2 sm:p-4" : "items-start justify-center pt-20 sm:pt-24 pb-8 px-2.5 sm:px-4 md:px-6 overflow-y-auto"} bg-black/85 backdrop-blur-sm`}>
+              <div className={`glass-panel w-full ${isSplit ? "max-w-[96vw] xl:max-w-7xl h-[92vh] max-h-[92vh]" : "max-w-3xl max-h-[calc(100vh-7.5rem)] sm:max-h-[calc(100vh-8.5rem)] overflow-y-auto"} border border-white/25 shadow-2xl flex flex-col rounded-xl my-auto transition-all duration-300`}>
+                {/* Modal Header */}
+                <div className="p-3.5 sm:p-5 border-b border-white/15 flex items-center justify-between sticky top-0 bg-black/95 backdrop-blur z-20 gap-2">
+                  <div className="min-w-0 flex-1 pr-2">
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-gray-400 block truncate">
+                      Candidate Review ({modalAppIndex + 1} of {filteredApplications.length})
+                    </span>
+                    <h2
+                      className="font-mono text-base sm:text-xl md:text-2xl font-bold text-white mt-0.5 truncate"
+                      title={currentModalApp.responses?.name || currentModalApp.responses?.fullName || "Candidate Profile"}
+                    >
+                      {currentModalApp.responses?.name || currentModalApp.responses?.fullName || "Candidate Profile"}
+                    </h2>
+                  </div>
+
+                  <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                    {hasResume && (
+                      <button
+                        type="button"
+                        onClick={() => setShowResumeSplit(!showResumeSplit)}
+                        className={`px-2.5 py-1.5 rounded font-mono text-xs flex items-center gap-1.5 border transition-all cursor-pointer ${
+                          showResumeSplit
+                            ? "border-emerald-500/60 bg-emerald-500/20 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.3)]"
+                            : "border-white/20 bg-white/5 text-gray-300 hover:text-white"
+                        }`}
+                        title="Toggle parallel split view for resume and evaluation"
+                      >
+                        <FaColumns className="text-xs" />
+                        <span className="hidden sm:inline">
+                          {showResumeSplit ? "Parallel View [ON]" : "Open Split View"}
+                        </span>
+                        <span className="sm:hidden">Split</span>
+                      </button>
+                    )}
+
+                    {hasResume && (
+                      <a
+                        href={resumeInfo.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="p-2 glass-panel border border-white/20 text-gray-300 hover:text-white rounded transition-colors"
+                        title="Open resume in full window"
+                      >
+                        <FaExternalLinkAlt className="text-xs" />
+                      </a>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={prevModalApp}
+                      disabled={modalAppIndex === 0}
+                      className="p-2 sm:p-2.5 glass-panel border border-white/20 text-gray-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed rounded cursor-pointer"
+                      title="Previous Applicant"
+                    >
+                      <FaChevronLeft className="text-xs" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={nextModalApp}
+                      disabled={modalAppIndex === filteredApplications.length - 1}
+                      className="p-2 sm:p-2.5 glass-panel border border-white/20 text-gray-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed rounded cursor-pointer"
+                      title="Next Applicant"
+                    >
+                      <FaChevronRight className="text-xs" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closeModal}
+                      className="p-2 sm:p-2.5 text-gray-400 hover:text-white rounded ml-1 cursor-pointer"
+                      title="Close Modal"
+                    >
+                      <FaTimes className="text-sm" />
+                    </button>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-                  <button
-                    type="button"
-                    onClick={prevModalApp}
-                    disabled={modalAppIndex === 0}
-                    className="p-2 sm:p-2.5 glass-panel border border-white/20 text-gray-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed rounded cursor-pointer"
-                    title="Previous Applicant"
-                  >
-                    <FaChevronLeft className="text-xs" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={nextModalApp}
-                    disabled={modalAppIndex === filteredApplications.length - 1}
-                    className="p-2 sm:p-2.5 glass-panel border border-white/20 text-gray-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed rounded cursor-pointer"
-                    title="Next Applicant"
-                  >
-                    <FaChevronRight className="text-xs" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={closeModal}
-                    className="p-2 sm:p-2.5 text-gray-400 hover:text-white rounded ml-1 cursor-pointer"
-                    title="Close Modal"
-                  >
-                    <FaTimes className="text-sm" />
-                  </button>
-                </div>
-              </div>
+                {/* Modal Body */}
+                <div className={`p-3.5 sm:p-5 ${isSplit ? "flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-4 overflow-hidden" : "space-y-4 sm:space-y-6"}`}>
+                  {/* Left Column: Embedded in-website PDF Viewer */}
+                  {isSplit && (
+                    <div className="flex flex-col h-full rounded-xl border border-white/15 bg-black/80 overflow-hidden shadow-2xl min-h-[420px] lg:min-h-0">
+                      <div className="p-2.5 sm:p-3 border-b border-white/10 bg-white/[0.04] flex items-center justify-between font-mono text-xs">
+                        <div className="flex items-center gap-2 truncate">
+                          <FaFilePdf className="text-rose-400 text-base flex-shrink-0" />
+                          <span className="text-white font-bold truncate max-w-[200px] sm:max-w-xs" title={resumeInfo.filename}>
+                            {resumeInfo.filename || "Candidate Resume.pdf"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className="text-[10px] text-emerald-300 px-2 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 uppercase font-semibold">
+                            Live Document
+                          </span>
+                          <a
+                            href={resumeInfo.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-gray-300 hover:text-white text-xs p-1 rounded hover:bg-white/10 transition-colors"
+                            title="Open PDF in new window"
+                          >
+                            <FaExternalLinkAlt />
+                          </a>
+                        </div>
+                      </div>
+                      <div className="flex-1 relative bg-neutral-950 overflow-hidden">
+                        <iframe
+                          src={resumeInfo.url}
+                          className="w-full h-full border-none bg-neutral-900"
+                          title="Candidate Resume"
+                        />
+                      </div>
+                    </div>
+                  )}
 
-              {/* Modal Body */}
-              <div className="p-3.5 sm:p-6 space-y-4 sm:space-y-6">
+                  {/* Right Column: Candidate Responses & Simultaneous Grading */}
+                  <div className={`${isSplit ? "h-full overflow-y-auto pr-1 sm:pr-2 space-y-4 sm:space-y-6" : "space-y-4 sm:space-y-6"}`}>
+                    {hasResume && !isSplit && (
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 p-3 rounded-lg border border-rose-500/35 bg-rose-950/20 font-mono text-xs">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <FaFilePdf className="text-rose-400 text-base flex-shrink-0" />
+                          <span className="text-white font-semibold truncate">
+                            Candidate Resume: <strong className="text-gray-200">{resumeInfo.filename}</strong>
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowResumeSplit(true)}
+                          className="px-3 py-1.5 rounded bg-rose-500 hover:bg-rose-400 text-white font-bold font-mono text-xs flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap self-end sm:self-auto"
+                        >
+                          <FaColumns className="text-xs" />
+                          <span>[ Open Parallel Split View ]</span>
+                        </button>
+                      </div>
+                    )}
                 {/* Quick Info Grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 font-mono text-xs">
                   <div className="bg-white/5 p-2.5 sm:p-3 rounded border border-white/10">
@@ -2794,24 +2925,26 @@ export default function RecruitmentAdminPage() {
                     </div>
                   );
                 })()}
-              </div>
+                  </div>
+                </div>
 
-              {/* Modal Footer */}
-              <div className="p-3 sm:p-4 border-t border-white/10 bg-black/80 flex items-center justify-between font-mono text-xs">
-                <span className="text-gray-500 text-[11px] sm:text-xs truncate pr-2">
-                  Use arrows in top right to navigate candidates.
-                </span>
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="px-4 py-1.5 glass-panel border border-white/20 text-gray-300 hover:text-white rounded flex-shrink-0 cursor-pointer"
-                >
-                  Close
-                </button>
+                {/* Modal Footer */}
+                <div className="p-3 sm:p-4 border-t border-white/10 bg-black/80 flex items-center justify-between font-mono text-xs">
+                  <span className="text-gray-500 text-[11px] sm:text-xs truncate pr-2">
+                    Use arrows in top right to navigate candidates.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="px-4 py-1.5 glass-panel border border-white/20 text-gray-300 hover:text-white rounded flex-shrink-0 cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );
