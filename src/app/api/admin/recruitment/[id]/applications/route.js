@@ -84,7 +84,17 @@ export async function PUT(req, { params }) {
 
     const { id } = await params;
     const body = await req.json();
-    const { applicationId, department, year, responses, points, comments, feedback } = body || {};
+    const {
+      applicationId,
+      department,
+      year,
+      responses,
+      points,
+      comments,
+      feedback,
+      positiveRemarks,
+      negativeRemarks,
+    } = body || {};
 
     if (!applicationId) {
       return NextResponse.json(
@@ -126,7 +136,7 @@ export async function PUT(req, { params }) {
       application.year = String(year).trim();
     }
 
-    // Evaluation fields (points, comments, feedback)
+    // Evaluation fields (points, comments, feedback, positiveRemarks, negativeRemarks)
     if (points !== undefined) {
       application.points = String(points).trim();
     }
@@ -136,8 +146,20 @@ export async function PUT(req, { params }) {
     if (feedback !== undefined) {
       application.feedback = String(feedback).trim().toLowerCase();
     }
+    if (positiveRemarks !== undefined) {
+      application.positiveRemarks = Array.isArray(positiveRemarks) ? positiveRemarks : [];
+    }
+    if (negativeRemarks !== undefined) {
+      application.negativeRemarks = Array.isArray(negativeRemarks) ? negativeRemarks : [];
+    }
 
-    if (points !== undefined || comments !== undefined || feedback !== undefined) {
+    if (
+      points !== undefined ||
+      comments !== undefined ||
+      feedback !== undefined ||
+      positiveRemarks !== undefined ||
+      negativeRemarks !== undefined
+    ) {
       application.evaluatedBy = authResult.session?.user?.username || "admin";
       application.evaluatedAt = new Date();
     }

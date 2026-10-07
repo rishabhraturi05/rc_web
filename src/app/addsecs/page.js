@@ -21,6 +21,8 @@ import {
   FaStar,
   FaThumbsUp,
   FaThumbsDown,
+  FaPlus,
+  FaTrash,
   FaLaptopCode,
   FaCogs,
   FaMicrochip,
@@ -105,15 +107,17 @@ export default function AddSecDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedYear, setSelectedYear] = useState("all");
   const [evaluationFilter, setEvaluationFilter] = useState("all"); // 'all', 'evaluated', 'pending'
-  const [feedbackFilter, setFeedbackFilter] = useState("all"); // 'all', 'positive', 'waitlist', 'negative', 'unclassified'
+  const [scoreFilter, setScoreFilter] = useState("all"); // 'all', 'positive', 'zero', 'negative', 'pending'
   const [sortBy, setSortBy] = useState("newest"); // 'newest', 'oldest', 'points_desc', 'points_asc', 'name_asc'
 
-  // Inline edits state: { [appId]: { points, comments, feedback, isDirty, isSaving, savedRecently } }
+  // Inline edits state: { [appId]: { points, comments, feedback, positiveRemarks, negativeRemarks, isDirty, isSaving, savedRecently } }
   const [inlineEdits, setInlineEdits] = useState({});
 
   // Review Modal state
   const [modalAppIndex, setModalAppIndex] = useState(null); // index in filteredApplications
   const [modalOpen, setModalOpen] = useState(false);
+  const [newPositiveInput, setNewPositiveInput] = useState("");
+  const [newNegativeInput, setNewNegativeInput] = useState("");
 
   // Department name from session
   const departmentName = session?.user?.department || "Department";
@@ -195,6 +199,8 @@ export default function AddSecDashboard() {
             points: app.points || "",
             comments: app.comments || "",
             feedback: app.feedback || "",
+            positiveRemarks: Array.isArray(app.positiveRemarks) ? [...app.positiveRemarks] : [],
+            negativeRemarks: Array.isArray(app.negativeRemarks) ? [...app.negativeRemarks] : [],
             isDirty: false,
             isSaving: false,
             savedRecently: false,
@@ -223,6 +229,72 @@ export default function AddSecDashboard() {
     [forms, activeFormId]
   );
 
+  // Helper to extract net score, formatting, and classification status
+  const getCandidateScoreInfo = useCallback((app, edit) => {
+    const currentPos =
+      edit?.positiveRemarks !== undefined
+        ? edit.positiveRemarks
+        : Array.isArray(app?.positiveRemarks)
+        ? app.positiveRemarks
+        : [];
+    const currentNeg =
+      edit?.negativeRemarks !== undefined
+        ? edit.negativeRemarks
+        : Array.isArray(app?.negativeRemarks)
+        ? app.negativeRemarks
+        : [];
+
+    const hasRemarks = currentPos.length > 0 || currentNeg.length > 0;
+    const currentPoints = edit?.points !== undefined ? edit.points : app?.points;
+    const hasPoints =
+      currentPoints !== undefined &&
+      currentPoints !== null &&
+      String(currentPoints).trim() !== "";
+    const currentComments =
+      edit?.comments !== undefined ? edit.comments : app?.comments;
+    const hasComments = Boolean(currentComments && String(currentComments).trim() !== "");
+
+    let scoreNum = null;
+    let scoreFormatted = "—";
+    let isEvaluated = false;
+
+    if (hasRemarks) {
+      scoreNum = currentPos.length - currentNeg.length;
+      scoreFormatted = scoreNum > 0 ? `+${scoreNum}` : `${scoreNum}`;
+      isEvaluated = true;
+    } else if (hasPoints) {
+      const parsed = parseFloat(currentPoints);
+      if (!Number.isNaN(parsed)) {
+        scoreNum = parsed;
+        scoreFormatted = parsed > 0 ? `+${parsed}` : `${parsed}`;
+      } else {
+        scoreFormatted = String(currentPoints);
+      }
+      isEvaluated = true;
+    } else if (hasComments) {
+      isEvaluated = true;
+    }
+
+    let status = "pending";
+    if (scoreNum !== null) {
+      if (scoreNum > 0) status = "positive";
+      else if (scoreNum === 0) status = "zero";
+      else status = "negative";
+    } else if (isEvaluated) {
+      status = "zero";
+    }
+
+    return {
+      scoreNum,
+      scoreFormatted,
+      isEvaluated,
+      status, // 'positive' (>0), 'zero' (=0), 'negative' (<0), 'pending'
+      posCount: currentPos.length,
+      negCount: currentNeg.length,
+      comments: currentComments || "",
+    };
+  }, []);
+
   // Filtered & Sorted Applications
   const filteredApplications = useMemo(() => {
     if (!applications.length) return [];
@@ -234,24 +306,17 @@ export default function AddSecDashboard() {
         return false;
       }
 
+      const scoreInfo = getCandidateScoreInfo(app, inlineEdits[app._id]);
+
       // 2. Evaluation status filter
-      const hasPoints = Boolean(inlineEdits[app._id]?.points || app.points);
-      const hasComments = Boolean(inlineEdits[app._id]?.comments || app.comments);
-      const isEvaluated = hasPoints || hasComments;
+      if (evaluationFilter === "evaluated" && !scoreInfo.isEvaluated) return false;
+      if (evaluationFilter === "pending" && scoreInfo.isEvaluated) return false;
 
-      if (evaluationFilter === "evaluated" && !isEvaluated) return false;
-      if (evaluationFilter === "pending" && isEvaluated) return false;
-
-      // 3. Feedback filter (Positive / Waitlist / Negative / Unclassified)
-      const currentFeedback =
-        inlineEdits[app._id]?.feedback !== undefined
-          ? inlineEdits[app._id]?.feedback
-          : app.feedback || "";
-
-      if (feedbackFilter === "positive" && currentFeedback !== "positive") return false;
-      if (feedbackFilter === "waitlist" && currentFeedback !== "waitlist") return false;
-      if (feedbackFilter === "negative" && currentFeedback !== "negative") return false;
-      if (feedbackFilter === "unclassified" && Boolean(currentFeedback)) return false;
+      // 3. Score status filter (Positive / Zero / Negative / Pending)
+      if (scoreFilter === "positive" && scoreInfo.status !== "positive") return false;
+      if (scoreFilter === "zero" && (scoreInfo.status !== "zero" || !scoreInfo.isEvaluated)) return false;
+      if (scoreFilter === "negative" && scoreInfo.status !== "negative") return false;
+      if (scoreFilter === "pending" && scoreInfo.isEvaluated) return false;
 
       // 4. Search query
       if (searchQuery.trim()) {
@@ -259,7 +324,7 @@ export default function AddSecDashboard() {
         const candidateName = String(app.responses?.name || app.responses?.fullName || "").toLowerCase();
         const candidateRoll = String(app.responses?.rollno || app.responses?.rollNumber || "").toLowerCase();
         const candidateEmail = String(app.responses?.email || "").toLowerCase();
-        const candidateComments = String(inlineEdits[app._id]?.comments || app.comments || "").toLowerCase();
+        const candidateComments = String(scoreInfo.comments).toLowerCase();
 
         // Search through all response values as well
         const allAnswers = Object.values(app.responses || {})
@@ -285,13 +350,17 @@ export default function AddSecDashboard() {
         return new Date(a.createdAt) - new Date(b.createdAt);
       }
       if (sortBy === "points_desc") {
-        const pA = parseFloat(inlineEdits[a._id]?.points || a.points) || -999999;
-        const pB = parseFloat(inlineEdits[b._id]?.points || b.points) || -999999;
+        const infoA = getCandidateScoreInfo(a, inlineEdits[a._id]);
+        const infoB = getCandidateScoreInfo(b, inlineEdits[b._id]);
+        const pA = infoA.scoreNum !== null ? infoA.scoreNum : -999999;
+        const pB = infoB.scoreNum !== null ? infoB.scoreNum : -999999;
         return pB - pA;
       }
       if (sortBy === "points_asc") {
-        const pA = parseFloat(inlineEdits[a._id]?.points || a.points) || 999999;
-        const pB = parseFloat(inlineEdits[b._id]?.points || b.points) || 999999;
+        const infoA = getCandidateScoreInfo(a, inlineEdits[a._id]);
+        const infoB = getCandidateScoreInfo(b, inlineEdits[b._id]);
+        const pA = infoA.scoreNum !== null ? infoA.scoreNum : 999999;
+        const pB = infoB.scoreNum !== null ? infoB.scoreNum : 999999;
         return pA - pB;
       }
       if (sortBy === "name_asc") {
@@ -304,40 +373,36 @@ export default function AddSecDashboard() {
     });
 
     return list;
-  }, [applications, selectedYear, evaluationFilter, feedbackFilter, searchQuery, sortBy, inlineEdits]);
+  }, [applications, selectedYear, evaluationFilter, scoreFilter, searchQuery, sortBy, inlineEdits, getCandidateScoreInfo]);
 
-  // Overall Statistics for this Form & Department
+  // Overall Statistics for this Form & Department (Score-driven)
   const stats = useMemo(() => {
     const total = applications.length;
     let evaluated = 0;
     let positiveCount = 0;
-    let waitlistCount = 0;
+    let zeroCount = 0;
     let negativeCount = 0;
-    let totalPoints = 0;
-    let numericPointsCount = 0;
+    let totalScore = 0;
+    let scoredCandidatesCount = 0;
 
     applications.forEach((app) => {
-      const p = inlineEdits[app._id]?.points !== undefined ? inlineEdits[app._id]?.points : app.points;
-      const c = inlineEdits[app._id]?.comments !== undefined ? inlineEdits[app._id]?.comments : app.comments;
-      const fb = inlineEdits[app._id]?.feedback !== undefined ? inlineEdits[app._id]?.feedback : app.feedback;
+      const info = getCandidateScoreInfo(app, inlineEdits[app._id]);
+      if (info.isEvaluated) evaluated++;
+      if (info.status === "positive") positiveCount++;
+      else if (info.status === "zero" && info.isEvaluated) zeroCount++;
+      else if (info.status === "negative") negativeCount++;
 
-      if (p || c || fb) evaluated++;
-      if (fb === "positive") positiveCount++;
-      if (fb === "waitlist") waitlistCount++;
-      if (fb === "negative") negativeCount++;
-
-      const num = parseFloat(p);
-      if (!Number.isNaN(num)) {
-        totalPoints += num;
-        numericPointsCount++;
+      if (info.scoreNum !== null) {
+        totalScore += info.scoreNum;
+        scoredCandidatesCount++;
       }
     });
 
     const pending = total - evaluated;
-    const avgScore = numericPointsCount > 0 ? (totalPoints / numericPointsCount).toFixed(1) : "—";
+    const avgScore = scoredCandidatesCount > 0 ? (totalScore / scoredCandidatesCount).toFixed(1) : "—";
 
-    return { total, evaluated, pending, avgScore, positiveCount, waitlistCount, negativeCount };
-  }, [applications, inlineEdits]);
+    return { total, evaluated, pending, avgScore, positiveCount, zeroCount, negativeCount };
+  }, [applications, inlineEdits, getCandidateScoreInfo]);
 
   // Handle inline change
   const handleInlineChange = (appId, field, value) => {
@@ -371,6 +436,8 @@ export default function AddSecDashboard() {
           points: edit.points,
           comments: edit.comments,
           feedback: edit.feedback,
+          positiveRemarks: edit.positiveRemarks || [],
+          negativeRemarks: edit.negativeRemarks || [],
         }),
       });
 
@@ -393,6 +460,8 @@ export default function AddSecDashboard() {
                 points: edit.points,
                 comments: edit.comments,
                 feedback: edit.feedback,
+                positiveRemarks: edit.positiveRemarks || [],
+                negativeRemarks: edit.negativeRemarks || [],
                 evaluatedBy: result.data?.evaluatedBy,
                 evaluatedAt: result.data?.evaluatedAt,
               }
@@ -422,6 +491,123 @@ export default function AddSecDashboard() {
     }
   };
 
+  // Live remarks handlers with automatic score calculation (+1 / -1)
+  const handleAddPositiveRemark = (appId) => {
+    if (!newPositiveInput.trim() || !appId) return;
+    const text = newPositiveInput.trim();
+    const currentEdit = inlineEdits[appId] || {};
+    const currentApp = applications.find((a) => a._id === appId);
+    const currentPos = currentEdit.positiveRemarks !== undefined
+      ? currentEdit.positiveRemarks
+      : (currentApp?.positiveRemarks || []);
+    const currentNeg = currentEdit.negativeRemarks !== undefined
+      ? currentEdit.negativeRemarks
+      : (currentApp?.negativeRemarks || []);
+
+    const nextPos = [...currentPos, text];
+    const nextScore = nextPos.length - currentNeg.length;
+    const scoreStr = nextScore > 0 ? `+${nextScore}` : `${nextScore}`;
+
+    setInlineEdits((prev) => ({
+      ...prev,
+      [appId]: {
+        ...(prev[appId] || {}),
+        positiveRemarks: nextPos,
+        negativeRemarks: currentNeg,
+        points: scoreStr,
+        isDirty: true,
+        savedRecently: false,
+      },
+    }));
+    setNewPositiveInput("");
+  };
+
+  const handleRemovePositiveRemark = (appId, index) => {
+    if (!appId) return;
+    const currentEdit = inlineEdits[appId] || {};
+    const currentApp = applications.find((a) => a._id === appId);
+    const currentPos = currentEdit.positiveRemarks !== undefined
+      ? currentEdit.positiveRemarks
+      : (currentApp?.positiveRemarks || []);
+    const currentNeg = currentEdit.negativeRemarks !== undefined
+      ? currentEdit.negativeRemarks
+      : (currentApp?.negativeRemarks || []);
+
+    const nextPos = currentPos.filter((_, i) => i !== index);
+    const nextScore = nextPos.length - currentNeg.length;
+    const scoreStr = nextScore > 0 ? `+${nextScore}` : `${nextScore}`;
+
+    setInlineEdits((prev) => ({
+      ...prev,
+      [appId]: {
+        ...(prev[appId] || {}),
+        positiveRemarks: nextPos,
+        negativeRemarks: currentNeg,
+        points: scoreStr,
+        isDirty: true,
+        savedRecently: false,
+      },
+    }));
+  };
+
+  const handleAddNegativeRemark = (appId) => {
+    if (!newNegativeInput.trim() || !appId) return;
+    const text = newNegativeInput.trim();
+    const currentEdit = inlineEdits[appId] || {};
+    const currentApp = applications.find((a) => a._id === appId);
+    const currentPos = currentEdit.positiveRemarks !== undefined
+      ? currentEdit.positiveRemarks
+      : (currentApp?.positiveRemarks || []);
+    const currentNeg = currentEdit.negativeRemarks !== undefined
+      ? currentEdit.negativeRemarks
+      : (currentApp?.negativeRemarks || []);
+
+    const nextNeg = [...currentNeg, text];
+    const nextScore = currentPos.length - nextNeg.length;
+    const scoreStr = nextScore > 0 ? `+${nextScore}` : `${nextScore}`;
+
+    setInlineEdits((prev) => ({
+      ...prev,
+      [appId]: {
+        ...(prev[appId] || {}),
+        positiveRemarks: currentPos,
+        negativeRemarks: nextNeg,
+        points: scoreStr,
+        isDirty: true,
+        savedRecently: false,
+      },
+    }));
+    setNewNegativeInput("");
+  };
+
+  const handleRemoveNegativeRemark = (appId, index) => {
+    if (!appId) return;
+    const currentEdit = inlineEdits[appId] || {};
+    const currentApp = applications.find((a) => a._id === appId);
+    const currentPos = currentEdit.positiveRemarks !== undefined
+      ? currentEdit.positiveRemarks
+      : (currentApp?.positiveRemarks || []);
+    const currentNeg = currentEdit.negativeRemarks !== undefined
+      ? currentEdit.negativeRemarks
+      : (currentApp?.negativeRemarks || []);
+
+    const nextNeg = currentNeg.filter((_, i) => i !== index);
+    const nextScore = currentPos.length - nextNeg.length;
+    const scoreStr = nextScore > 0 ? `+${nextScore}` : `${nextScore}`;
+
+    setInlineEdits((prev) => ({
+      ...prev,
+      [appId]: {
+        ...(prev[appId] || {}),
+        positiveRemarks: currentPos,
+        negativeRemarks: nextNeg,
+        points: scoreStr,
+        isDirty: true,
+        savedRecently: false,
+      },
+    }));
+  };
+
   // Helper to build Excel rows
   const buildExcelRows = (form, appList) => {
     const customFields = (form?.fields || []).filter(
@@ -430,6 +616,8 @@ export default function AddSecDashboard() {
 
     return appList.map((app) => {
       const edit = inlineEdits[app._id] || {};
+      const posRemarks = edit.positiveRemarks !== undefined ? edit.positiveRemarks : app.positiveRemarks || [];
+      const negRemarks = edit.negativeRemarks !== undefined ? edit.negativeRemarks : app.negativeRemarks || [];
       const pointsVal = edit.points !== undefined ? edit.points : app.points || "";
       const commentsVal = edit.comments !== undefined ? edit.comments : app.comments || "";
       const feedbackVal = edit.feedback !== undefined ? edit.feedback : app.feedback || "";
@@ -456,16 +644,20 @@ export default function AddSecDashboard() {
             : String(val);
       });
 
+      const scoreInfo = getCandidateScoreInfo(app, edit);
+
       // Evaluation columns
-      row["Feedback Classification"] =
-        feedbackVal === "positive"
-          ? "Positive"
-          : feedbackVal === "waitlist"
-          ? "Waitlist"
-          : feedbackVal === "negative"
-          ? "Negative"
-          : "Unclassified";
-      row["Points / Score"] = pointsVal;
+      row["Score Classification"] =
+        scoreInfo.status === "positive"
+          ? "Positive (>0)"
+          : scoreInfo.status === "zero" && scoreInfo.isEvaluated
+          ? "Zero (0)"
+          : scoreInfo.status === "negative"
+          ? "Negative (<0)"
+          : "Pending";
+      row["Points / Score"] = scoreInfo.isEvaluated ? scoreInfo.scoreFormatted : "";
+      row["Positive Remarks (+1)"] = Array.isArray(posRemarks) ? posRemarks.join("; ") : "";
+      row["Negative Remarks (-1)"] = Array.isArray(negRemarks) ? negRemarks.join("; ") : "";
       row["Comments / Remarks"] = commentsVal;
       row["Evaluated By"] = app.evaluatedBy || "";
       row["Evaluated At"] = app.evaluatedAt ? new Date(app.evaluatedAt).toLocaleString() : "";
@@ -555,16 +747,21 @@ export default function AddSecDashboard() {
               : String(val);
         });
 
-        const feedbackVal = edit.feedback !== undefined ? edit.feedback : app.feedback || "";
-        row["Feedback Classification"] =
-          feedbackVal === "positive"
-            ? "Positive"
-            : feedbackVal === "waitlist"
-            ? "Waitlist"
-            : feedbackVal === "negative"
-            ? "Negative"
-            : "Unclassified";
-        row["Points / Score"] = pointsVal;
+        const posRemarks = edit.positiveRemarks !== undefined ? edit.positiveRemarks : app.positiveRemarks || [];
+        const negRemarks = edit.negativeRemarks !== undefined ? edit.negativeRemarks : app.negativeRemarks || [];
+        const scoreInfo = getCandidateScoreInfo(app, edit);
+
+        row["Score Classification"] =
+          scoreInfo.status === "positive"
+            ? "Positive (>0)"
+            : scoreInfo.status === "zero" && scoreInfo.isEvaluated
+            ? "Zero (0)"
+            : scoreInfo.status === "negative"
+            ? "Negative (<0)"
+            : "Pending";
+        row["Points / Score"] = scoreInfo.isEvaluated ? scoreInfo.scoreFormatted : "";
+        row["Positive Remarks (+1)"] = Array.isArray(posRemarks) ? posRemarks.join("; ") : "";
+        row["Negative Remarks (-1)"] = Array.isArray(negRemarks) ? negRemarks.join("; ") : "";
         row["Comments / Remarks"] = commentsVal;
         row["Evaluated By"] = app.evaluatedBy || "";
         row["Evaluated At"] = app.evaluatedAt ? new Date(app.evaluatedAt).toLocaleString() : "";
@@ -586,23 +783,31 @@ export default function AddSecDashboard() {
   // Modal navigation
   const openModal = (index) => {
     setModalAppIndex(index);
+    setNewPositiveInput("");
+    setNewNegativeInput("");
     setModalOpen(true);
   };
 
   const closeModal = () => {
     setModalOpen(false);
     setModalAppIndex(null);
+    setNewPositiveInput("");
+    setNewNegativeInput("");
   };
 
   const nextModalApp = () => {
     if (modalAppIndex !== null && modalAppIndex < filteredApplications.length - 1) {
       setModalAppIndex(modalAppIndex + 1);
+      setNewPositiveInput("");
+      setNewNegativeInput("");
     }
   };
 
   const prevModalApp = () => {
     if (modalAppIndex !== null && modalAppIndex > 0) {
       setModalAppIndex(modalAppIndex - 1);
+      setNewPositiveInput("");
+      setNewNegativeInput("");
     }
   };
 
@@ -1033,32 +1238,32 @@ export default function AddSecDashboard() {
 
             <div className="glass-panel p-3.5 sm:p-4 border border-emerald-500/30 bg-emerald-950/20 flex flex-col justify-between rounded-lg">
               <span className="font-mono text-xs text-emerald-400 uppercase tracking-wider flex items-center gap-1.5 font-semibold">
-                <FaThumbsUp className="text-emerald-400" /> Positive
+                <FaStar className="text-emerald-400" /> Positive
               </span>
               <div className="font-mono text-2xl sm:text-3xl font-bold mt-1.5 text-emerald-400">
                 {stats.positiveCount}
               </div>
-              <span className="font-mono text-[10px] sm:text-[11px] text-emerald-500/70 mt-1">Green verdict</span>
+              <span className="font-mono text-[10px] sm:text-[11px] text-emerald-500/70 mt-1">Score &gt; 0 pts</span>
             </div>
 
             <div className="glass-panel p-3.5 sm:p-4 border border-amber-400/40 bg-amber-950/25 flex flex-col justify-between rounded-lg shadow-[0_0_15px_rgba(251,191,36,0.1)]">
               <span className="font-mono text-xs text-amber-300 uppercase tracking-wider flex items-center gap-1.5 font-semibold">
-                <FaClock className="text-amber-400" /> Waitlist
+                <FaClock className="text-amber-400" /> Zero
               </span>
               <div className="font-mono text-2xl sm:text-3xl font-bold mt-1.5 text-amber-300">
-                {stats.waitlistCount}
+                {stats.zeroCount}
               </div>
-              <span className="font-mono text-[10px] sm:text-[11px] text-amber-400/70 mt-1">Yellow verdict</span>
+              <span className="font-mono text-[10px] sm:text-[11px] text-amber-400/70 mt-1">Score = 0 pts</span>
             </div>
 
             <div className="glass-panel p-3.5 sm:p-4 border border-rose-500/30 bg-rose-950/20 flex flex-col justify-between rounded-lg">
               <span className="font-mono text-xs text-rose-400 uppercase tracking-wider flex items-center gap-1.5 font-semibold">
-                <FaThumbsDown className="text-rose-400" /> Negative
+                <FaStar className="text-rose-400" /> Negative
               </span>
               <div className="font-mono text-2xl sm:text-3xl font-bold mt-1.5 text-rose-400">
                 {stats.negativeCount}
               </div>
-              <span className="font-mono text-[10px] sm:text-[11px] text-rose-500/70 mt-1">Red verdict</span>
+              <span className="font-mono text-[10px] sm:text-[11px] text-rose-500/70 mt-1">Score &lt; 0 pts</span>
             </div>
 
             <div className="glass-panel p-3.5 sm:p-4 border border-white/10 flex flex-col justify-between rounded-lg">
@@ -1068,7 +1273,7 @@ export default function AddSecDashboard() {
               <div className="font-mono text-2xl sm:text-3xl font-bold mt-1.5 text-blue-400">
                 {stats.evaluated}
               </div>
-              <span className="font-mono text-[10px] sm:text-[11px] text-gray-500 mt-1 truncate">Notes / score given</span>
+              <span className="font-mono text-[10px] sm:text-[11px] text-gray-500 mt-1 truncate">{stats.pending} pending</span>
             </div>
 
             <div className="glass-panel p-3.5 sm:p-4 border border-white/10 flex flex-col justify-between rounded-lg">
@@ -1078,44 +1283,45 @@ export default function AddSecDashboard() {
               <div className="font-mono text-2xl sm:text-3xl font-bold mt-1.5 text-amber-400">
                 {stats.avgScore}
               </div>
-              <span className="font-mono text-[10px] sm:text-[11px] text-gray-500 mt-1 truncate">From numeric scores</span>
+              <span className="font-mono text-[10px] sm:text-[11px] text-gray-500 mt-1 truncate">From scored candidates</span>
             </div>
           </div>
         )}
 
         {/* Filter and Search Bar */}
+        {/* Filter and Search Bar - Unified Single Line */}
         {activeForm && (
-          <div className="glass-panel p-3.5 sm:p-5 border border-white/15 space-y-3.5 sm:space-y-4 rounded-xl">
-            <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-              {/* Search Bar */}
-              <div className="relative flex-1 min-w-[200px]">
-                <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by name, roll no, email, or any response keyword..."
-                  className="w-full pl-9 pr-8 py-2.5 bg-black/60 border border-white/20 rounded text-xs sm:text-sm font-mono text-white placeholder-gray-500 focus:outline-none focus:border-white transition-colors"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
-                  >
-                    <FaTimes className="text-xs" />
-                  </button>
-                )}
-              </div>
+          <div className="glass-panel p-2.5 sm:p-3 border border-white/15 rounded-xl">
+            <div className="flex flex-wrap items-center justify-between gap-2.5">
+              {/* Left Group: Shrunk Search Bar + Compact Filters + Candidate Count */}
+              <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+                {/* Search Bar - Shrunk slightly */}
+                <div className="relative w-44 sm:w-52 md:w-56 shrink-0">
+                  <FaSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search name, roll, email..."
+                    className="w-full pl-8 pr-7 py-1.5 bg-black/60 border border-white/20 rounded text-xs font-mono text-white placeholder-gray-500 focus:outline-none focus:border-white transition-colors"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                    >
+                      <FaTimes className="text-xs" />
+                    </button>
+                  )}
+                </div>
 
-              {/* Responsive Dropdowns Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:flex lg:items-center gap-2 sm:gap-3">
                 {/* Year Filter */}
-                <div className="flex flex-col xs:flex-row xs:items-center gap-1 sm:gap-1.5">
-                  <label className="font-mono text-[11px] sm:text-xs text-gray-400 whitespace-nowrap">Year:</label>
+                <div className="flex items-center gap-1 shrink-0">
+                  <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Year:</label>
                   <select
                     value={selectedYear}
                     onChange={(e) => setSelectedYear(e.target.value)}
-                    className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 sm:py-2 text-xs font-mono text-white focus:outline-none focus:border-white w-full"
+                    className="bg-black/60 border border-white/20 rounded px-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-white"
                   >
                     <option value="all">All Years</option>
                     {(activeForm.years || ["1st Year", "2nd Year", "3rd Year", "4th Year"]).map((yr) => (
@@ -1127,12 +1333,12 @@ export default function AddSecDashboard() {
                 </div>
 
                 {/* Evaluation Status Filter */}
-                <div className="flex flex-col xs:flex-row xs:items-center gap-1 sm:gap-1.5">
-                  <label className="font-mono text-[11px] sm:text-xs text-gray-400 whitespace-nowrap">Status:</label>
+                <div className="flex items-center gap-1 shrink-0">
+                  <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Status:</label>
                   <select
                     value={evaluationFilter}
                     onChange={(e) => setEvaluationFilter(e.target.value)}
-                    className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 sm:py-2 text-xs font-mono text-white focus:outline-none focus:border-white w-full"
+                    className="bg-black/60 border border-white/20 rounded px-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-white"
                   >
                     <option value="all">All Status</option>
                     <option value="evaluated">Evaluated Only</option>
@@ -1140,29 +1346,29 @@ export default function AddSecDashboard() {
                   </select>
                 </div>
 
-                {/* Feedback Filter */}
-                <div className="flex flex-col xs:flex-row xs:items-center gap-1 sm:gap-1.5">
-                  <label className="font-mono text-[11px] sm:text-xs text-gray-400 whitespace-nowrap">Feedback:</label>
+                {/* Score Status Filter */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Score:</label>
                   <select
-                    value={feedbackFilter}
-                    onChange={(e) => setFeedbackFilter(e.target.value)}
-                    className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 sm:py-2 text-xs font-mono text-white focus:outline-none focus:border-white w-full"
+                    value={scoreFilter}
+                    onChange={(e) => setScoreFilter(e.target.value)}
+                    className="bg-black/60 border border-white/20 rounded px-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-white"
                   >
-                    <option value="all">All Feedback</option>
-                    <option value="positive">🟢 Positive (Green)</option>
-                    <option value="waitlist">🟡 Waitlist (Yellow)</option>
-                    <option value="negative">🔴 Negative (Red)</option>
-                    <option value="unclassified">Unclassified</option>
+                    <option value="all">All Scores</option>
+                    <option value="positive">🟢 Positive (&gt; 0)</option>
+                    <option value="zero">🟡 Zero (0)</option>
+                    <option value="negative">🔴 Negative (&lt; 0)</option>
+                    <option value="pending">⚪ Pending</option>
                   </select>
                 </div>
 
-                {/* Sort By */}
-                <div className="flex flex-col xs:flex-row xs:items-center gap-1 sm:gap-1.5">
-                  <label className="font-mono text-[11px] sm:text-xs text-gray-400 whitespace-nowrap">Sort:</label>
+                {/* Sort By Filter */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Sort:</label>
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
-                    className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 sm:py-2 text-xs font-mono text-white focus:outline-none focus:border-white w-full"
+                    className="bg-black/60 border border-white/20 rounded px-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-white"
                   >
                     <option value="newest">Newest First</option>
                     <option value="oldest">Oldest First</option>
@@ -1171,36 +1377,37 @@ export default function AddSecDashboard() {
                     <option value="name_asc">Name: A to Z</option>
                   </select>
                 </div>
-              </div>
-            </div>
 
-            {/* Bottom Row of Filter Bar: Count + Excel Buttons */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2.5 border-t border-white/10 text-xs font-mono">
-              <div className="text-gray-400 text-[11px] sm:text-xs">
-                Showing <strong className="text-white">{filteredApplications.length}</strong> of{" "}
-                <strong className="text-white">{applications.length}</strong> candidates
-                {(searchQuery || selectedYear !== "all" || evaluationFilter !== "all" || feedbackFilter !== "all") && (
-                  <button
-                    onClick={() => {
-                      setSearchQuery("");
-                      setSelectedYear("all");
-                      setEvaluationFilter("all");
-                      setFeedbackFilter("all");
-                      setSortBy("newest");
-                    }}
-                    className="ml-2 text-blue-400 hover:underline"
-                  >
-                    [ Clear Filters ]
-                  </button>
-                )}
+                {/* Showing Count + Quick Clear */}
+                <div className="flex items-center gap-1.5 text-gray-400 text-[11px] font-mono shrink-0 pl-1">
+                  <span>
+                    Showing <strong className="text-white">{filteredApplications.length}</strong> of{" "}
+                    <strong className="text-white">{applications.length}</strong>
+                  </span>
+                  {(searchQuery || selectedYear !== "all" || evaluationFilter !== "all" || scoreFilter !== "all" || sortBy !== "newest") && (
+                    <button
+                      onClick={() => {
+                        setSearchQuery("");
+                        setSelectedYear("all");
+                        setEvaluationFilter("all");
+                        setScoreFilter("all");
+                        setSortBy("newest");
+                      }}
+                      className="text-blue-400 hover:underline cursor-pointer"
+                      title="Clear active filters"
+                    >
+                      [Clear]
+                    </button>
+                  )}
+                </div>
               </div>
 
-              {/* Excel Download Buttons */}
-              <div className="flex flex-col xs:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full sm:w-auto">
+              {/* Right Group: Excel Download Buttons (Always in one line side-by-side) */}
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   onClick={exportFilteredView}
                   disabled={!filteredApplications.length}
-                  className="px-3.5 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 rounded font-mono text-[11px] sm:text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="px-2.5 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 rounded font-mono text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap cursor-pointer"
                   title="Download the current table rows as Excel"
                 >
                   <FaDownload className="text-xs" />
@@ -1210,7 +1417,7 @@ export default function AddSecDashboard() {
                 <button
                   onClick={exportThisForm}
                   disabled={!applications.length}
-                  className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/30 rounded font-mono text-[11px] sm:text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="px-2.5 py-1.5 bg-white/10 hover:bg-white/20 text-white border border-white/30 rounded font-mono text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap cursor-pointer"
                   title="Download all applicants for this form"
                 >
                   <FaDownload className="text-xs" />
@@ -1238,23 +1445,23 @@ export default function AddSecDashboard() {
                 {/* 1. MOBILE RESPONSIVE CARDS VIEW (block on screens < md) */}
                 <div className="block md:hidden space-y-3.5">
                   {filteredApplications.map((app, index) => {
-                    const edit = inlineEdits[app._id] || { points: "", comments: "", feedback: "" };
+                    const edit = inlineEdits[app._id] || {};
+                    const scoreInfo = getCandidateScoreInfo(app, edit);
                     const candidateName = app.responses?.name || app.responses?.fullName || "Applicant";
                     const candidateRoll = app.responses?.rollno || app.responses?.rollNumber || "—";
                     const candidateEmail = app.responses?.email || "—";
                     const candidateYear = app.year || app.responses?.year || "—";
-                    const candidateFeedback = edit.feedback !== undefined ? edit.feedback : app.feedback || "";
 
                     return (
                       <div
                         key={app._id}
                         className={`glass-panel p-4 rounded-xl border transition-all ${
-                          candidateFeedback === "positive"
-                            ? "border-emerald-500/70 bg-emerald-950/20 shadow-[0_0_15px_rgba(16,185,129,0.15)]"
-                            : candidateFeedback === "waitlist"
+                          scoreInfo.status === "positive"
+                            ? "border-emerald-500/70 bg-emerald-950/25 shadow-[0_0_15px_rgba(16,185,129,0.18)]"
+                            : scoreInfo.status === "zero" && scoreInfo.isEvaluated
                             ? "border-amber-400/80 bg-amber-950/25 shadow-[0_0_15px_rgba(251,191,36,0.18)]"
-                            : candidateFeedback === "negative"
-                            ? "border-rose-500/70 bg-rose-950/20 shadow-[0_0_15px_rgba(244,63,94,0.15)]"
+                            : scoreInfo.status === "negative"
+                            ? "border-rose-500/70 bg-rose-950/25 shadow-[0_0_15px_rgba(244,63,94,0.18)]"
                             : "border-white/15 bg-white/[0.02]"
                         }`}
                       >
@@ -1276,173 +1483,75 @@ export default function AddSecDashboard() {
                           </span>
                         </div>
 
-                        {/* Sub-info: Email, Date, View Responses */}
+                        {/* Sub-info: Email & View All */}
                         <div className="py-2.5 flex items-center justify-between text-xs font-mono text-gray-400 border-b border-white/10 gap-2">
                           <div className="truncate text-[11px] text-gray-500 flex-1" title={candidateEmail}>
                             {candidateEmail}
                           </div>
-                          <button
-                            onClick={() => openModal(index)}
-                            className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 whitespace-nowrap font-semibold"
-                          >
-                            <FaEye className="text-[11px]" />
-                            <span>View All ({Object.keys(app.responses || {}).length})</span>
-                          </button>
+                          <span className="text-[10px] text-gray-500">
+                            {new Date(app.createdAt).toLocaleDateString()}
+                          </span>
                         </div>
 
-                        {/* Verdict / Feedback: 3 Touch-Friendly Buttons */}
-                        <div className="pt-3 pb-2 space-y-1.5">
-                          <div className="flex items-center justify-between">
+                        {/* Score & Remarks Preview Bar */}
+                        <div className="py-2.5 flex items-center justify-between border-b border-white/10 gap-2">
+                          <div className="flex items-center gap-2">
                             <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider font-semibold">
-                              Verdict Classification:
+                              Score:
                             </span>
-                            {candidateFeedback && (
+                            {scoreInfo.isEvaluated ? (
                               <span
-                                className={`text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
-                                  candidateFeedback === "positive"
-                                    ? "text-emerald-300 bg-emerald-950/60 border border-emerald-500/40"
-                                    : candidateFeedback === "waitlist"
-                                    ? "text-amber-300 bg-amber-950/60 border border-amber-400/50"
-                                    : "text-rose-300 bg-rose-950/60 border border-rose-500/40"
+                                className={`px-2.5 py-0.5 rounded text-xs font-bold font-mono ${
+                                  scoreInfo.status === "positive"
+                                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/60"
+                                    : scoreInfo.status === "negative"
+                                    ? "bg-rose-500/20 text-rose-300 border border-rose-500/60"
+                                    : "bg-amber-400/20 text-amber-300 border border-amber-400/60"
                                 }`}
                               >
-                                {candidateFeedback}
+                                {scoreInfo.scoreFormatted} <span className="text-[10px] opacity-75">pts</span>
                               </span>
+                            ) : (
+                              <span className="text-gray-500 font-mono text-xs italic">Pending</span>
                             )}
                           </div>
-                          <div className="grid grid-cols-3 gap-1.5">
-                            {/* Positive Button */}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const nextVal = candidateFeedback === "positive" ? "" : "positive";
-                                handleInlineChange(app._id, "feedback", nextVal);
-                                saveEvaluation(app._id, { ...edit, feedback: nextVal });
-                              }}
-                              className={`py-2 px-1 rounded text-xs font-mono font-bold uppercase transition-all flex items-center justify-center gap-1.5 ${
-                                candidateFeedback === "positive"
-                                  ? "bg-emerald-500 text-black border border-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.5)] font-extrabold"
-                                  : "bg-white/5 hover:bg-emerald-950/40 text-gray-300 border border-white/10"
-                              }`}
-                            >
-                              <FaThumbsUp className="text-[11px]" />
-                              <span>Positive</span>
-                            </button>
 
-                            {/* Waitlist (Yellow) Button */}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const nextVal = candidateFeedback === "waitlist" ? "" : "waitlist";
-                                handleInlineChange(app._id, "feedback", nextVal);
-                                saveEvaluation(app._id, { ...edit, feedback: nextVal });
-                              }}
-                              className={`py-2 px-1 rounded text-xs font-mono font-bold uppercase transition-all flex items-center justify-center gap-1.5 ${
-                                candidateFeedback === "waitlist"
-                                  ? "bg-amber-400 text-black border border-amber-200 shadow-[0_0_12px_rgba(251,191,36,0.6)] font-extrabold"
-                                  : "bg-white/5 hover:bg-amber-950/40 text-gray-300 border border-white/10"
-                              }`}
-                            >
-                              <FaClock className="text-[11px]" />
-                              <span>Waitlist</span>
-                            </button>
-
-                            {/* Negative Button */}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const nextVal = candidateFeedback === "negative" ? "" : "negative";
-                                handleInlineChange(app._id, "feedback", nextVal);
-                                saveEvaluation(app._id, { ...edit, feedback: nextVal });
-                              }}
-                              className={`py-2 px-1 rounded text-xs font-mono font-bold uppercase transition-all flex items-center justify-center gap-1.5 ${
-                                candidateFeedback === "negative"
-                                  ? "bg-rose-500 text-white border border-rose-300 shadow-[0_0_12px_rgba(244,63,94,0.5)] font-extrabold"
-                                  : "bg-white/5 hover:bg-rose-950/40 text-gray-300 border border-white/10"
-                              }`}
-                            >
-                              <FaThumbsDown className="text-[11px]" />
-                              <span>Negative</span>
-                            </button>
-                          </div>
+                          {(scoreInfo.posCount > 0 || scoreInfo.negCount > 0) && (
+                            <div className="flex items-center gap-1.5">
+                              {scoreInfo.posCount > 0 && (
+                                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-500/30">
+                                  +{scoreInfo.posCount} Pos
+                                </span>
+                              )}
+                              {scoreInfo.negCount > 0 && (
+                                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-rose-950/60 text-rose-400 border border-rose-500/30">
+                                  -{scoreInfo.negCount} Neg
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
 
-                        {/* Inline Score & Remarks */}
-                        <div className="pt-2 space-y-2">
-                          <div className="flex items-center gap-2">
-                            <label className="text-[11px] font-mono text-gray-400 w-16 whitespace-nowrap">Score:</label>
-                            <input
-                              type="text"
-                              value={edit.points}
-                              onChange={(e) => handleInlineChange(app._id, "points", e.target.value)}
-                              onBlur={() => {
-                                if (edit.isDirty) saveEvaluation(app._id);
-                              }}
-                              placeholder="e.g. 8.5/10"
-                              className={`flex-1 px-2.5 py-1.5 bg-black/70 rounded text-xs text-white focus:outline-none font-mono font-bold transition-colors ${
-                                candidateFeedback === "positive"
-                                  ? "border border-emerald-500/50 focus:border-emerald-400"
-                                  : candidateFeedback === "waitlist"
-                                  ? "border border-amber-400/60 focus:border-amber-300"
-                                  : candidateFeedback === "negative"
-                                  ? "border border-rose-500/50 focus:border-rose-400"
-                                  : "border border-white/20 focus:border-white"
-                              }`}
-                            />
+                        {/* Remarks Snippet */}
+                        {scoreInfo.comments && (
+                          <div className="py-2 text-xs font-mono text-gray-300 line-clamp-2 border-b border-white/5">
+                            {scoreInfo.comments}
                           </div>
-
-                          <div className="space-y-1">
-                            <textarea
-                              rows={2}
-                              value={edit.comments}
-                              onChange={(e) => handleInlineChange(app._id, "comments", e.target.value)}
-                              onBlur={() => {
-                                if (edit.isDirty) saveEvaluation(app._id);
-                              }}
-                              placeholder="Remarks, interview feedback..."
-                              className={`w-full px-2.5 py-1.5 bg-black/70 rounded text-xs text-white focus:outline-none resize-none placeholder-gray-600 font-mono transition-colors ${
-                                candidateFeedback === "positive"
-                                  ? "border border-emerald-500/50 focus:border-emerald-400"
-                                  : candidateFeedback === "waitlist"
-                                  ? "border border-amber-400/60 focus:border-amber-300"
-                                  : candidateFeedback === "negative"
-                                  ? "border border-rose-500/50 focus:border-rose-400"
-                                  : "border border-white/20 focus:border-white"
-                              }`}
-                            />
-                          </div>
-                        </div>
+                        )}
 
                         {/* Card Actions Footer */}
-                        <div className="pt-2.5 flex items-center justify-between text-xs font-mono border-t border-white/10 mt-2">
+                        <div className="pt-2.5 flex items-center justify-between text-xs font-mono mt-1">
                           <div className="text-[10px] text-gray-500">
                             {app.evaluatedBy ? `Evaluated by ${app.evaluatedBy}` : "Not yet evaluated"}
                           </div>
-                          <div>
-                            {edit.isSaving ? (
-                              <span className="text-[11px] text-amber-400 animate-pulse font-mono font-bold">
-                                Saving...
-                              </span>
-                            ) : edit.savedRecently ? (
-                              <span className="text-[11px] text-emerald-400 font-mono flex items-center gap-1 font-bold">
-                                <FaCheckCircle className="text-xs" /> Saved
-                              </span>
-                            ) : edit.isDirty ? (
-                              <button
-                                onClick={() => saveEvaluation(app._id)}
-                                className="px-3 py-1 bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/50 rounded text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1 transition-colors"
-                              >
-                                <FaSave className="text-xs" /> Save
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => openModal(index)}
-                                className="px-3 py-1 bg-white/5 hover:bg-white/15 text-gray-300 hover:text-white border border-white/20 rounded text-xs font-mono uppercase tracking-wider transition-colors"
-                              >
-                                Review
-                              </button>
-                            )}
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => openModal(index)}
+                            className="px-3.5 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded text-xs font-mono uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer border border-white/20 font-bold"
+                          >
+                            <FaEye className="text-xs" />
+                            <span>Review</span>
+                          </button>
                         </div>
                       </div>
                     );
@@ -1456,27 +1565,18 @@ export default function AddSecDashboard() {
                       <thead className="bg-white/5 border-b border-white/15 text-gray-400 uppercase tracking-wider">
                         <tr>
                           <th className="py-3 px-3 w-12 text-center">#</th>
-                          <th className="py-3 px-4 min-w-[180px]">Applicant Info</th>
+                          <th className="py-3 px-4 min-w-[200px]">Applicant Info</th>
                           <th className="py-3 px-3 min-w-[85px]">Year</th>
-                          <th className="py-3 px-4 min-w-[140px]">Responses Preview</th>
-                          <th className="py-3 px-3 min-w-[170px] text-center">
-                            <div className="flex items-center justify-center gap-1.5">
-                              <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" title="Positive"></span>
-                              <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" title="Waitlist"></span>
-                              <span className="w-2 h-2 rounded-full bg-rose-400 inline-block" title="Negative"></span>
-                              <span>Verdict</span>
-                            </div>
-                          </th>
-                          <th className="py-3 px-3 min-w-[110px]">
+                          <th className="py-3 px-3 min-w-[120px]">
                             <div className="flex items-center gap-1">
                               <FaStar className="text-amber-400 text-xs" />
-                              <span>Points</span>
+                              <span>Score</span>
                             </div>
                           </th>
-                          <th className="py-3 px-4 min-w-[240px]">
+                          <th className="py-3 px-4 min-w-[260px]">
                             <div className="flex items-center gap-1">
                               <FaRegCommentDots className="text-blue-400 text-xs" />
-                              <span>Comments / Remarks</span>
+                              <span>Positive / Negative Points</span>
                             </div>
                           </th>
                           <th className="py-3 px-3 min-w-[110px] text-center">Actions</th>
@@ -1484,23 +1584,23 @@ export default function AddSecDashboard() {
                       </thead>
                       <tbody className="divide-y divide-white/10">
                         {filteredApplications.map((app, index) => {
-                          const edit = inlineEdits[app._id] || { points: "", comments: "", feedback: "" };
+                          const edit = inlineEdits[app._id] || {};
+                          const scoreInfo = getCandidateScoreInfo(app, edit);
                           const candidateName = app.responses?.name || app.responses?.fullName || "Applicant";
                           const candidateRoll = app.responses?.rollno || app.responses?.rollNumber || "—";
                           const candidateEmail = app.responses?.email || "—";
                           const candidateYear = app.year || app.responses?.year || "—";
-                          const candidateFeedback = edit.feedback !== undefined ? edit.feedback : app.feedback || "";
 
                           return (
                             <tr
                               key={app._id}
                               className={`transition-colors group ${
-                                candidateFeedback === "positive"
-                                  ? "border-l-4 border-l-emerald-500 bg-emerald-950/15 hover:bg-emerald-950/25"
-                                  : candidateFeedback === "waitlist"
+                                scoreInfo.status === "positive"
+                                  ? "border-l-4 border-l-emerald-500 bg-emerald-950/20 hover:bg-emerald-950/30"
+                                  : scoreInfo.status === "zero" && scoreInfo.isEvaluated
                                   ? "border-l-4 border-l-amber-400 bg-amber-950/20 hover:bg-amber-950/30"
-                                  : candidateFeedback === "negative"
-                                  ? "border-l-4 border-l-rose-500 bg-rose-950/15 hover:bg-rose-950/25"
+                                  : scoreInfo.status === "negative"
+                                  ? "border-l-4 border-l-rose-500 bg-rose-950/20 hover:bg-rose-950/30"
                                   : "hover:bg-white/[0.03]"
                               }`}
                             >
@@ -1516,6 +1616,9 @@ export default function AddSecDashboard() {
                                 <div className="text-gray-500 text-[10px] truncate max-w-[200px]" title={candidateEmail}>
                                   {candidateEmail}
                                 </div>
+                                <div className="text-gray-500 text-[10px] mt-0.5">
+                                  Submitted: {new Date(app.createdAt).toLocaleDateString()}
+                                </div>
                               </td>
 
                               {/* Year */}
@@ -1525,164 +1628,68 @@ export default function AddSecDashboard() {
                                 </span>
                               </td>
 
-                              {/* Responses Preview */}
-                              <td className="py-3 px-4">
-                                <button
-                                  onClick={() => openModal(index)}
-                                  className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1.5 transition-colors font-medium"
-                                >
-                                  <FaEye className="text-xs" />
-                                  <span>View All ({Object.keys(app.responses || {}).length})</span>
-                                </button>
-                                <div className="text-[10px] text-gray-500 mt-1">
-                                  {new Date(app.createdAt).toLocaleDateString()}
-                                </div>
-                              </td>
-
-                              {/* Feedback Classification Cell: Pos (Green), Waitlist (Yellow), Neg (Red) */}
-                              <td className="py-3 px-3 text-center">
-                                <div className="flex items-center justify-center gap-1">
-                                  {/* Positive / Green */}
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const nextVal = candidateFeedback === "positive" ? "" : "positive";
-                                      handleInlineChange(app._id, "feedback", nextVal);
-                                      saveEvaluation(app._id, { ...edit, feedback: nextVal });
-                                    }}
-                                    className={`px-2 py-1 rounded text-[10px] font-mono font-bold uppercase transition-all flex items-center gap-1 ${
-                                      candidateFeedback === "positive"
-                                        ? "bg-emerald-500 text-black border border-emerald-300 shadow-[0_0_10px_rgba(16,185,129,0.5)] scale-105"
-                                        : "bg-white/5 hover:bg-emerald-950/40 text-gray-400 hover:text-emerald-300 border border-white/10"
-                                    }`}
-                                    title="Classify as Positive Feedback (Green)"
-                                  >
-                                    <FaThumbsUp className="text-[10px]" />
-                                    <span>{candidateFeedback === "positive" ? "Pos" : "+"}</span>
-                                  </button>
-
-                                  {/* Waitlist / Yellow */}
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const nextVal = candidateFeedback === "waitlist" ? "" : "waitlist";
-                                      handleInlineChange(app._id, "feedback", nextVal);
-                                      saveEvaluation(app._id, { ...edit, feedback: nextVal });
-                                    }}
-                                    className={`px-2 py-1 rounded text-[10px] font-mono font-bold uppercase transition-all flex items-center gap-1 ${
-                                      candidateFeedback === "waitlist"
-                                        ? "bg-amber-400 text-black border border-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.6)] scale-105"
-                                        : "bg-white/5 hover:bg-amber-950/40 text-gray-400 hover:text-amber-300 border border-white/10"
-                                    }`}
-                                    title="Classify as Waitlist (Yellow)"
-                                  >
-                                    <FaClock className="text-[10px]" />
-                                    <span>{candidateFeedback === "waitlist" ? "Wait" : "~"}</span>
-                                  </button>
-
-                                  {/* Negative / Red */}
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const nextVal = candidateFeedback === "negative" ? "" : "negative";
-                                      handleInlineChange(app._id, "feedback", nextVal);
-                                      saveEvaluation(app._id, { ...edit, feedback: nextVal });
-                                    }}
-                                    className={`px-2 py-1 rounded text-[10px] font-mono font-bold uppercase transition-all flex items-center gap-1 ${
-                                      candidateFeedback === "negative"
-                                        ? "bg-rose-500 text-white border border-rose-300 shadow-[0_0_10px_rgba(244,63,94,0.5)] scale-105"
-                                        : "bg-white/5 hover:bg-rose-950/40 text-gray-400 hover:text-rose-300 border border-white/10"
-                                    }`}
-                                    title="Classify as Negative Feedback (Red)"
-                                  >
-                                    <FaThumbsDown className="text-[10px]" />
-                                    <span>{candidateFeedback === "negative" ? "Neg" : "-"}</span>
-                                  </button>
-                                </div>
-                              </td>
-
-                              {/* Editable Points / Score */}
+                              {/* Read-only Score Badge */}
                               <td className="py-3 px-3">
-                                <div className="flex items-center gap-1">
-                                  <input
-                                    type="text"
-                                    value={edit.points}
-                                    onChange={(e) => handleInlineChange(app._id, "points", e.target.value)}
-                                    onBlur={() => {
-                                      if (edit.isDirty) saveEvaluation(app._id);
-                                    }}
-                                    placeholder="e.g. 9/10"
-                                    className={`w-20 px-2 py-1.5 bg-black/70 rounded text-center text-xs text-white focus:outline-none transition-colors font-bold ${
-                                      candidateFeedback === "positive"
-                                        ? "border border-emerald-500/50 focus:border-emerald-400"
-                                        : candidateFeedback === "waitlist"
-                                        ? "border border-amber-400/60 focus:border-amber-300"
-                                        : candidateFeedback === "negative"
-                                        ? "border border-rose-500/50 focus:border-rose-400"
-                                        : "border border-white/20 focus:border-white"
+                                {scoreInfo.isEvaluated ? (
+                                  <span
+                                    className={`inline-flex items-center px-2.5 py-1 rounded text-xs font-bold font-mono ${
+                                      scoreInfo.status === "positive"
+                                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/60 shadow-[0_0_8px_rgba(16,185,129,0.25)]"
+                                        : scoreInfo.status === "negative"
+                                        ? "bg-rose-500/20 text-rose-300 border border-rose-500/60 shadow-[0_0_8px_rgba(244,63,94,0.25)]"
+                                        : "bg-amber-400/20 text-amber-300 border border-amber-400/60 shadow-[0_0_8px_rgba(251,191,36,0.25)]"
                                     }`}
-                                  />
-                                </div>
-                              </td>
-
-                              {/* Editable Comments / Remarks */}
-                              <td className="py-3 px-4">
-                                <div className="flex items-center gap-2">
-                                  <textarea
-                                    rows={1}
-                                    value={edit.comments}
-                                    onChange={(e) => handleInlineChange(app._id, "comments", e.target.value)}
-                                    onBlur={() => {
-                                      if (edit.isDirty) saveEvaluation(app._id);
-                                    }}
-                                    placeholder="Add notes, interview review, impressions..."
-                                    className={`w-full px-2.5 py-1.5 bg-black/70 rounded text-xs text-white focus:outline-none transition-colors resize-none placeholder-gray-600 ${
-                                      candidateFeedback === "positive"
-                                        ? "border border-emerald-500/50 focus:border-emerald-400"
-                                        : candidateFeedback === "waitlist"
-                                        ? "border border-amber-400/60 focus:border-amber-300"
-                                        : candidateFeedback === "negative"
-                                        ? "border border-rose-500/50 focus:border-rose-400"
-                                        : "border border-white/20 focus:border-white"
-                                    }`}
-                                  />
-                                </div>
-                                {app.evaluatedBy && (
-                                  <div className="text-[10px] text-gray-500 mt-0.5">
-                                    By {app.evaluatedBy} • {app.evaluatedAt ? new Date(app.evaluatedAt).toLocaleDateString() : ""}
-                                  </div>
+                                  >
+                                    <span>{scoreInfo.scoreFormatted}</span>
+                                    <span className="text-[10px] opacity-75 ml-1">pts</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-500 font-mono text-xs">—</span>
                                 )}
                               </td>
 
-                              {/* Save & Review Actions */}
-                              <td className="py-3 px-3 text-center">
-                                <div className="flex items-center justify-center gap-1.5">
-                                  {edit.isSaving ? (
-                                    <span className="text-[11px] text-amber-400 animate-pulse font-mono font-bold">
-                                      Saving...
-                                    </span>
-                                  ) : edit.savedRecently ? (
-                                    <span className="text-[11px] text-emerald-400 font-mono flex items-center gap-1 font-bold">
-                                      <FaCheckCircle className="text-xs" /> Saved
-                                    </span>
-                                  ) : edit.isDirty ? (
-                                    <button
-                                      onClick={() => saveEvaluation(app._id)}
-                                      className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/50 rounded text-[11px] font-mono uppercase tracking-wider flex items-center gap-1 transition-colors font-bold"
-                                      title="Save changes to Mongo"
-                                    >
-                                      <FaSave className="text-xs" /> Save
-                                    </button>
-                                  ) : (
-                                    <button
-                                      onClick={() => openModal(index)}
-                                      className="px-2.5 py-1 bg-white/5 hover:bg-white/15 text-gray-300 hover:text-white border border-white/20 rounded text-[11px] font-mono uppercase tracking-wider transition-colors"
-                                      title="Open candidate detailed review modal"
-                                    >
-                                      Review
-                                    </button>
+                              {/* Read-only Remarks & Comments Preview (NO TEXTAREA) */}
+                              <td className="py-3 px-4 max-w-[280px]">
+                                <div className="space-y-1">
+                                  {(scoreInfo.posCount > 0 || scoreInfo.negCount > 0) && (
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      {scoreInfo.posCount > 0 && (
+                                        <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-950/70 text-emerald-300 border border-emerald-500/40">
+                                          +{scoreInfo.posCount} Pos
+                                        </span>
+                                      )}
+                                      {scoreInfo.negCount > 0 && (
+                                        <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-rose-950/70 text-rose-300 border border-rose-500/40">
+                                          -{scoreInfo.negCount} Neg
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                  {scoreInfo.comments ? (
+                                    <div className="text-xs text-gray-300 line-clamp-2 break-words font-mono" title={scoreInfo.comments}>
+                                      {scoreInfo.comments}
+                                    </div>
+                                  ) : !scoreInfo.posCount && !scoreInfo.negCount ? (
+                                    <span className="text-gray-500 text-xs italic">No remarks yet</span>
+                                  ) : null}
+                                  {app.evaluatedBy && (
+                                    <div className="text-[10px] text-gray-500">
+                                      By {app.evaluatedBy} • {app.evaluatedAt ? new Date(app.evaluatedAt).toLocaleDateString() : ""}
+                                    </div>
                                   )}
                                 </div>
+                              </td>
+
+                              {/* Review Actions */}
+                              <td className="py-3 px-3 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => openModal(index)}
+                                  className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white border border-white/25 rounded text-xs font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                                  title="Open candidate detailed review modal to edit remarks and score"
+                                >
+                                  Review
+                                </button>
                               </td>
                             </tr>
                           );
@@ -1701,8 +1708,8 @@ export default function AddSecDashboard() {
 
       {/* Detailed Candidate Review Modal */}
       {modalOpen && currentModalApp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 md:p-6 bg-black/85 backdrop-blur-sm">
-          <div className="glass-panel w-full max-w-3xl max-h-[94vh] sm:max-h-[90vh] overflow-y-auto border border-white/25 shadow-2xl flex flex-col rounded-xl">
+        <div className="fixed inset-0 z-[100] flex items-start justify-center pt-24 sm:pt-28 pb-8 px-2.5 sm:px-4 md:px-6 bg-black/85 backdrop-blur-sm overflow-y-auto">
+          <div className="glass-panel w-full max-w-3xl max-h-[calc(100vh-7.5rem)] sm:max-h-[calc(100vh-8.5rem)] overflow-y-auto border border-white/25 shadow-2xl flex flex-col rounded-xl my-auto">
             {/* Modal Header */}
             <div className="p-3.5 sm:p-5 border-b border-white/15 flex items-center justify-between sticky top-0 bg-black/95 backdrop-blur z-20 gap-2">
               <div className="min-w-0 flex-1 pr-2">
@@ -1842,156 +1849,293 @@ export default function AddSecDashboard() {
                     ? modalEdit.feedback
                     : currentModalApp.feedback || "";
 
+                const currentPos =
+                  modalEdit.positiveRemarks !== undefined
+                    ? modalEdit.positiveRemarks
+                    : Array.isArray(currentModalApp.positiveRemarks)
+                    ? currentModalApp.positiveRemarks
+                    : [];
+                const currentNeg =
+                  modalEdit.negativeRemarks !== undefined
+                    ? modalEdit.negativeRemarks
+                    : Array.isArray(currentModalApp.negativeRemarks)
+                    ? currentModalApp.negativeRemarks
+                    : [];
+
+                const autoScore = currentPos.length - currentNeg.length;
+                const autoScoreFormatted = autoScore > 0 ? `+${autoScore}` : `${autoScore}`;
+                const displayScore =
+                  modalEdit.points !== undefined && modalEdit.points !== ""
+                    ? modalEdit.points
+                    : currentPos.length > 0 || currentNeg.length > 0
+                    ? autoScoreFormatted
+                    : currentModalApp.points ?? "";
+
                 return (
                   <div
-                    className={`p-3.5 sm:p-5 rounded-xl transition-all duration-300 space-y-3.5 sm:space-y-4 ${
-                      modalFeedback === "positive"
+                    className={`p-3.5 sm:p-5 rounded-xl transition-all duration-300 space-y-4 ${
+                      autoScore > 0
                         ? "bg-emerald-950/25 border-2 border-emerald-500 shadow-[0_0_25px_rgba(16,185,129,0.35)]"
-                        : modalFeedback === "waitlist"
-                        ? "bg-amber-950/25 border-2 border-amber-400 shadow-[0_0_25px_rgba(251,191,36,0.35)]"
-                        : modalFeedback === "negative"
+                        : autoScore < 0
                         ? "bg-rose-950/25 border-2 border-rose-500 shadow-[0_0_25px_rgba(244,63,94,0.35)]"
-                        : "bg-white/5 border border-white/20"
+                        : "bg-amber-950/25 border-2 border-amber-400 shadow-[0_0_25px_rgba(251,191,36,0.35)]"
                     }`}
                   >
+                    {/* Header & Score Status */}
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3
                           className={`font-mono text-xs uppercase tracking-wider font-bold flex items-center gap-1.5 ${
-                            modalFeedback === "positive"
+                            autoScore > 0
                               ? "text-emerald-300"
-                              : modalFeedback === "waitlist"
-                              ? "text-amber-300"
-                              : modalFeedback === "negative"
+                              : autoScore < 0
                               ? "text-rose-300"
                               : "text-amber-300"
                           }`}
                         >
-                          <FaStar /> Evaluation & Notes
+                          <FaStar /> Evaluation &amp; Scoring
                         </h3>
 
-                        {modalFeedback === "positive" && (
-                          <span className="px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500 flex items-center gap-1">
-                            <FaThumbsUp className="text-[9px]" /> Positive Feedback
-                          </span>
-                        )}
-                        {modalFeedback === "waitlist" && (
-                          <span className="px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400 flex items-center gap-1">
-                            <FaClock className="text-[9px]" /> Waitlist
-                          </span>
-                        )}
-                        {modalFeedback === "negative" && (
-                          <span className="px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500 flex items-center gap-1">
-                            <FaThumbsDown className="text-[9px]" /> Negative Feedback
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Feedback Classification Buttons: Positive, Waitlist, Negative */}
-                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                        <span className="font-mono text-[11px] sm:text-xs text-gray-400 uppercase tracking-wider mr-1">
-                          Verdict:
+                        <span
+                          className={`px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider border flex items-center gap-1 ${
+                            autoScore > 0
+                              ? "bg-emerald-500/20 text-emerald-300 border-emerald-500"
+                              : autoScore < 0
+                              ? "bg-rose-500/20 text-rose-300 border-rose-500"
+                              : "bg-amber-400/20 text-amber-300 border-amber-400"
+                          }`}
+                        >
+                          {autoScore > 0 ? "● Positive Score" : autoScore < 0 ? "● Negative Score" : "● Zero Score"}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleInlineChange(
-                              currentModalApp._id,
-                              "feedback",
-                              modalFeedback === "positive" ? "" : "positive"
-                            )
-                          }
-                          className={`px-2.5 sm:px-3 py-1.5 rounded font-mono text-xs uppercase tracking-wider font-bold flex items-center gap-1.5 transition-all ${
-                            modalFeedback === "positive"
-                              ? "bg-emerald-500 text-black border-2 border-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.5)] scale-105"
-                              : "bg-emerald-950/40 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-900/50"
-                          }`}
-                        >
-                          <FaThumbsUp className="text-xs" /> Positive
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleInlineChange(
-                              currentModalApp._id,
-                              "feedback",
-                              modalFeedback === "waitlist" ? "" : "waitlist"
-                            )
-                          }
-                          className={`px-2.5 sm:px-3 py-1.5 rounded font-mono text-xs uppercase tracking-wider font-bold flex items-center gap-1.5 transition-all ${
-                            modalFeedback === "waitlist"
-                              ? "bg-amber-400 text-black border-2 border-amber-200 shadow-[0_0_15px_rgba(251,191,36,0.6)] scale-105"
-                              : "bg-amber-950/40 text-amber-300 border border-amber-500/40 hover:bg-amber-900/50"
-                          }`}
-                        >
-                          <FaClock className="text-xs" /> Waitlist
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleInlineChange(
-                              currentModalApp._id,
-                              "feedback",
-                              modalFeedback === "negative" ? "" : "negative"
-                            )
-                          }
-                          className={`px-2.5 sm:px-3 py-1.5 rounded font-mono text-xs uppercase tracking-wider font-bold flex items-center gap-1.5 transition-all ${
-                            modalFeedback === "negative"
-                              ? "bg-rose-500 text-white border-2 border-rose-300 shadow-[0_0_15px_rgba(244,63,94,0.5)] scale-105"
-                              : "bg-rose-950/40 text-rose-300 border border-rose-500/40 hover:bg-rose-900/50"
-                          }`}
-                        >
-                          <FaThumbsDown className="text-xs" /> Negative
-                        </button>
                       </div>
+
+                      <span className="font-mono text-[11px] text-gray-400">
+                        Score auto-updates with positive (+1) &amp; negative (-1) remarks
+                      </span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-xs font-mono text-gray-300 mb-1 uppercase tracking-wider">
-                          Points / Score
+                    {/* Live Scorecard Bar */}
+                    <div className="glass-panel p-3.5 rounded-lg border border-white/15 bg-black/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono text-xs text-gray-400 uppercase tracking-wider font-semibold">
+                            Live Score:
+                          </span>
+                          <div
+                            className={`px-3 py-1 rounded font-mono text-base font-extrabold tracking-wider border flex items-center gap-1.5 ${
+                              autoScore > 0
+                                ? "bg-emerald-500/20 text-emerald-300 border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.3)]"
+                                : autoScore < 0
+                                ? "bg-rose-500/20 text-rose-300 border-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.3)]"
+                                : "bg-amber-400/20 text-amber-300 border-amber-400"
+                            }`}
+                          >
+                            <span>{autoScoreFormatted}</span>
+                            <span className="text-[10px] uppercase font-normal opacity-75">pts</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 text-xs font-mono">
+                          <span className="px-2 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-500/40">
+                            +{currentPos.length} pos ({currentPos.length * 1} pts)
+                          </span>
+                          <span className="text-gray-500">-</span>
+                          <span className="px-2 py-0.5 rounded bg-rose-950/60 text-rose-400 border border-rose-500/40">
+                            -{currentNeg.length} neg (-{currentNeg.length * 1} pts)
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Override / Manual Score Field */}
+                      <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <label className="text-[11px] font-mono text-gray-400 whitespace-nowrap uppercase">
+                          Score Field:
                         </label>
                         <input
                           type="text"
-                          value={modalEdit.points ?? currentModalApp.points ?? ""}
+                          value={displayScore}
                           onChange={(e) => handleInlineChange(currentModalApp._id, "points", e.target.value)}
-                          placeholder="e.g. 8.5 / 10"
-                          className={`w-full px-3 py-2 bg-black/70 rounded text-sm font-mono text-white focus:outline-none transition-colors ${
-                            modalFeedback === "positive"
-                              ? "border border-emerald-500/50 focus:border-emerald-400"
-                              : modalFeedback === "waitlist"
-                              ? "border border-amber-400/60 focus:border-amber-300"
-                              : modalFeedback === "negative"
-                              ? "border border-rose-500/50 focus:border-rose-400"
-                              : "border border-white/20 focus:border-amber-400"
-                          }`}
-                        />
-                      </div>
-
-                      <div className="sm:col-span-2">
-                        <label className="block text-xs font-mono text-gray-300 mb-1 uppercase tracking-wider">
-                          Comments / Interview Remarks
-                        </label>
-                        <textarea
-                          rows={3}
-                          value={modalEdit.comments ?? currentModalApp.comments ?? ""}
-                          onChange={(e) => handleInlineChange(currentModalApp._id, "comments", e.target.value)}
-                          placeholder="Interview feedback, task performance, reasoning for score..."
-                          className={`w-full px-3 py-2 bg-black/70 rounded text-xs font-mono text-white focus:outline-none transition-colors ${
-                            modalFeedback === "positive"
-                              ? "border border-emerald-500/50 focus:border-emerald-400"
-                              : modalFeedback === "waitlist"
-                              ? "border border-amber-400/60 focus:border-amber-300"
-                              : modalFeedback === "negative"
-                              ? "border border-rose-500/50 focus:border-rose-400"
-                              : "border border-white/20 focus:border-blue-400"
-                          }`}
+                          placeholder="e.g. +2"
+                          className="w-24 px-2.5 py-1 bg-black/80 rounded text-sm font-mono font-bold text-center text-white border border-white/20 focus:outline-none focus:border-amber-400"
+                          title="Auto-calculated from remarks. You may also edit manually if needed."
                         />
                       </div>
                     </div>
 
+                    {/* Side-by-Side Remarks Containers: Positive (+1) and Negative (-1) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                      {/* POSITIVE REMARKS COLUMN */}
+                      <div className="rounded-xl border border-emerald-500/35 bg-emerald-950/15 p-3.5 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between pb-2 border-b border-emerald-500/20 mb-3">
+                            <span className="font-mono text-xs font-bold uppercase tracking-wider text-emerald-300 flex items-center gap-1.5">
+                              <FaThumbsUp className="text-[11px]" /> Positive Remarks
+                            </span>
+                            <span className="px-2 py-0.5 rounded font-mono text-[10px] font-extrabold bg-emerald-500 text-black">
+                              +1 pt each
+                            </span>
+                          </div>
+
+                          {/* Positive Input Bar */}
+                          <div className="flex gap-1.5 mb-3">
+                            <input
+                              type="text"
+                              value={newPositiveInput}
+                              onChange={(e) => setNewPositiveInput(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  handleAddPositiveRemark(currentModalApp._id);
+                                }
+                              }}
+                              placeholder="Add positive point & press Enter..."
+                              className="flex-1 px-3 py-1.5 bg-black/75 rounded text-xs font-mono text-white placeholder-emerald-400/40 border border-emerald-500/40 focus:outline-none focus:border-emerald-300"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleAddPositiveRemark(currentModalApp._id)}
+                              className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black font-bold font-mono text-xs rounded transition-all flex items-center gap-1 cursor-pointer flex-shrink-0"
+                            >
+                              <FaPlus className="text-[10px]" />
+                              <span>+1</span>
+                            </button>
+                          </div>
+
+                          {/* List of Positive Remarks */}
+                          <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
+                            {currentPos.length === 0 ? (
+                              <div className="p-3 rounded border border-dashed border-emerald-500/20 text-center font-mono text-[11px] text-emerald-400/60">
+                                No positive remarks yet. Type above to add (+1 pt each).
+                              </div>
+                            ) : (
+                              currentPos.map((remark, idx) => (
+                                <div
+                                  key={idx}
+                                  className="p-2 rounded bg-black/60 border border-emerald-500/30 flex items-start justify-between gap-2 group transition-colors hover:border-emerald-400"
+                                >
+                                  <div className="flex items-start gap-2">
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 flex-shrink-0">
+                                      +1
+                                    </span>
+                                    <span className="text-xs font-mono text-emerald-100 break-words">
+                                      {remark}
+                                    </span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemovePositiveRemark(currentModalApp._id, idx)}
+                                    className="text-gray-500 hover:text-rose-400 p-1 transition-colors flex-shrink-0 cursor-pointer"
+                                    title="Remove remark (-1 pt)"
+                                  >
+                                    <FaTrash className="text-[10px]" />
+                                  </button>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="pt-2 text-right">
+                          <span className="font-mono text-[10px] text-emerald-400/70">
+                            Total positive: +{currentPos.length} pts
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* NEGATIVE REMARKS COLUMN */}
+                      <div className="rounded-xl border border-rose-500/35 bg-rose-950/15 p-3.5 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between pb-2 border-b border-rose-500/20 mb-3">
+                            <span className="font-mono text-xs font-bold uppercase tracking-wider text-rose-300 flex items-center gap-1.5">
+                              <FaThumbsDown className="text-[11px]" /> Negative Remarks
+                            </span>
+                            <span className="px-2 py-0.5 rounded font-mono text-[10px] font-extrabold bg-rose-500 text-white">
+                              -1 pt each
+                            </span>
+                          </div>
+
+                          {/* Negative Input Bar */}
+                          <div className="flex gap-1.5 mb-3">
+                            <input
+                              type="text"
+                              value={newNegativeInput}
+                              onChange={(e) => setNewNegativeInput(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  handleAddNegativeRemark(currentModalApp._id);
+                                }
+                              }}
+                              placeholder="Add negative point & press Enter..."
+                              className="flex-1 px-3 py-1.5 bg-black/75 rounded text-xs font-mono text-white placeholder-rose-400/40 border border-rose-500/40 focus:outline-none focus:border-rose-300"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleAddNegativeRemark(currentModalApp._id)}
+                              className="px-3 py-1.5 bg-rose-500 hover:bg-rose-400 text-white font-bold font-mono text-xs rounded transition-all flex items-center gap-1 cursor-pointer flex-shrink-0"
+                            >
+                              <FaPlus className="text-[10px]" />
+                              <span>-1</span>
+                            </button>
+                          </div>
+
+                          {/* List of Negative Remarks */}
+                          <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
+                            {currentNeg.length === 0 ? (
+                              <div className="p-3 rounded border border-dashed border-rose-500/20 text-center font-mono text-[11px] text-rose-400/60">
+                                No negative remarks yet. Type above to add (-1 pt each).
+                              </div>
+                            ) : (
+                              currentNeg.map((remark, idx) => (
+                                <div
+                                  key={idx}
+                                  className="p-2 rounded bg-black/60 border border-rose-500/30 flex items-start justify-between gap-2 group transition-colors hover:border-rose-400"
+                                >
+                                  <div className="flex items-start gap-2">
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/50 flex-shrink-0">
+                                      -1
+                                    </span>
+                                    <span className="text-xs font-mono text-rose-100 break-words">
+                                      {remark}
+                                    </span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveNegativeRemark(currentModalApp._id, idx)}
+                                    className="text-gray-500 hover:text-rose-400 p-1 transition-colors flex-shrink-0 cursor-pointer"
+                                    title="Remove deduction (+1 pt back)"
+                                  >
+                                    <FaTrash className="text-[10px]" />
+                                  </button>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="pt-2 text-right">
+                          <span className="font-mono text-[10px] text-rose-400/70">
+                            Total deduction: -{currentNeg.length} pts
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Optional Overall Comments / Notes */}
+                    <div>
+                      <label className="block text-xs font-mono text-gray-300 mb-1 uppercase tracking-wider">
+                        Additional Overall Notes / Summary (Optional)
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={modalEdit.comments ?? currentModalApp.comments ?? ""}
+                        onChange={(e) => handleInlineChange(currentModalApp._id, "comments", e.target.value)}
+                        placeholder="General impressions, round feedback, interview notes..."
+                        className="w-full px-3 py-2 bg-black/70 rounded text-xs font-mono text-white focus:outline-none transition-colors border border-white/20 focus:border-blue-400 resize-none"
+                      />
+                    </div>
+
+                    {/* Save Button & Last Evaluated Metadata */}
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2">
                       <div>
                         {currentModalApp.evaluatedBy && (
@@ -2003,16 +2147,20 @@ export default function AddSecDashboard() {
                       </div>
 
                       <button
-                        onClick={() => saveEvaluation(currentModalApp._id)}
+                        type="button"
+                        onClick={() =>
+                          saveEvaluation(currentModalApp._id, {
+                            feedback: autoScore > 0 ? "positive" : autoScore < 0 ? "negative" : "waitlist",
+                            points: displayScore,
+                          })
+                        }
                         disabled={modalEdit.isSaving}
-                        className={`w-full sm:w-auto px-5 py-2.5 font-bold rounded font-mono text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-lg ${
-                          modalFeedback === "positive"
-                            ? "bg-emerald-500 text-black hover:bg-emerald-400"
-                            : modalFeedback === "waitlist"
-                            ? "bg-amber-400 text-black hover:bg-amber-300 shadow-[0_0_15px_rgba(251,191,36,0.4)]"
-                            : modalFeedback === "negative"
-                            ? "bg-rose-500 text-white hover:bg-rose-400"
-                            : "bg-white text-black hover:bg-gray-200"
+                        className={`w-full sm:w-auto px-6 py-2.5 font-bold rounded font-mono text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-lg cursor-pointer ${
+                          autoScore > 0
+                            ? "bg-emerald-500 text-black hover:bg-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.4)]"
+                            : autoScore < 0
+                            ? "bg-rose-500 text-white hover:bg-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.4)]"
+                            : "bg-amber-400 text-black hover:bg-amber-300 shadow-[0_0_15px_rgba(251,191,36,0.4)]"
                         }`}
                       >
                         <FaSave className="text-xs" />

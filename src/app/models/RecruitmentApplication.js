@@ -13,6 +13,8 @@ const RecruitmentApplicationSchema = new mongoose.Schema(
     responses: { type: Object, default: {} },
     points: { type: String, default: "", trim: true },
     comments: { type: String, default: "", trim: true },
+    positiveRemarks: { type: [String], default: [] },
+    negativeRemarks: { type: [String], default: [] },
     feedback: { type: String, default: "", trim: true }, // "positive" | "waitlist" | "negative" | ""
     evaluatedBy: { type: String, default: "" },
     evaluatedAt: { type: Date, default: null },

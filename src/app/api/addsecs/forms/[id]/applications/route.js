@@ -93,7 +93,14 @@ export async function PUT(req, { params }) {
     const { id } = await params;
     const userDepartment = session.user?.department;
     const body = await req.json();
-    const { applicationId, points, comments, feedback } = body || {};
+    const {
+      applicationId,
+      points,
+      comments,
+      feedback,
+      positiveRemarks,
+      negativeRemarks,
+    } = body || {};
 
     if (!applicationId) {
       return NextResponse.json(
@@ -119,7 +126,7 @@ export async function PUT(req, { params }) {
       );
     }
 
-    // Update points, comments, feedback classification, and evaluation metadata
+    // Update points, comments, feedback classification, remarks, and evaluation metadata
     if (points !== undefined) {
       application.points = String(points).trim();
     }
@@ -129,6 +136,13 @@ export async function PUT(req, { params }) {
     if (feedback !== undefined) {
       application.feedback = String(feedback).trim().toLowerCase();
     }
+    if (positiveRemarks !== undefined) {
+      application.positiveRemarks = Array.isArray(positiveRemarks) ? positiveRemarks : [];
+    }
+    if (negativeRemarks !== undefined) {
+      application.negativeRemarks = Array.isArray(negativeRemarks) ? negativeRemarks : [];
+    }
+
     application.evaluatedBy = session.user?.username || "addsec";
     application.evaluatedAt = new Date();
 
@@ -142,6 +156,8 @@ export async function PUT(req, { params }) {
         points: application.points,
         comments: application.comments,
         feedback: application.feedback,
+        positiveRemarks: application.positiveRemarks,
+        negativeRemarks: application.negativeRemarks,
         evaluatedBy: application.evaluatedBy,
         evaluatedAt: application.evaluatedAt,
       },
