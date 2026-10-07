@@ -15,10 +15,11 @@ async function validateAdmin() {
         { success: false, message: "Unauthorized" },
         { status: 401 }
       ),
+      session: null,
     };
   }
 
-  return { response: null };
+  return { response: null, session };
 }
 
 export const dynamic = "force-dynamic";
@@ -83,7 +84,7 @@ export async function PUT(req, { params }) {
 
     const { id } = await params;
     const body = await req.json();
-    const { applicationId, department, year, responses } = body || {};
+    const { applicationId, department, year, responses, points, comments, feedback } = body || {};
 
     if (!applicationId) {
       return NextResponse.json(
@@ -106,23 +107,40 @@ export async function PUT(req, { params }) {
       );
     }
 
-    const updatedResponses = {
-      ...(application.responses || {}),
-      ...(responses && typeof responses === "object" ? responses : {}),
-    };
-
-    if (year) {
-      updatedResponses.year = year;
+    if (responses && typeof responses === "object") {
+      const updatedResponses = {
+        ...(application.responses || {}),
+        ...responses,
+      };
+      if (year) {
+        updatedResponses.year = year;
+      }
+      application.responses = updatedResponses;
+      application.markModified("responses");
     }
 
-    if (department) {
+    if (department !== undefined) {
       application.department = String(department).trim();
     }
-    if (year) {
+    if (year !== undefined) {
       application.year = String(year).trim();
     }
-    application.responses = updatedResponses;
-    application.markModified("responses");
+
+    // Evaluation fields (points, comments, feedback)
+    if (points !== undefined) {
+      application.points = String(points).trim();
+    }
+    if (comments !== undefined) {
+      application.comments = String(comments).trim();
+    }
+    if (feedback !== undefined) {
+      application.feedback = String(feedback).trim().toLowerCase();
+    }
+
+    if (points !== undefined || comments !== undefined || feedback !== undefined) {
+      application.evaluatedBy = authResult.session?.user?.username || "admin";
+      application.evaluatedAt = new Date();
+    }
 
     await application.save();
 
