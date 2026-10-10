@@ -117,6 +117,8 @@ export async function PUT(req, { params }) {
       fields: merged.fields,
       departments: merged.departments,
       years: merged.years,
+      whatsappLink: merged.whatsappLink || "",
+      pocs: Array.isArray(merged.pocs) ? merged.pocs : [],
       updatedAt: new Date(),
     };
 

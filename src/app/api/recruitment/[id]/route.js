@@ -46,6 +46,12 @@ export async function GET(req, { params }) {
           ...form,
           years,
           title,
+          whatsappLink:
+            (form.whatsappLink && form.whatsappLink.trim()) ||
+            process.env.NEXT_PUBLIC_RECRUITMENT_WHATSAPP_LINK ||
+            process.env.RECRUITMENT_WHATSAPP_LINK ||
+            "https://chat.whatsapp.com/FoMYMW3X0DnK4EpoeSO9Em?s=sw&p=a&mlu=4&ilr=4",
+          pocs: Array.isArray(form.pocs) ? form.pocs : [],
           fields: ensureDefaultRecruitmentFields(form.fields || []),
         },
       },

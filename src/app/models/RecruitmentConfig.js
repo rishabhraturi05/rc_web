@@ -26,6 +26,19 @@ const RecruitmentConfigSchema = new mongoose.Schema(
       type: [String],
       default: ["1st Year", "2nd Year", "3rd Year", "4th Year"],
     },
+    whatsappLink: { type: String, trim: true, default: "" },
+    pocs: {
+      type: [
+        {
+          name: { type: String, trim: true, default: "" },
+          phone: { type: String, trim: true, default: "" },
+        },
+      ],
+      default: [
+        { name: "", phone: "" },
+        { name: "", phone: "" },
+      ],
+    },
   },
   {
     timestamps: true,

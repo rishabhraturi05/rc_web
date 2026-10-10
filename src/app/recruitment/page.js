@@ -13,6 +13,8 @@ import {
   FaEye,
   FaSpinner,
   FaDownload,
+  FaPhoneAlt,
+  FaUserTie,
 } from "react-icons/fa";
 
 const defaultFormState = {};
@@ -640,6 +642,30 @@ export default function RecruitmentPage() {
             </div>
           </div>
 
+          {/* POC Contacts Bar on Submission Success */}
+          {Array.isArray(selectedForm?.pocs) && selectedForm.pocs.some((p) => p?.name || p?.phone) && (
+            <div className="p-3 sm:p-3.5 rounded-xl border border-cyan-500/30 bg-[#0c131a] flex flex-col sm:flex-row items-center justify-between gap-2.5 text-center sm:text-left font-mono text-xs">
+              <div className="flex items-center gap-2">
+                <FaUserTie className="text-cyan-400 text-sm shrink-0" />
+                <span className="text-gray-300">Drive Inquiries? Contact Official POCs:</span>
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {selectedForm.pocs.map((poc, idx) => (
+                  (poc?.name || poc?.phone) && (
+                    <div key={idx} className="bg-black/80 px-2.5 py-1 rounded border border-white/10 flex items-center gap-1.5">
+                      <span className="text-white font-bold">{poc.name || `POC ${idx + 1}`}:</span>
+                      {poc.phone && (
+                        <a href={`tel:${poc.phone}`} className="text-cyan-300 hover:text-white font-semibold">
+                          {poc.phone}
+                        </a>
+                      )}
+                    </div>
+                  )
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Back to Drives Link */}
           <div className="text-center pt-1">
             <button
@@ -675,6 +701,134 @@ export default function RecruitmentPage() {
           <p className="text-gray-300 font-mono text-sm md:text-base max-w-2xl mx-auto bg-black/40 backdrop-blur-sm p-3.5 rounded-lg border border-white/10">
             Select a recruitment drive below and submit your application to join the team.
           </p>
+        </div>
+
+        {/* Recruitment Syllabus Section - On top after heading */}
+        <div className="relative z-30 mb-10 glass-panel p-5 sm:p-6 md:p-8 rounded-2xl border border-white/20 bg-black/70 shadow-[0_0_40px_rgba(0,0,0,0.8)]">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-white/15 pb-4 mb-5">
+            <div>
+              <div className="flex items-center gap-2">
+                <FaFilePdf className="text-xl text-rose-400 shrink-0" />
+                <h2
+                  className="font-mono text-lg sm:text-xl font-bold uppercase tracking-wider text-white"
+                  style={{ fontFamily: 'var(--font-orbitron)' }}
+                >
+                  Recruitment Syllabus
+                </h2>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                  Official Guides
+                </span>
+              </div>
+              <p className="font-mono text-xs sm:text-sm text-gray-300 mt-1">
+                Download the official syllabus for your target team and year of study to prepare for the recruitment tasks and interviews:
+              </p>
+            </div>
+            <span className="hidden sm:inline-block font-mono text-[11px] text-cyan-400/90 bg-cyan-950/60 px-3 py-1 rounded-full border border-cyan-500/30 whitespace-nowrap">
+              3 Guides Available
+            </span>
+          </div>
+
+          {/* 3 Download Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+            {/* 1st Year Tech Team Syllabus */}
+            <a
+              href="/recruitment_docs/1st year.pdf"
+              download="1st_Year_Tech_Team_Syllabus.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-4 rounded-xl bg-[#101720] hover:bg-[#15202d] border border-cyan-500/40 hover:border-cyan-300 transition-all duration-300 flex flex-col justify-between group shadow-md hover:shadow-[0_0_20px_rgba(34,211,238,0.25)] hover:-translate-y-0.5 cursor-pointer"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-2.5">
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-500/30">
+                    1st Year
+                  </span>
+                  <span className="text-[10px] font-mono text-gray-400">PDF • Tech Team</span>
+                </div>
+                <h3 className="font-mono text-sm font-bold text-white group-hover:text-cyan-300 transition-colors">
+                  1st Year Tech Team Syllabus
+                </h3>
+                <p className="font-mono text-xs text-gray-400 mt-1 leading-relaxed">
+                  Fundamental robotics concepts, basic programming, hardware basics, and task guidelines.
+                </p>
+              </div>
+              <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between font-mono text-xs font-bold text-cyan-400 group-hover:text-cyan-300">
+                <span className="flex items-center gap-1.5">
+                  <FaDownload className="text-xs group-hover:scale-110 transition-transform" />
+                  <span>Download PDF</span>
+                </span>
+                <span className="text-cyan-300/80 bg-cyan-950/80 text-[10px] px-1.5 py-0.5 rounded border border-cyan-500/30">
+                  PDF
+                </span>
+              </div>
+            </a>
+
+            {/* 2nd Year Tech Team Syllabus */}
+            <a
+              href="/recruitment_docs/2nd years.pdf"
+              download="2nd_Year_Tech_Team_Syllabus.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-4 rounded-xl bg-[#101720] hover:bg-[#15202d] border border-cyan-500/40 hover:border-cyan-300 transition-all duration-300 flex flex-col justify-between group shadow-md hover:shadow-[0_0_20px_rgba(34,211,238,0.25)] hover:-translate-y-0.5 cursor-pointer"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-2.5">
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-500/30">
+                    2nd Year
+                  </span>
+                  <span className="text-[10px] font-mono text-gray-400">PDF • Tech Team</span>
+                </div>
+                <h3 className="font-mono text-sm font-bold text-white group-hover:text-cyan-300 transition-colors">
+                  2nd Year Tech Team Syllabus
+                </h3>
+                <p className="font-mono text-xs text-gray-400 mt-1 leading-relaxed">
+                  Advanced software, ROS, embedded systems, mechanical design, and circuit architecture.
+                </p>
+              </div>
+              <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between font-mono text-xs font-bold text-cyan-400 group-hover:text-cyan-300">
+                <span className="flex items-center gap-1.5">
+                  <FaDownload className="text-xs group-hover:scale-110 transition-transform" />
+                  <span>Download PDF</span>
+                </span>
+                <span className="text-cyan-300/80 bg-cyan-950/80 text-[10px] px-1.5 py-0.5 rounded border border-cyan-500/30">
+                  PDF
+                </span>
+              </div>
+            </a>
+
+            {/* PR Syllabus (1st, 2nd, 3rd) Year */}
+            <a
+              href="/recruitment_docs/PR_syllabus_1st,2nd,3rd year.pdf"
+              download="PR_syllabus_1st,2nd,3rd year.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-4 rounded-xl bg-[#17101f] hover:bg-[#20152c] border border-fuchsia-500/40 hover:border-fuchsia-300 transition-all duration-300 flex flex-col justify-between group shadow-md hover:shadow-[0_0_20px_rgba(217,70,239,0.25)] hover:-translate-y-0.5 cursor-pointer"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-2.5">
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-fuchsia-300 bg-fuchsia-950/80 px-2 py-0.5 rounded border border-fuchsia-500/30">
+                    1st, 2nd & 3rd Year
+                  </span>
+                  <span className="text-[10px] font-mono text-gray-400">PDF • PR Team</span>
+                </div>
+                <h3 className="font-mono text-sm font-bold text-white group-hover:text-fuchsia-300 transition-colors">
+                  PR Syllabus (1st, 2nd, 3rd) Year
+                </h3>
+                <p className="font-mono text-xs text-gray-400 mt-1 leading-relaxed">
+                  Public relations, content, graphic design, sponsorship outreach, and event operations.
+                </p>
+              </div>
+              <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between font-mono text-xs font-bold text-fuchsia-400 group-hover:text-fuchsia-300">
+                <span className="flex items-center gap-1.5">
+                  <FaDownload className="text-xs group-hover:scale-110 transition-transform" />
+                  <span>Download PDF</span>
+                </span>
+                <span className="text-fuchsia-300/80 bg-fuchsia-950/80 text-[10px] px-1.5 py-0.5 rounded border border-fuchsia-500/30">
+                  PDF
+                </span>
+              </div>
+            </a>
+          </div>
         </div>
 
         <div className="relative z-10 grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
@@ -762,6 +916,37 @@ export default function RecruitmentPage() {
                     </p>
                   )}
                 </div>
+
+                {/* Points of Contact (POCs) for selected drive */}
+                {Array.isArray(selectedForm.pocs) && selectedForm.pocs.some((p) => p?.name || p?.phone) && (
+                  <div className="p-3.5 sm:p-4 rounded-xl border border-cyan-500/30 bg-cyan-950/20 font-mono text-xs space-y-2">
+                    <div className="flex items-center gap-2 text-cyan-300 font-bold uppercase tracking-wider text-[11px]">
+                      <FaPhoneAlt className="text-xs shrink-0" />
+                      <span>Have Doubts? Contact Drive POCs:</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                      {selectedForm.pocs.map((poc, idx) => (
+                        (poc?.name || poc?.phone) && (
+                          <div key={idx} className="bg-black/60 p-2.5 rounded-lg border border-white/10 flex items-center justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <span className="text-[10px] text-gray-400 block truncate">Point of Contact {idx + 1}</span>
+                              <span className="text-white font-bold block truncate">{poc.name || "Club Executive"}</span>
+                            </div>
+                            {poc.phone && (
+                              <a
+                                href={`tel:${poc.phone}`}
+                                className="text-cyan-300 hover:text-white px-2.5 py-1 rounded bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-[11px] font-bold flex items-center gap-1.5 shrink-0 transition-colors"
+                              >
+                                <FaPhoneAlt className="text-[10px]" />
+                                <span>{poc.phone}</span>
+                              </a>
+                            )}
+                          </div>
+                        )
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Department & Year of Study in 2 Columns */}
                 <div className="grid gap-4 sm:grid-cols-2">

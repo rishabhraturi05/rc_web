@@ -173,6 +173,19 @@ export function normalizeRecruitmentConfig(payload = {}) {
   const customTitle = String(payload.title || "").trim();
   const title = customTitle || getRecruitmentFormTitle({ departments, years });
 
+  const whatsappLink = String(payload.whatsappLink || "").trim();
+  const rawPocs = Array.isArray(payload.pocs) ? payload.pocs : [];
+  const pocs = [
+    {
+      name: String(rawPocs[0]?.name || payload.poc1Name || "").trim(),
+      phone: String(rawPocs[0]?.phone || payload.poc1Phone || "").trim(),
+    },
+    {
+      name: String(rawPocs[1]?.name || payload.poc2Name || "").trim(),
+      phone: String(rawPocs[1]?.phone || payload.poc2Phone || "").trim(),
+    },
+  ];
+
   return {
     title,
     isOpen: Boolean(payload.isOpen !== undefined ? payload.isOpen : true),
@@ -180,6 +193,8 @@ export function normalizeRecruitmentConfig(payload = {}) {
     fields,
     departments: departments.length ? departments : DEFAULT_DEPARTMENT_OPTIONS,
     years: years.length ? years : DEFAULT_YEAR_OPTIONS,
+    whatsappLink,
+    pocs,
   };
 }
 

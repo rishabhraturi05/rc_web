@@ -102,6 +102,8 @@ export async function POST(req) {
       fields: normalized.fields,
       departments: normalized.departments,
       years: normalized.years,
+      whatsappLink: normalized.whatsappLink || "",
+      pocs: Array.isArray(normalized.pocs) ? normalized.pocs : [],
       createdAt: new Date(),
       updatedAt: new Date(),
     };

@@ -30,6 +30,9 @@ import {
   FaFilePdf,
   FaColumns,
   FaExternalLinkAlt,
+  FaWhatsapp,
+  FaPhoneAlt,
+  FaUserTie,
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import {
@@ -62,6 +65,11 @@ const blankForm = {
   deadline: DEFAULT_DEADLINE,
   departments: [...DEFAULT_DEPARTMENT_OPTIONS],
   years: [...DEFAULT_YEAR_OPTIONS],
+  whatsappLink: "",
+  pocs: [
+    { name: "", phone: "" },
+    { name: "", phone: "" },
+  ],
   fields: [
     { ...blankField(), name: "name", label: "Name", type: "text", required: true },
     { ...blankField(), name: "email", label: "Email", type: "email", required: true },
@@ -992,6 +1000,8 @@ export default function RecruitmentAdminPage() {
     }
 
     setEditingId(form._id);
+    const poc1 = (Array.isArray(form?.pocs) && form.pocs[0]) || { name: "", phone: "" };
+    const poc2 = (Array.isArray(form?.pocs) && form.pocs[1]) || { name: "", phone: "" };
     const formFields = ensureDefaultRecruitmentFields(form.fields || [])
       .filter((field) => !["department", "year"].includes(String(field?.name || "").trim().toLowerCase()))
       .map((field) => ({
@@ -1009,6 +1019,11 @@ export default function RecruitmentAdminPage() {
       deadline: form.deadline ? new Date(form.deadline).toISOString().slice(0, 16) : DEFAULT_DEADLINE,
       departments: Array.isArray(form.departments) && form.departments.length ? form.departments : [...DEFAULT_DEPARTMENT_OPTIONS],
       years: Array.isArray(form.years) && form.years.length ? form.years : [...DEFAULT_YEAR_OPTIONS],
+      whatsappLink: form.whatsappLink || "",
+      pocs: [
+        { name: poc1.name || "", phone: poc1.phone || "" },
+        { name: poc2.name || "", phone: poc2.phone || "" },
+      ],
       fields: formFields,
     });
     setShowEditor(true);
@@ -1103,6 +1118,22 @@ export default function RecruitmentAdminPage() {
         fields: finalFields,
         departments,
         years,
+        whatsappLink: String(editor.whatsappLink || "").trim(),
+        pocs: Array.isArray(editor.pocs)
+          ? [
+              {
+                name: String(editor.pocs[0]?.name || "").trim(),
+                phone: String(editor.pocs[0]?.phone || "").trim(),
+              },
+              {
+                name: String(editor.pocs[1]?.name || "").trim(),
+                phone: String(editor.pocs[1]?.phone || "").trim(),
+              },
+            ]
+          : [
+              { name: "", phone: "" },
+              { name: "", phone: "" },
+            ],
       };
 
       const endpoint = editingId ? `/api/admin/recruitment/${editingId}` : "/api/admin/recruitment";
@@ -1393,6 +1424,151 @@ export default function RecruitmentAdminPage() {
                       <span>{year}</span>
                     </label>
                   ))}
+                </div>
+              </div>
+
+              {/* Official WhatsApp Group Invite Link */}
+              <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/20 p-4 sm:p-5 shadow-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <FaWhatsapp className="text-emerald-400 text-xl shrink-0" />
+                  <label className="font-mono text-sm font-bold text-white uppercase tracking-wider">
+                    Official WhatsApp Group Invite Link
+                  </label>
+                  <span className="text-[10px] font-mono text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-500/40 font-bold">
+                    For Applicants
+                  </span>
+                </div>
+                <input
+                  type="url"
+                  value={editor.whatsappLink || ""}
+                  onChange={(event) => setEditor((prev) => ({ ...prev, whatsappLink: event.target.value }))}
+                  placeholder="e.g. https://chat.whatsapp.com/FoMYMW3X0DnK4EpoeSO9Em..."
+                  className="w-full rounded border border-white/20 bg-black/60 px-3.5 py-2 font-mono text-sm text-white placeholder:text-gray-500 focus:border-emerald-400 focus:outline-none transition-colors"
+                />
+                <p className="font-mono text-xs text-gray-400 mt-1.5 leading-relaxed">
+                  Applicants who submit this recruitment form will receive this link to join the official WhatsApp group for interview slot notifications and drive updates. (Leave blank to use default club group).
+                </p>
+              </div>
+
+              {/* Two Points of Contact (POCs) for this Form */}
+              <div className="rounded-xl border border-cyan-500/40 bg-cyan-950/20 p-4 sm:p-5 space-y-4 shadow-lg">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <FaPhoneAlt className="text-cyan-400 text-base shrink-0" />
+                    <label className="font-mono text-sm font-bold text-white uppercase tracking-wider">
+                      Points of Contact (2 POCs) for this Form
+                    </label>
+                    <span className="text-[10px] font-mono text-cyan-300 bg-cyan-500/20 px-2 py-0.5 rounded border border-cyan-500/40 font-bold">
+                      Contact Persons
+                    </span>
+                  </div>
+                  <p className="font-mono text-xs text-gray-400 leading-relaxed">
+                    Provide names and phone numbers for two club POCs so applicants can contact them directly for queries regarding this recruitment drive.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* POC 1 */}
+                  <div className="rounded-lg border border-white/15 bg-black/60 p-4 space-y-3">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                      <span className="font-mono text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                        <FaUserTie className="text-cyan-400 text-xs" />
+                        Point of Contact 1 (POC 1)
+                      </span>
+                      <span className="text-[10px] font-mono text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-500/30">
+                        Primary POC
+                      </span>
+                    </div>
+                    <div>
+                      <label className="block font-mono text-xs text-gray-400 mb-1">POC 1 Full Name</label>
+                      <input
+                        type="text"
+                        value={editor.pocs?.[0]?.name || ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEditor((prev) => {
+                            const currentPocs = Array.isArray(prev.pocs)
+                              ? [...prev.pocs]
+                              : [{ name: "", phone: "" }, { name: "", phone: "" }];
+                            currentPocs[0] = { ...(currentPocs[0] || {}), name: val };
+                            return { ...prev, pocs: currentPocs };
+                          });
+                        }}
+                        placeholder="e.g. Rishabh Raturi"
+                        className="w-full rounded border border-white/20 bg-black/40 px-3 py-2 font-mono text-sm text-white placeholder:text-gray-500 focus:border-cyan-400 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-mono text-xs text-gray-400 mb-1">POC 1 Contact / Phone Number</label>
+                      <input
+                        type="tel"
+                        value={editor.pocs?.[0]?.phone || ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEditor((prev) => {
+                            const currentPocs = Array.isArray(prev.pocs)
+                              ? [...prev.pocs]
+                              : [{ name: "", phone: "" }, { name: "", phone: "" }];
+                            currentPocs[0] = { ...(currentPocs[0] || {}), phone: val };
+                            return { ...prev, pocs: currentPocs };
+                          });
+                        }}
+                        placeholder="e.g. +91 9876543210"
+                        className="w-full rounded border border-white/20 bg-black/40 px-3 py-2 font-mono text-sm text-white placeholder:text-gray-500 focus:border-cyan-400 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* POC 2 */}
+                  <div className="rounded-lg border border-white/15 bg-black/60 p-4 space-y-3">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                      <span className="font-mono text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                        <FaUserTie className="text-cyan-400 text-xs" />
+                        Point of Contact 2 (POC 2)
+                      </span>
+                      <span className="text-[10px] font-mono text-gray-400 bg-white/5 px-2 py-0.5 rounded border border-white/10">
+                        Secondary POC
+                      </span>
+                    </div>
+                    <div>
+                      <label className="block font-mono text-xs text-gray-400 mb-1">POC 2 Full Name</label>
+                      <input
+                        type="text"
+                        value={editor.pocs?.[1]?.name || ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEditor((prev) => {
+                            const currentPocs = Array.isArray(prev.pocs)
+                              ? [...prev.pocs]
+                              : [{ name: "", phone: "" }, { name: "", phone: "" }];
+                            currentPocs[1] = { ...(currentPocs[1] || {}), name: val };
+                            return { ...prev, pocs: currentPocs };
+                          });
+                        }}
+                        placeholder="e.g. Team Lead / Executive"
+                        className="w-full rounded border border-white/20 bg-black/40 px-3 py-2 font-mono text-sm text-white placeholder:text-gray-500 focus:border-cyan-400 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-mono text-xs text-gray-400 mb-1">POC 2 Contact / Phone Number</label>
+                      <input
+                        type="tel"
+                        value={editor.pocs?.[1]?.phone || ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEditor((prev) => {
+                            const currentPocs = Array.isArray(prev.pocs)
+                              ? [...prev.pocs]
+                              : [{ name: "", phone: "" }, { name: "", phone: "" }];
+                            currentPocs[1] = { ...(currentPocs[1] || {}), phone: val };
+                            return { ...prev, pocs: currentPocs };
+                          });
+                        }}
+                        placeholder="e.g. +91 9123456789"
+                        className="w-full rounded border border-white/20 bg-black/40 px-3 py-2 font-mono text-sm text-white placeholder:text-gray-500 focus:border-cyan-400 focus:outline-none"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1773,6 +1949,39 @@ export default function RecruitmentAdminPage() {
                 </button>
               </div>
             </div>
+
+            {/* Configured POCs & WhatsApp Link Quick Bar */}
+            {(Boolean(selectedForm.whatsappLink) || (Array.isArray(selectedForm.pocs) && selectedForm.pocs.some((p) => p?.name || p?.phone))) && (
+              <div className="mb-6 p-3.5 sm:p-4 rounded-xl border border-white/10 bg-white/[0.03] flex flex-wrap items-center justify-between gap-3 font-mono text-xs">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-gray-400 font-bold uppercase tracking-wider text-[11px]">Drive Config:</span>
+                  {selectedForm.whatsappLink && (
+                    <div className="flex items-center gap-1.5 text-emerald-400 bg-emerald-950/40 px-2.5 py-1 rounded border border-emerald-500/30">
+                      <FaWhatsapp className="text-xs shrink-0" />
+                      <span className="text-gray-300">WhatsApp Group:</span>
+                      <a
+                        href={selectedForm.whatsappLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-emerald-300 underline underline-offset-2 hover:text-emerald-200 max-w-[180px] sm:max-w-xs truncate"
+                        title={selectedForm.whatsappLink}
+                      >
+                        {selectedForm.whatsappLink}
+                      </a>
+                    </div>
+                  )}
+                  {Array.isArray(selectedForm.pocs) && selectedForm.pocs.map((poc, idx) => (
+                    (poc?.name || poc?.phone) && (
+                      <div key={idx} className="flex items-center gap-1.5 text-cyan-300 bg-cyan-950/40 px-2.5 py-1 rounded border border-cyan-500/30">
+                        <FaUserTie className="text-xs shrink-0" />
+                        <span className="text-white font-semibold">{poc.name || `POC ${idx + 1}`}:</span>
+                        <span className="text-gray-200">{poc.phone || "—"}</span>
+                      </div>
+                    )
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Quick Stats Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3.5 mb-6">
