@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
@@ -237,10 +238,30 @@ export default function RecruitmentAdminPage() {
 
   // Review Modal state
   const [modalAppIndex, setModalAppIndex] = useState(null);
+  const [activeModalAppId, setActiveModalAppId] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [showResumeSplit, setShowResumeSplit] = useState(true);
   const [newPositiveInput, setNewPositiveInput] = useState("");
   const [newNegativeInput, setNewNegativeInput] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (modalOpen || editingApplication) {
+      document.body.style.overflow = "hidden";
+      document.body.classList.add("admin-modal-open");
+    } else {
+      document.body.style.overflow = "";
+      document.body.classList.remove("admin-modal-open");
+    }
+    return () => {
+      document.body.style.overflow = "";
+      document.body.classList.remove("admin-modal-open");
+    };
+  }, [modalOpen, editingApplication]);
 
   useEffect(() => {
     if (status === "loading") return;
@@ -272,52 +293,105 @@ export default function RecruitmentAdminPage() {
     );
   }, [selectedForm]);
 
-  const filteredApplications = useMemo(() => {
+  // Candidate identity key helper
+  const getCandidateKey = (app) => {
+    const email = String(app.responses?.email || "").trim().toLowerCase();
+    const roll = String(app.responses?.rollno || app.responses?.rollNumber || "").trim().toLowerCase();
+    if (email) return `email:${email}`;
+    if (roll) return `roll:${roll}`;
+    return `id:${app._id}`;
+  };
+
+  const groupedApplications = useMemo(() => {
     if (!applications.length) return [];
 
-    let list = applications.filter((application) => {
+    // 1. Group raw applications by candidate identity
+    const groupsMap = new Map();
+    for (const app of applications) {
+      const key = getCandidateKey(app);
+      if (!groupsMap.has(key)) {
+        groupsMap.set(key, {
+          key,
+          primaryApp: app,
+          candidateName: app.responses?.name || app.responses?.fullName || "Applicant",
+          candidateRoll: app.responses?.rollno || app.responses?.rollNumber || "—",
+          candidateEmail: app.responses?.email || "—",
+          candidateYear: app.year || app.responses?.year || "—",
+          createdAt: app.createdAt,
+          deptApplications: [],
+        });
+      }
+      const group = groupsMap.get(key);
+      if (new Date(app.createdAt) > new Date(group.createdAt)) {
+        group.createdAt = app.createdAt;
+      }
+      group.deptApplications.push(app);
+    }
+
+    const allGroups = Array.from(groupsMap.values());
+
+    // 2. Filter groups
+    let list = allGroups.filter((group) => {
       // 1. Department filter
-      const matchDept = selectedDepartment === "all" || application.department === selectedDepartment;
-      if (!matchDept) return false;
+      if (selectedDepartment !== "all") {
+        const hasDept = group.deptApplications.some((d) => d.department === selectedDepartment);
+        if (!hasDept) return false;
+      }
 
       // 2. Year filter
-      const appYear = application.year || application.responses?.year || "";
-      const matchYear = selectedYear === "all" || appYear === selectedYear;
-      if (!matchYear) return false;
+      if (selectedYear !== "all") {
+        const matchYear = group.candidateYear === selectedYear;
+        if (!matchYear) return false;
+      }
 
-      const scoreInfo = getCandidateScoreInfo(application, inlineEdits[application._id]);
+      const deptScoreInfos = group.deptApplications.map((d) =>
+        getCandidateScoreInfo(d, inlineEdits[d._id])
+      );
 
       // 3. Evaluation status filter
-      if (evaluationFilter === "evaluated" && !scoreInfo.isEvaluated) return false;
-      if (evaluationFilter === "pending" && scoreInfo.isEvaluated) return false;
+      if (evaluationFilter === "evaluated") {
+        const anyEvaluated = deptScoreInfos.some((info) => info.isEvaluated);
+        if (!anyEvaluated) return false;
+      } else if (evaluationFilter === "pending") {
+        const anyPending = deptScoreInfos.some((info) => !info.isEvaluated);
+        if (!anyPending) return false;
+      }
 
-      // 4. Score status filter (Positive / Zero / Negative / Pending)
-      if (scoreFilter === "positive" && scoreInfo.status !== "positive") return false;
-      if (scoreFilter === "zero" && (scoreInfo.status !== "zero" || !scoreInfo.isEvaluated)) return false;
-      if (scoreFilter === "negative" && scoreInfo.status !== "negative") return false;
-      if (scoreFilter === "pending" && scoreInfo.isEvaluated) return false;
+      // 4. Score filter
+      if (scoreFilter === "positive") {
+        const anyPos = deptScoreInfos.some((info) => info.status === "positive");
+        if (!anyPos) return false;
+      } else if (scoreFilter === "zero") {
+        const anyZero = deptScoreInfos.some((info) => info.status === "zero" && info.isEvaluated);
+        if (!anyZero) return false;
+      } else if (scoreFilter === "negative") {
+        const anyNeg = deptScoreInfos.some((info) => info.status === "negative");
+        if (!anyNeg) return false;
+      } else if (scoreFilter === "pending") {
+        const anyPending = deptScoreInfos.some((info) => !info.isEvaluated);
+        if (!anyPending) return false;
+      }
 
       // 5. Search query
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim();
-        const candidateName = String(
-          application.responses?.name || application.responses?.fullName || ""
-        ).toLowerCase();
-        const candidateRoll = String(
-          application.responses?.rollno || application.responses?.rollNumber || ""
-        ).toLowerCase();
-        const candidateEmail = String(application.responses?.email || "").toLowerCase();
-        const candidateComments = String(scoreInfo.comments).toLowerCase();
+        const cName = group.candidateName.toLowerCase();
+        const cRoll = group.candidateRoll.toLowerCase();
+        const cEmail = group.candidateEmail.toLowerCase();
+        const cDepts = group.deptApplications.map((d) => String(d.department || "").toLowerCase()).join(" ");
+        const cComments = deptScoreInfos.map((i) => String(i.comments).toLowerCase()).join(" ");
 
-        const allAnswers = Object.values(application.responses || {})
+        const allAnswers = group.deptApplications
+          .flatMap((d) => Object.values(d.responses || {}))
           .map((v) => String(v).toLowerCase())
           .join(" ");
 
         const matches =
-          candidateName.includes(query) ||
-          candidateRoll.includes(query) ||
-          candidateEmail.includes(query) ||
-          candidateComments.includes(query) ||
+          cName.includes(query) ||
+          cRoll.includes(query) ||
+          cEmail.includes(query) ||
+          cDepts.includes(query) ||
+          cComments.includes(query) ||
           allAnswers.includes(query);
 
         if (!matches) return false;
@@ -326,29 +400,43 @@ export default function RecruitmentAdminPage() {
       return true;
     });
 
-    // Sorting
+    // 3. Sorting
     list = [...list].sort((a, b) => {
       if (sortBy === "oldest") {
         return new Date(a.createdAt) - new Date(b.createdAt);
       }
       if (sortBy === "points_desc") {
-        const infoA = getCandidateScoreInfo(a, inlineEdits[a._id]);
-        const infoB = getCandidateScoreInfo(b, inlineEdits[b._id]);
-        const pA = infoA.scoreNum !== null ? infoA.scoreNum : -999999;
-        const pB = infoB.scoreNum !== null ? infoB.scoreNum : -999999;
-        return pB - pA;
+        const maxScoreA = Math.max(
+          ...a.deptApplications.map((d) => {
+            const info = getCandidateScoreInfo(d, inlineEdits[d._id]);
+            return info.scoreNum !== null ? info.scoreNum : -999999;
+          })
+        );
+        const maxScoreB = Math.max(
+          ...b.deptApplications.map((d) => {
+            const info = getCandidateScoreInfo(d, inlineEdits[d._id]);
+            return info.scoreNum !== null ? info.scoreNum : -999999;
+          })
+        );
+        return maxScoreB - maxScoreA;
       }
       if (sortBy === "points_asc") {
-        const infoA = getCandidateScoreInfo(a, inlineEdits[a._id]);
-        const infoB = getCandidateScoreInfo(b, inlineEdits[b._id]);
-        const pA = infoA.scoreNum !== null ? infoA.scoreNum : 999999;
-        const pB = infoB.scoreNum !== null ? infoB.scoreNum : 999999;
-        return pA - pB;
+        const minScoreA = Math.min(
+          ...a.deptApplications.map((d) => {
+            const info = getCandidateScoreInfo(d, inlineEdits[d._id]);
+            return info.scoreNum !== null ? info.scoreNum : 999999;
+          })
+        );
+        const minScoreB = Math.min(
+          ...b.deptApplications.map((d) => {
+            const info = getCandidateScoreInfo(d, inlineEdits[d._id]);
+            return info.scoreNum !== null ? info.scoreNum : 999999;
+          })
+        );
+        return minScoreA - minScoreB;
       }
       if (sortBy === "name_asc") {
-        const nameA = String(a.responses?.name || "").toLowerCase();
-        const nameB = String(b.responses?.name || "").toLowerCase();
-        return nameA.localeCompare(nameB);
+        return a.candidateName.localeCompare(b.candidateName);
       }
       return new Date(b.createdAt) - new Date(a.createdAt);
     });
@@ -364,6 +452,10 @@ export default function RecruitmentAdminPage() {
     sortBy,
     inlineEdits,
   ]);
+
+  const filteredApplications = useMemo(() => {
+    return groupedApplications.flatMap((g) => g.deptApplications);
+  }, [groupedApplications]);
 
   // Overall Statistics for this Form (or selected department)
   const stats = useMemo(() => {
@@ -608,8 +700,15 @@ export default function RecruitmentAdminPage() {
   };
 
   // Modal navigation
-  const openModal = (index, forceSplit = true) => {
-    setModalAppIndex(index);
+  const openModal = (groupIndex, targetAppId = null, forceSplit = true) => {
+    setModalAppIndex(groupIndex);
+    const targetGroup = groupedApplications[groupIndex];
+    if (targetGroup) {
+      const chosenApp = targetAppId
+        ? targetGroup.deptApplications.find((d) => d._id === targetAppId)
+        : targetGroup.deptApplications[0];
+      setActiveModalAppId(chosenApp ? chosenApp._id : targetGroup.deptApplications[0]?._id || null);
+    }
     setNewPositiveInput("");
     setNewNegativeInput("");
     if (forceSplit) {
@@ -621,13 +720,17 @@ export default function RecruitmentAdminPage() {
   const closeModal = () => {
     setModalOpen(false);
     setModalAppIndex(null);
+    setActiveModalAppId(null);
     setNewPositiveInput("");
     setNewNegativeInput("");
   };
 
   const nextModalApp = () => {
-    if (modalAppIndex !== null && modalAppIndex < filteredApplications.length - 1) {
-      setModalAppIndex(modalAppIndex + 1);
+    if (modalAppIndex !== null && modalAppIndex < groupedApplications.length - 1) {
+      const nextIdx = modalAppIndex + 1;
+      setModalAppIndex(nextIdx);
+      const nextGroup = groupedApplications[nextIdx];
+      setActiveModalAppId(nextGroup?.deptApplications[0]?._id || null);
       setNewPositiveInput("");
       setNewNegativeInput("");
     }
@@ -635,16 +738,28 @@ export default function RecruitmentAdminPage() {
 
   const prevModalApp = () => {
     if (modalAppIndex !== null && modalAppIndex > 0) {
-      setModalAppIndex(modalAppIndex - 1);
+      const prevIdx = modalAppIndex - 1;
+      setModalAppIndex(prevIdx);
+      const prevGroup = groupedApplications[prevIdx];
+      setActiveModalAppId(prevGroup?.deptApplications[0]?._id || null);
       setNewPositiveInput("");
       setNewNegativeInput("");
     }
   };
 
-  const currentModalApp =
-    modalAppIndex !== null && filteredApplications[modalAppIndex]
-      ? filteredApplications[modalAppIndex]
+  const currentModalGroup =
+    modalAppIndex !== null && groupedApplications[modalAppIndex]
+      ? groupedApplications[modalAppIndex]
       : null;
+
+  const currentModalApp = useMemo(() => {
+    if (!currentModalGroup) return null;
+    if (activeModalAppId) {
+      const found = currentModalGroup.deptApplications.find((d) => d._id === activeModalAppId);
+      if (found) return found;
+    }
+    return currentModalGroup.deptApplications[0] || null;
+  }, [currentModalGroup, activeModalAppId]);
 
   const fetchForms = async () => {
     try {
@@ -796,6 +911,32 @@ export default function RecruitmentAdminPage() {
       setMessage("Error updating applicant response.");
     } finally {
       setSavingApplication(false);
+    }
+  };
+
+  const deleteApplicantGroup = async (group) => {
+    if (!selectedForm || !group) return;
+    const count = group.deptApplications.length;
+    const deptNames = group.deptApplications.map((d) => d.department).join(" & ");
+    const confirmed = window.confirm(
+      `Are you sure you want to delete ${group.candidateName}'s application (${count > 1 ? `both ${deptNames}` : deptNames})? This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      for (const app of group.deptApplications) {
+        await fetch(
+          `/api/admin/recruitment/${selectedForm._id}/applications?applicationId=${app._id}`,
+          { method: "DELETE" }
+        );
+      }
+
+      setMessage("Applicant response deleted successfully.");
+      await fetchApplications(selectedForm._id);
+      await fetchForms();
+    } catch (error) {
+      console.error("Delete applicant group error:", error);
+      setMessage("Error deleting applicant response.");
     }
   };
 
@@ -1611,7 +1752,7 @@ export default function RecruitmentAdminPage() {
                   </span>
                 </div>
                 <p className="font-mono text-sm text-gray-400 mt-1">
-                  Showing {filteredApplications.length} of {applications.length} submitted applications
+                  Showing {groupedApplications.length} candidates ({applications.length} department entries)
                 </p>
               </div>
 
@@ -1832,7 +1973,7 @@ export default function RecruitmentAdminPage() {
               {(searchQuery || selectedDepartment !== "all" || selectedYear !== "all" || evaluationFilter !== "all" || scoreFilter !== "all" || sortBy !== "newest") && (
                 <div className="flex items-center justify-between text-xs font-mono text-gray-400 pt-2 border-t border-white/10">
                   <span>
-                    Filtered: Showing <strong className="text-white">{filteredApplications.length}</strong> of <strong className="text-white">{applications.length}</strong> candidates
+                    Filtered: Showing <strong className="text-white">{groupedApplications.length}</strong> of <strong className="text-white">{new Set(applications.map(getCandidateKey)).size}</strong> candidates
                   </span>
                   <button
                     type="button"
@@ -1853,7 +1994,7 @@ export default function RecruitmentAdminPage() {
             </div>
 
             {/* Applications Display */}
-            {filteredApplications.length === 0 ? (
+            {groupedApplications.length === 0 ? (
               <div className="glass-panel border border-white/15 p-12 text-center space-y-2 rounded-xl">
                 <p className="font-mono text-gray-300 text-base">No applicants found matching your criteria.</p>
                 <p className="font-mono text-gray-500 text-xs">Try clearing filters or search keywords.</p>
@@ -1862,24 +2003,30 @@ export default function RecruitmentAdminPage() {
               <>
                 {/* 1. Mobile Cards View (visible on < md) */}
                 <div className="block md:hidden space-y-3.5">
-                  {filteredApplications.map((app, index) => {
-                    const edit = inlineEdits[app._id] || {};
-                    const scoreInfo = getCandidateScoreInfo(app, edit);
-                    const candidateName = app.responses?.name || app.responses?.fullName || "Applicant";
-                    const candidateRoll = app.responses?.rollno || app.responses?.rollNumber || "—";
-                    const candidateEmail = app.responses?.email || "—";
-                    const candidateYear = app.year || app.responses?.year || "—";
-                    const appResume = getApplicantResumeInfo(app.responses, selectedForm?.fields);
+                  {groupedApplications.map((group, index) => {
+                    const primaryApp = group.primaryApp;
+                    const candidateName = group.candidateName;
+                    const candidateRoll = group.candidateRoll;
+                    const candidateEmail = group.candidateEmail;
+                    const candidateYear = group.candidateYear;
+                    const appResume = getApplicantResumeInfo(primaryApp.responses, selectedForm?.fields);
+
+                    const allScoreInfos = group.deptApplications.map((d) =>
+                      getCandidateScoreInfo(d, inlineEdits[d._id])
+                    );
+                    const hasPositive = allScoreInfos.some((s) => s.status === "positive");
+                    const hasNegative = allScoreInfos.some((s) => s.status === "negative");
+                    const hasZero = allScoreInfos.some((s) => s.status === "zero" && s.isEvaluated);
 
                     return (
                       <div
-                        key={app._id}
+                        key={group.key}
                         className={`glass-panel p-4 rounded-xl border transition-all ${
-                          scoreInfo.status === "positive"
+                          hasPositive
                             ? "border-emerald-500/70 bg-emerald-950/25 shadow-[0_0_15px_rgba(16,185,129,0.18)]"
-                            : scoreInfo.status === "zero" && scoreInfo.isEvaluated
+                            : hasZero
                             ? "border-amber-400/80 bg-amber-950/25 shadow-[0_0_15px_rgba(251,191,36,0.18)]"
-                            : scoreInfo.status === "negative"
+                            : hasNegative
                             ? "border-rose-500/70 bg-rose-950/25 shadow-[0_0_15px_rgba(244,63,94,0.18)]"
                             : "border-white/15 bg-white/[0.02]"
                         }`}
@@ -1898,9 +2045,16 @@ export default function RecruitmentAdminPage() {
                             </div>
                           </div>
                           <div className="flex flex-col items-end gap-1">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono border border-white/20 bg-white/10 text-white whitespace-nowrap">
-                              {app.department}
-                            </span>
+                            <div className="flex items-center gap-1 flex-wrap justify-end">
+                              {group.deptApplications.map((deptApp) => (
+                                <span
+                                  key={deptApp._id}
+                                  className="px-2 py-0.5 rounded text-[10px] font-mono border border-white/20 bg-white/10 text-white whitespace-nowrap"
+                                >
+                                  {deptApp.department}
+                                </span>
+                              ))}
+                            </div>
                             <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-white/5 text-gray-300 border border-white/10 whitespace-nowrap">
                               {candidateYear}
                             </span>
@@ -1913,89 +2067,98 @@ export default function RecruitmentAdminPage() {
                             {candidateEmail}
                           </div>
                           <span className="text-[10px] text-gray-500">
-                            {new Date(app.createdAt).toLocaleDateString()}
+                            {new Date(group.createdAt).toLocaleDateString()}
                           </span>
                         </div>
 
-                        {/* Score & Remarks Preview Bar */}
-                        <div className="py-2.5 flex items-center justify-between border-b border-white/10 gap-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider font-semibold">
-                              Score:
-                            </span>
-                            {scoreInfo.isEvaluated ? (
-                              <span
-                                className={`px-2.5 py-0.5 rounded text-xs font-bold font-mono ${
-                                  scoreInfo.status === "positive"
-                                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/60"
-                                    : scoreInfo.status === "negative"
-                                    ? "bg-rose-500/20 text-rose-300 border border-rose-500/60"
-                                    : "bg-amber-400/20 text-amber-300 border border-amber-400/60"
-                                }`}
-                              >
-                                {scoreInfo.scoreFormatted} <span className="text-[10px] opacity-75">pts</span>
-                              </span>
-                            ) : (
-                              <span className="text-gray-500 font-mono text-xs italic">Pending</span>
-                            )}
-                          </div>
+                        {/* Department Scores & Remarks preview */}
+                        <div className="py-2.5 space-y-2 border-b border-white/10">
+                          {group.deptApplications.map((deptApp) => {
+                            const edit = inlineEdits[deptApp._id] || {};
+                            const scoreInfo = getCandidateScoreInfo(deptApp, edit);
+                            return (
+                              <div key={deptApp._id} className="flex items-center justify-between gap-2 text-xs font-mono">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="text-[10px] text-gray-400 font-bold uppercase truncate">
+                                    {deptApp.department}:
+                                  </span>
+                                  {scoreInfo.isEvaluated ? (
+                                    <span
+                                      className={`px-2 py-0.5 rounded text-xs font-bold ${
+                                        scoreInfo.status === "positive"
+                                          ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/60"
+                                          : scoreInfo.status === "negative"
+                                          ? "bg-rose-500/20 text-rose-300 border border-rose-500/60"
+                                          : "bg-amber-400/20 text-amber-300 border border-amber-400/60"
+                                      }`}
+                                    >
+                                      {scoreInfo.scoreFormatted} <span className="text-[10px] opacity-75">pts</span>
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-500 text-xs italic">Pending</span>
+                                  )}
+                                </div>
 
-                          {(scoreInfo.posCount > 0 || scoreInfo.negCount > 0) && (
-                            <div className="flex items-center gap-1.5">
-                              {scoreInfo.posCount > 0 && (
-                                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-500/30">
-                                  +{scoreInfo.posCount} Pos
-                                </span>
-                              )}
-                              {scoreInfo.negCount > 0 && (
-                                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-rose-950/60 text-rose-400 border border-rose-500/30">
-                                  -{scoreInfo.negCount} Neg
-                                </span>
-                              )}
-                            </div>
-                          )}
+                                {(scoreInfo.posCount > 0 || scoreInfo.negCount > 0) && (
+                                  <div className="flex items-center gap-1">
+                                    {scoreInfo.posCount > 0 && (
+                                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-500/30">
+                                        +{scoreInfo.posCount}
+                                      </span>
+                                    )}
+                                    {scoreInfo.negCount > 0 && (
+                                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-950/60 text-rose-400 border border-rose-500/30">
+                                        -{scoreInfo.negCount}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
 
-                        {/* Remarks Snippet */}
-                        {scoreInfo.comments && (
-                          <div className="py-2 text-xs font-mono text-gray-300 line-clamp-2 border-b border-white/5">
-                            {scoreInfo.comments}
-                          </div>
-                        )}
-
                         {/* Card Actions Footer */}
-                        <div className="pt-2.5 flex items-center justify-between text-xs font-mono mt-1">
-                          <div className="text-[10px] text-gray-500 truncate max-w-[140px]">
-                            {app.evaluatedBy ? `By ${app.evaluatedBy}` : "Not evaluated"}
+                        <div className="pt-2.5 flex items-center justify-between text-xs font-mono mt-1 gap-2 flex-wrap">
+                          <div className="text-[10px] text-gray-500 truncate">
+                            {group.deptApplications.map((d) => d.evaluatedBy).filter(Boolean).length > 0
+                              ? "Evaluated"
+                              : "Not evaluated"}
                           </div>
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             {appResume.hasResume && (
                               <button
                                 type="button"
-                                onClick={() => openModal(index, true)}
+                                onClick={() => openModal(index, group.deptApplications[0]._id, true)}
                                 className="px-2.5 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 rounded text-xs font-mono uppercase tracking-wider flex items-center gap-1 cursor-pointer font-bold"
                                 title="Open resume in parallel view & grade"
                               >
                                 <FaFilePdf className="text-xs" /> Resume
                               </button>
                             )}
+
+                            {group.deptApplications.map((deptApp) => (
+                              <button
+                                key={deptApp._id}
+                                type="button"
+                                onClick={() => openModal(index, deptApp._id)}
+                                className="px-2.5 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 rounded text-xs font-mono uppercase tracking-wider flex items-center gap-1 cursor-pointer font-bold whitespace-nowrap"
+                              >
+                                <FaEye className="text-xs" />
+                                {group.deptApplications.length > 1 ? deptApp.department : "Review"}
+                              </button>
+                            ))}
+
                             <button
                               type="button"
-                              onClick={() => openModal(index)}
-                              className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white border border-white/25 rounded text-xs font-mono uppercase tracking-wider flex items-center gap-1 cursor-pointer font-bold"
-                            >
-                              <FaEye className="text-xs" /> Review
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => openApplicationEditor(app)}
+                              onClick={() => openApplicationEditor(group.primaryApp)}
                               className="px-2 py-1.5 bg-white/5 hover:bg-white/15 text-gray-300 border border-white/20 rounded text-xs font-mono uppercase tracking-wider cursor-pointer"
                             >
                               Edit
                             </button>
                             <button
                               type="button"
-                              onClick={() => deleteApplication(app._id)}
+                              onClick={() => deleteApplicantGroup(group)}
                               className="px-2 py-1.5 text-red-400 hover:text-red-300 border border-red-500/30 rounded text-xs font-mono uppercase tracking-wider cursor-pointer"
                             >
                               Delete
@@ -2015,9 +2178,9 @@ export default function RecruitmentAdminPage() {
                         <tr>
                           <th className="py-3 px-3 w-10 text-center">#</th>
                           <th className="py-3 px-3 min-w-[190px]">Applicant Info</th>
-                          <th className="py-3 px-2 min-w-[95px]">Department</th>
+                          <th className="py-3 px-2 min-w-[130px]">Department</th>
                           <th className="py-3 px-2 min-w-[80px]">Year</th>
-                          <th className="py-3 px-3 min-w-[110px]">
+                          <th className="py-3 px-3 min-w-[140px]">
                             <div className="flex items-center gap-1">
                               <FaStar className="text-amber-400 text-xs" />
                               <span>Score</span>
@@ -2029,40 +2192,34 @@ export default function RecruitmentAdminPage() {
                               <span>Positive / Negative Points</span>
                             </div>
                           </th>
-                          <th className="py-3 px-3 min-w-[150px] text-right">Actions</th>
+                          <th className="py-3 px-3 min-w-[200px] text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/10">
-                        {filteredApplications.map((app, index) => {
-                          const edit = inlineEdits[app._id] || {};
-                          const scoreInfo = getCandidateScoreInfo(app, edit);
-                          const candidateName = app.responses?.name || app.responses?.fullName || "Applicant";
-                          const candidateRoll = app.responses?.rollno || app.responses?.rollNumber || "—";
-                          const candidateEmail = app.responses?.email || "—";
-                          const candidateYear = app.year || app.responses?.year || "—";
-                          const appResume = getApplicantResumeInfo(app.responses, selectedForm?.fields);
+                        {groupedApplications.map((group, index) => {
+                          const primaryApp = group.primaryApp;
+                          const candidateName = group.candidateName;
+                          const candidateRoll = group.candidateRoll;
+                          const candidateEmail = group.candidateEmail;
+                          const candidateYear = group.candidateYear;
+                          const appResume = getApplicantResumeInfo(primaryApp.responses, selectedForm?.fields);
 
-                          // Color-code department badges
-                          const deptLower = String(app.department || "").toLowerCase();
-                          const deptBadgeClass = deptLower.includes("soft")
-                            ? "text-blue-400 border-blue-500/40 bg-blue-950/30"
-                            : deptLower.includes("mech")
-                            ? "text-amber-400 border-amber-500/40 bg-amber-950/30"
-                            : deptLower.includes("embed")
-                            ? "text-emerald-400 border-emerald-500/40 bg-emerald-950/30"
-                            : deptLower.includes("pr")
-                            ? "text-purple-400 border-purple-500/40 bg-purple-950/30"
-                            : "text-white border-white/20 bg-white/10";
+                          const allScoreInfos = group.deptApplications.map((d) =>
+                            getCandidateScoreInfo(d, inlineEdits[d._id])
+                          );
+                          const hasPositive = allScoreInfos.some((s) => s.status === "positive");
+                          const hasNegative = allScoreInfos.some((s) => s.status === "negative");
+                          const hasZero = allScoreInfos.some((s) => s.status === "zero" && s.isEvaluated);
 
                           return (
                             <tr
-                              key={app._id}
+                              key={group.key}
                               className={`transition-colors group ${
-                                scoreInfo.status === "positive"
+                                hasPositive
                                   ? "border-l-4 border-l-emerald-500 bg-emerald-950/20 hover:bg-emerald-950/30"
-                                  : scoreInfo.status === "zero" && scoreInfo.isEvaluated
+                                  : hasZero
                                   ? "border-l-4 border-l-amber-400 bg-amber-950/20 hover:bg-amber-950/30"
-                                  : scoreInfo.status === "negative"
+                                  : hasNegative
                                   ? "border-l-4 border-l-rose-500 bg-rose-950/20 hover:bg-rose-950/30"
                                   : "hover:bg-white/[0.03]"
                               }`}
@@ -2080,15 +2237,35 @@ export default function RecruitmentAdminPage() {
                                   {candidateEmail}
                                 </div>
                                 <div className="text-gray-500 text-[10px] mt-0.5">
-                                  Submitted: {new Date(app.createdAt).toLocaleDateString()}
+                                  Submitted: {new Date(group.createdAt).toLocaleDateString()}
                                 </div>
                               </td>
 
-                              {/* Department */}
+                              {/* Department Badges (shows all applied departments) */}
                               <td className="py-3 px-2">
-                                <span className={`px-2 py-0.5 rounded text-[11px] border whitespace-nowrap font-medium ${deptBadgeClass}`}>
-                                  {app.department}
-                                </span>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {group.deptApplications.map((deptApp) => {
+                                    const deptLower = String(deptApp.department || "").toLowerCase();
+                                    const deptBadgeClass = deptLower.includes("soft")
+                                      ? "text-blue-400 border-blue-500/40 bg-blue-950/30"
+                                      : deptLower.includes("mech")
+                                      ? "text-amber-400 border-amber-500/40 bg-amber-950/30"
+                                      : deptLower.includes("embed")
+                                      ? "text-emerald-400 border-emerald-500/40 bg-emerald-950/30"
+                                      : deptLower.includes("pr")
+                                      ? "text-purple-400 border-purple-500/40 bg-purple-950/30"
+                                      : "text-white border-white/20 bg-white/10";
+
+                                    return (
+                                      <span
+                                        key={deptApp._id}
+                                        className={`px-2 py-0.5 rounded text-[11px] border whitespace-nowrap font-medium ${deptBadgeClass}`}
+                                      >
+                                        {deptApp.department}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
                               </td>
 
                               {/* Year */}
@@ -2098,91 +2275,119 @@ export default function RecruitmentAdminPage() {
                                 </span>
                               </td>
 
-                              {/* Read-only Score Badge */}
+                              {/* Read-only Score Badges (separate for each applied dept) */}
                               <td className="py-3 px-3">
-                                {scoreInfo.isEvaluated ? (
-                                  <span
-                                    className={`inline-flex items-center px-2.5 py-1 rounded text-xs font-bold font-mono ${
-                                      scoreInfo.status === "positive"
-                                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/60 shadow-[0_0_8px_rgba(16,185,129,0.25)]"
-                                        : scoreInfo.status === "negative"
-                                        ? "bg-rose-500/20 text-rose-300 border border-rose-500/60 shadow-[0_0_8px_rgba(244,63,94,0.25)]"
-                                        : "bg-amber-400/20 text-amber-300 border border-amber-400/60 shadow-[0_0_8px_rgba(251,191,36,0.25)]"
-                                    }`}
-                                  >
-                                    <span>{scoreInfo.scoreFormatted}</span>
-                                    <span className="text-[10px] opacity-75 ml-1">pts</span>
-                                  </span>
-                                ) : (
-                                  <span className="text-gray-500 font-mono text-xs">—</span>
-                                )}
-                              </td>
-
-                              {/* Read-only Remarks & Comments Preview (NO TEXTAREA) */}
-                              <td className="py-3 px-3 max-w-[280px]">
-                                <div className="space-y-1">
-                                  {(scoreInfo.posCount > 0 || scoreInfo.negCount > 0) && (
-                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                      {scoreInfo.posCount > 0 && (
-                                        <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-950/70 text-emerald-300 border border-emerald-500/40">
-                                          +{scoreInfo.posCount} Pos
-                                        </span>
-                                      )}
-                                      {scoreInfo.negCount > 0 && (
-                                        <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-rose-950/70 text-rose-300 border border-rose-500/40">
-                                          -{scoreInfo.negCount} Neg
-                                        </span>
-                                      )}
-                                    </div>
-                                  )}
-                                  {scoreInfo.comments ? (
-                                    <div className="text-xs text-gray-300 line-clamp-2 break-words font-mono" title={scoreInfo.comments}>
-                                      {scoreInfo.comments}
-                                    </div>
-                                  ) : !scoreInfo.posCount && !scoreInfo.negCount ? (
-                                    <span className="text-gray-500 text-xs italic">No remarks yet</span>
-                                  ) : null}
-                                  {app.evaluatedBy && (
-                                    <div className="text-[10px] text-gray-500 mt-0.5 font-mono">
-                                      By {app.evaluatedBy} • {app.evaluatedAt ? new Date(app.evaluatedAt).toLocaleDateString() : ""}
-                                    </div>
-                                  )}
+                                <div className="space-y-1.5">
+                                  {group.deptApplications.map((deptApp) => {
+                                    const edit = inlineEdits[deptApp._id] || {};
+                                    const scoreInfo = getCandidateScoreInfo(deptApp, edit);
+                                    return (
+                                      <div key={deptApp._id} className="flex items-center gap-1.5">
+                                        {group.deptApplications.length > 1 && (
+                                          <span className="text-[10px] text-gray-400 font-mono w-16 truncate" title={deptApp.department}>
+                                            {deptApp.department}:
+                                          </span>
+                                        )}
+                                        {scoreInfo.isEvaluated ? (
+                                          <span
+                                            className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold font-mono ${
+                                              scoreInfo.status === "positive"
+                                                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/60 shadow-[0_0_8px_rgba(16,185,129,0.25)]"
+                                                : scoreInfo.status === "negative"
+                                                ? "bg-rose-500/20 text-rose-300 border border-rose-500/60 shadow-[0_0_8px_rgba(244,63,94,0.25)]"
+                                                : "bg-amber-400/20 text-amber-300 border border-amber-400/60 shadow-[0_0_8px_rgba(251,191,36,0.25)]"
+                                            }`}
+                                          >
+                                            <span>{scoreInfo.scoreFormatted}</span>
+                                            <span className="text-[9px] opacity-75 ml-1">pts</span>
+                                          </span>
+                                        ) : (
+                                          <span className="text-gray-500 font-mono text-xs">—</span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               </td>
 
-                              {/* Actions */}
+                              {/* Read-only Remarks & Comments Preview per Department */}
+                              <td className="py-3 px-3 max-w-[280px]">
+                                <div className="space-y-2">
+                                  {group.deptApplications.map((deptApp) => {
+                                    const edit = inlineEdits[deptApp._id] || {};
+                                    const scoreInfo = getCandidateScoreInfo(deptApp, edit);
+                                    return (
+                                      <div key={deptApp._id} className="space-y-0.5">
+                                        {group.deptApplications.length > 1 && (
+                                          <div className="text-[10px] font-bold text-gray-400 font-mono uppercase">
+                                            [{deptApp.department}]
+                                          </div>
+                                        )}
+                                        {(scoreInfo.posCount > 0 || scoreInfo.negCount > 0) && (
+                                          <div className="flex items-center gap-1.5 flex-wrap">
+                                            {scoreInfo.posCount > 0 && (
+                                              <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-950/70 text-emerald-300 border border-emerald-500/40">
+                                                +{scoreInfo.posCount} Pos
+                                              </span>
+                                            )}
+                                            {scoreInfo.negCount > 0 && (
+                                              <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-rose-950/70 text-rose-300 border border-rose-500/40">
+                                                -{scoreInfo.negCount} Neg
+                                              </span>
+                                            )}
+                                          </div>
+                                        )}
+                                        {scoreInfo.comments ? (
+                                          <div className="text-xs text-gray-300 line-clamp-1 break-words font-mono" title={scoreInfo.comments}>
+                                            {scoreInfo.comments}
+                                          </div>
+                                        ) : !scoreInfo.posCount && !scoreInfo.negCount ? (
+                                          <span className="text-gray-500 text-[11px] italic">No remarks yet</span>
+                                        ) : null}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </td>
+
+                              {/* Actions: Review per applied dept, Edit, Delete */}
                               <td className="py-3 px-3 text-right whitespace-nowrap">
-                                <div className="flex items-center justify-end gap-1.5">
+                                <div className="flex items-center justify-end gap-1.5 flex-wrap">
                                   {appResume.hasResume && (
                                     <button
                                       type="button"
-                                      onClick={() => openModal(index, true)}
+                                      onClick={() => openModal(index, group.deptApplications[0]._id, true)}
                                       className="cursor-pointer font-mono text-[10px] uppercase tracking-wider text-rose-300 hover:text-white border border-rose-500/40 hover:border-rose-400 bg-rose-950/30 rounded px-2.5 py-1 transition-colors font-bold flex items-center gap-1"
                                       title="Open resume in parallel view & grade"
                                     >
                                       <FaFilePdf className="text-[10px]" /> Resume
                                     </button>
                                   )}
+
+                                  {group.deptApplications.map((deptApp) => (
+                                    <button
+                                      key={deptApp._id}
+                                      type="button"
+                                      onClick={() => openModal(index, deptApp._id)}
+                                      className="cursor-pointer font-mono text-[10px] uppercase tracking-wider text-blue-400 hover:text-white border border-blue-500/30 hover:border-blue-400 bg-blue-950/20 rounded px-2.5 py-1 transition-colors font-bold whitespace-nowrap"
+                                      title={`Review & Score for ${deptApp.department}`}
+                                    >
+                                      {group.deptApplications.length > 1 ? `Review: ${deptApp.department}` : "Review"}
+                                    </button>
+                                  ))}
+
                                   <button
                                     type="button"
-                                    onClick={() => openModal(index)}
-                                    className="cursor-pointer font-mono text-[10px] uppercase tracking-wider text-blue-400 hover:text-white border border-blue-500/30 hover:border-blue-400 bg-blue-950/20 rounded px-2.5 py-1 transition-colors font-bold"
-                                    title="Review candidate full response & evaluation"
-                                  >
-                                    Review
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => openApplicationEditor(app)}
-                                    className="cursor-pointer font-mono text-[10px] uppercase tracking-wider text-gray-300 hover:text-white border border-white/20 hover:border-white rounded px-2.5 py-1 transition-colors"
+                                    onClick={() => openApplicationEditor(group.primaryApp)}
+                                    className="cursor-pointer font-mono text-[10px] uppercase tracking-wider text-gray-300 hover:text-white border border-white/20 hover:border-white rounded px-2 py-1 transition-colors"
                                     title="Edit raw response fields"
                                   >
                                     Edit
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => deleteApplication(app._id)}
-                                    className="cursor-pointer font-mono text-[10px] uppercase tracking-wider text-red-400 hover:text-red-300 border border-red-500/30 hover:border-red-400 rounded px-2.5 py-1 transition-colors"
+                                    onClick={() => deleteApplicantGroup(group)}
+                                    className="cursor-pointer font-mono text-[10px] uppercase tracking-wider text-red-400 hover:text-red-300 border border-red-500/30 hover:border-red-400 rounded px-2 py-1 transition-colors"
                                     title="Delete candidate response"
                                   >
                                     Delete
@@ -2208,8 +2413,8 @@ export default function RecruitmentAdminPage() {
         )}
 
         {/* Edit Application Response Modal */}
-        {editingApplication && (
-          <div className="fixed inset-0 z-[100] flex items-start justify-center pt-24 sm:pt-28 pb-8 px-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+        {editingApplication && mounted && typeof document !== "undefined" && createPortal(
+          <div className="fixed inset-0 z-[99999] flex items-start justify-center pt-24 sm:pt-28 pb-8 px-4 bg-black/85 backdrop-blur-md overflow-y-auto">
             <div className="glass-panel w-full max-w-xl p-6 sm:p-8 border border-white/30 max-h-[calc(100vh-7.5rem)] sm:max-h-[calc(100vh-8.5rem)] overflow-y-auto my-auto">
               <div className="flex items-center justify-between gap-4 mb-6 border-b border-white/15 pb-4">
                 <div>
@@ -2339,22 +2544,24 @@ export default function RecruitmentAdminPage() {
                 </button>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
         {/* Detailed Candidate Review Modal (matching AddSec dashboard) */}
-        {modalOpen && currentModalApp && (() => {
-          const resumeInfo = getApplicantResumeInfo(currentModalApp.responses, selectedForm?.fields);
-          const hasResume = resumeInfo.hasResume;
-          const isSplit = hasResume && showResumeSplit;
+        {modalOpen && currentModalApp && mounted && typeof document !== "undefined" && createPortal(
+          (() => {
+            const resumeInfo = getApplicantResumeInfo(currentModalApp.responses, selectedForm?.fields);
+            const hasResume = resumeInfo.hasResume;
+            const isSplit = hasResume && showResumeSplit;
 
-          return (
-            <div className={`fixed inset-0 z-[100] flex ${isSplit ? "items-center justify-center p-2 sm:p-4" : "items-start justify-center pt-20 sm:pt-24 pb-8 px-2.5 sm:px-4 md:px-6 overflow-y-auto"} bg-black/85 backdrop-blur-sm`}>
-              <div className={`glass-panel w-full ${isSplit ? "max-w-[96vw] xl:max-w-7xl h-[92vh] max-h-[92vh]" : "max-w-3xl max-h-[calc(100vh-7.5rem)] sm:max-h-[calc(100vh-8.5rem)] overflow-y-auto"} border border-white/25 shadow-2xl flex flex-col rounded-xl my-auto transition-all duration-300`}>
+            return (
+              <div className={`fixed inset-0 z-[99999] flex ${isSplit ? "items-center justify-center p-2 sm:p-4" : "items-start justify-center pt-20 sm:pt-24 pb-8 px-2.5 sm:px-4 md:px-6 overflow-y-auto"} bg-black/90 backdrop-blur-md`}>
+                <div className={`glass-panel w-full ${isSplit ? "max-w-[96vw] xl:max-w-7xl h-[92vh] max-h-[92vh]" : "max-w-3xl max-h-[calc(100vh-7.5rem)] sm:max-h-[calc(100vh-8.5rem)] overflow-y-auto"} border border-white/25 shadow-2xl flex flex-col rounded-xl my-auto transition-all duration-300`}>
                 {/* Modal Header */}
                 <div className="p-3.5 sm:p-5 border-b border-white/15 flex items-center justify-between sticky top-0 bg-black/95 backdrop-blur z-20 gap-2">
                   <div className="min-w-0 flex-1 pr-2">
                     <span className="text-[10px] font-mono uppercase tracking-widest text-gray-400 block truncate">
-                      Candidate Review ({modalAppIndex + 1} of {filteredApplications.length})
+                      Candidate Review ({modalAppIndex + 1} of {groupedApplications.length})
                     </span>
                     <h2
                       className="font-mono text-base sm:text-xl md:text-2xl font-bold text-white mt-0.5 truncate"
@@ -2408,7 +2615,7 @@ export default function RecruitmentAdminPage() {
                     <button
                       type="button"
                       onClick={nextModalApp}
-                      disabled={modalAppIndex === filteredApplications.length - 1}
+                      disabled={modalAppIndex === groupedApplications.length - 1}
                       className="p-2 sm:p-2.5 glass-panel border border-white/20 text-gray-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed rounded cursor-pointer"
                       title="Next Applicant"
                     >
@@ -2482,6 +2689,58 @@ export default function RecruitmentAdminPage() {
                         </button>
                       </div>
                     )}
+
+                {/* Department Switcher Tabs for Multi-Department Applicants */}
+                {currentModalGroup && currentModalGroup.deptApplications.length > 1 && (
+                  <div className="bg-gradient-to-r from-blue-950/50 via-purple-950/40 to-black/70 p-3 sm:p-3.5 rounded-xl border border-blue-500/35 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xl">
+                    <div className="flex items-center gap-2">
+                      <FaStar className="text-amber-400 text-xs flex-shrink-0" />
+                      <span className="text-xs font-mono uppercase tracking-wider text-blue-200 font-bold">
+                        Switch Review / Score Dept:
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {currentModalGroup.deptApplications.map((deptApp, dIdx) => {
+                        const dEdit = inlineEdits[deptApp._id] || {};
+                        const dScore = getCandidateScoreInfo(deptApp, dEdit);
+                        const isActive = deptApp._id === currentModalApp._id;
+
+                        return (
+                          <button
+                            key={deptApp._id}
+                            type="button"
+                            onClick={() => {
+                              setActiveModalAppId(deptApp._id);
+                              setNewPositiveInput("");
+                              setNewNegativeInput("");
+                            }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-2 border transition-all cursor-pointer ${
+                              isActive
+                                ? "bg-blue-600 text-white border-blue-300 shadow-[0_0_12px_rgba(59,130,246,0.6)] ring-1 ring-white/50"
+                                : "bg-black/60 text-gray-300 hover:text-white border-white/20 hover:bg-white/10"
+                            }`}
+                          >
+                            <span>Dept {dIdx + 1}: <strong className="text-white">{deptApp.department}</strong></span>
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
+                                dScore.isEvaluated
+                                  ? dScore.status === "positive"
+                                    ? "bg-emerald-500/25 text-emerald-300 border border-emerald-400/50"
+                                    : dScore.status === "negative"
+                                    ? "bg-rose-500/25 text-rose-300 border border-rose-500/50"
+                                    : "bg-amber-400/25 text-amber-300 border border-amber-400/50"
+                                  : "bg-white/10 text-gray-400"
+                              }`}
+                            >
+                              {dScore.isEvaluated ? `${dScore.scoreFormatted} pts` : "Unscored"}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* Quick Info Grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 font-mono text-xs">
                   <div className="bg-white/5 p-2.5 sm:p-3 rounded border border-white/10">
@@ -2491,9 +2750,14 @@ export default function RecruitmentAdminPage() {
                     </span>
                   </div>
                   <div className="bg-white/5 p-2.5 sm:p-3 rounded border border-white/10">
-                    <span className="text-gray-500 block text-[11px]">Department</span>
+                    <span className="text-gray-500 block text-[11px]">Active Department</span>
                     <span className="text-white font-bold text-xs sm:text-sm mt-0.5 block truncate">
                       {currentModalApp.department}
+                      {currentModalGroup?.deptApplications.length > 1 && (
+                        <span className="text-[10px] text-blue-400 ml-1.5 font-normal">
+                          (of {currentModalGroup.deptApplications.length})
+                        </span>
+                      )}
                     </span>
                   </div>
                   <div className="bg-white/5 p-2.5 sm:p-3 rounded border border-white/10">
@@ -2627,7 +2891,7 @@ export default function RecruitmentAdminPage() {
                                 : "text-rose-300"
                             }`}
                           >
-                            <FaStar /> Evaluation & Scoring
+                            <FaStar /> Evaluation & Scoring — <span className="underline">{currentModalApp.department}</span>
                           </h3>
 
                           {scoreStatus === "positive" && (
@@ -2944,7 +3208,9 @@ export default function RecruitmentAdminPage() {
               </div>
             </div>
           );
-        })()}
+        })(),
+        document.body
+      )}
       </div>
     </div>
   );

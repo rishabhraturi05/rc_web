@@ -443,19 +443,6 @@ export default function RecruitmentPage() {
       const result = await response.json();
 
       if (!result.success) {
-        if (result.alreadyApplied || result.message?.toLowerCase().includes("already")) {
-          setSubmittedSuccess(true);
-          setSubmittedDept(result.department || departments.join(" & ") || "Robotics Club");
-          setSubmittedYear(result.year || year || "");
-          if (result.whatsappLink) {
-            setWhatsappGroupLink(result.whatsappLink);
-          }
-          setMessage(result.message || "You are already registered. Join the WhatsApp group below.");
-          if (typeof window !== "undefined") {
-            window.scrollTo({ top: 120, behavior: "smooth" });
-          }
-          return;
-        }
         setMessage(result.message || "Failed to submit application.");
         return;
       }
@@ -471,7 +458,7 @@ export default function RecruitmentPage() {
       setDepartments([]);
       setYear("");
       if (typeof window !== "undefined") {
-        window.scrollTo({ top: 120, behavior: "smooth" });
+        window.scrollTo({ top: 0, behavior: "smooth" });
       }
     } catch (error) {
       console.error("Submit recruitment application error:", error);
@@ -503,6 +490,169 @@ export default function RecruitmentPage() {
           <p className="font-mono text-gray-300 leading-relaxed text-sm md:text-base">
             No active recruitment forms are currently open. Please check back later or contact the club for updates.
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (submittedSuccess) {
+    return (
+      <div className="min-h-[100dvh] bg-black text-white px-3 sm:px-6 pt-16 sm:pt-20 pb-4 flex flex-col justify-center items-center">
+        <div className="w-full max-w-4xl mx-auto space-y-3 sm:space-y-4">
+          {/* Header Section */}
+          <div className="flex flex-col items-center justify-center text-center space-y-1">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-mono text-[11px] sm:text-xs font-bold uppercase tracking-wider shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+              <FaCheckCircle className="text-sm text-emerald-400" />
+              <span>Application Submitted</span>
+            </div>
+            <h2
+              className="text-xl sm:text-2xl md:text-3xl font-black text-white uppercase tracking-wider mt-1"
+              style={{ fontFamily: 'var(--font-orbitron)' }}
+            >
+              Application Received!
+            </h2>
+            <p className="font-mono text-gray-300 text-xs sm:text-sm max-w-md mx-auto leading-tight">
+              Your application for <strong className="text-white">{submittedDept || "Robotics Club"}</strong> {submittedYear ? `(${submittedYear})` : ""} has been submitted.
+            </p>
+          </div>
+
+          {/* Action Cards Grid - 2 columns on laptop/desktop, 1 column on phone */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 items-stretch relative z-20">
+            {/* WhatsApp Group Card */}
+            <div
+              className="p-4 sm:p-5 rounded-xl border border-emerald-500/50 bg-[#0c120e] flex flex-col justify-between shadow-[0_0_30px_rgba(0,0,0,0.8)] relative overflow-hidden"
+              onContextMenu={(e) => e.preventDefault()}
+              onCopy={(e) => e.preventDefault()}
+            >
+              <div>
+                <div className="flex items-center justify-between gap-2 border-b border-emerald-500/30 pb-2 mb-2.5">
+                  <div className="flex items-center gap-2">
+                    <FaWhatsapp className="text-xl sm:text-2xl text-emerald-400 shrink-0" />
+                    <span className="font-mono text-xs sm:text-sm font-bold text-white uppercase tracking-wider">
+                      Official WhatsApp Group
+                    </span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 shrink-0">
+                    MANDATORY JOIN
+                  </span>
+                </div>
+
+                <p className="font-mono text-[11px] sm:text-xs text-gray-200 leading-snug mb-2.5">
+                  All interview slots, schedule updates, assignment tasks, and announcements will be shared exclusively inside the official applicants WhatsApp group.
+                </p>
+
+                <div className="p-2 sm:p-2.5 rounded-lg bg-black/80 border border-white/15 flex items-center gap-2 text-gray-300 font-mono text-[10px] sm:text-[11px] leading-tight mb-3">
+                  <FaShieldAlt className="text-amber-400 text-xs shrink-0" />
+                  <span>Security protocol: Direct link for applicants only. Forwarding disabled.</span>
+                </div>
+              </div>
+
+              {/* Anti-copy WhatsApp Button */}
+              <button
+                type="button"
+                onClick={handleJoinWhatsApp}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  return false;
+                }}
+                draggable={false}
+                onDragStart={(e) => e.preventDefault()}
+                onCopy={(e) => e.preventDefault()}
+                className="w-full py-2.5 sm:py-3 px-4 rounded-lg bg-[#25D366] hover:bg-[#1EBE5D] text-black font-mono font-bold text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2.5 transition-all duration-300 shadow-[0_0_20px_rgba(37,211,102,0.4)] hover:shadow-[0_0_30px_rgba(37,211,102,0.6)] cursor-pointer select-none active:scale-[0.98]"
+                style={{ userSelect: "none", WebkitUserSelect: "none" }}
+              >
+                <FaWhatsapp className="text-xl text-black shrink-0" />
+                <span>[ JOIN WHATSAPP GROUP ]</span>
+                <FaArrowRight className="text-xs shrink-0" />
+              </button>
+            </div>
+
+            {/* Interview Syllabus Download Card */}
+            <div className="p-4 sm:p-5 rounded-xl border border-cyan-500/40 bg-[#0d1117] flex flex-col justify-between shadow-[0_0_30px_rgba(0,0,0,0.8)] relative overflow-hidden">
+              <div>
+                <div className="flex items-center justify-between gap-2 border-b border-cyan-500/30 pb-2 mb-2.5">
+                  <div className="flex items-center gap-2">
+                    <FaFilePdf className="text-lg sm:text-xl text-rose-400 shrink-0" />
+                    <span className="font-mono text-xs sm:text-sm font-bold text-white uppercase tracking-wider">
+                      Interview Syllabus
+                    </span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/40 shrink-0">
+                    PDF DOWNLOADS
+                  </span>
+                </div>
+
+                <p className="font-mono text-[11px] sm:text-xs text-gray-200 leading-snug mb-3">
+                  Please download the interview syllabus according to your team and year of study to prepare for the upcoming recruitment process:
+                </p>
+              </div>
+
+              {/* 3 Download Buttons - Solid, Sharp, High Contrast */}
+              <div className="flex flex-col gap-2">
+                <a
+                  href="/recruitment_docs/1st year.pdf"
+                  download="1st_Year_Tech_Team_Syllabus.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2.5 px-3 rounded-lg bg-[#141b24] hover:bg-[#1a2432] border border-cyan-500/50 hover:border-cyan-300 text-white font-mono font-bold text-xs uppercase tracking-wider flex items-center justify-between transition-all duration-200 cursor-pointer group shadow-md hover:shadow-[0_0_15px_rgba(34,211,238,0.3)] active:scale-[0.98]"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <FaDownload className="text-xs text-cyan-400 group-hover:scale-110 transition-transform shrink-0" />
+                    <span className="text-white font-semibold">1st Year Tech Team Syllabus</span>
+                  </span>
+                  <span className="text-[10px] font-mono font-bold text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-500/40 shrink-0">
+                    PDF
+                  </span>
+                </a>
+
+                <a
+                  href="/recruitment_docs/2nd years.pdf"
+                  download="2nd_Year_Tech_Team_Syllabus.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2.5 px-3 rounded-lg bg-[#141b24] hover:bg-[#1a2432] border border-cyan-500/50 hover:border-cyan-300 text-white font-mono font-bold text-xs uppercase tracking-wider flex items-center justify-between transition-all duration-200 cursor-pointer group shadow-md hover:shadow-[0_0_15px_rgba(34,211,238,0.3)] active:scale-[0.98]"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <FaDownload className="text-xs text-cyan-400 group-hover:scale-110 transition-transform shrink-0" />
+                    <span className="text-white font-semibold">2nd Year Tech Team Syllabus</span>
+                  </span>
+                  <span className="text-[10px] font-mono font-bold text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-500/40 shrink-0">
+                    PDF
+                  </span>
+                </a>
+
+                <a
+                  href="/recruitment_docs/PR_syllabus_1st,2nd,3rd year.pdf"
+                  download="PR_syllabus_1st,2nd,3rd year.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2.5 px-3 rounded-lg bg-[#1b1424] hover:bg-[#251a32] border border-fuchsia-500/50 hover:border-fuchsia-300 text-white font-mono font-bold text-xs uppercase tracking-wider flex items-center justify-between transition-all duration-200 cursor-pointer group shadow-md hover:shadow-[0_0_15px_rgba(217,70,239,0.3)] active:scale-[0.98]"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <FaDownload className="text-xs text-fuchsia-400 group-hover:scale-110 transition-transform shrink-0" />
+                    <span className="text-white font-semibold">PR Syllabus (1st, 2nd, 3rd) Year</span>
+                  </span>
+                  <span className="text-[10px] font-mono font-bold text-fuchsia-300 bg-fuchsia-950/80 px-2 py-0.5 rounded border border-fuchsia-500/40 shrink-0">
+                    PDF
+                  </span>
+                </a>
+              </div>
+            </div>
+          </div>
+
+          {/* Back to Drives Link */}
+          <div className="text-center pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                setSubmittedSuccess(false);
+                setMessage("");
+              }}
+              className="font-mono text-[11px] sm:text-xs text-gray-400 hover:text-white underline underline-offset-4 transition-colors cursor-pointer"
+            >
+              ← Back to application drives
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -581,122 +731,7 @@ export default function RecruitmentPage() {
 
           {/* Right Side: Form Panel */}
           <div className="glass-panel relative z-10 p-6 md:p-8 border border-white/20">
-            {submittedSuccess ? (
-              <div
-                className="space-y-6 select-none py-4 sm:py-6"
-                onContextMenu={(e) => e.preventDefault()}
-                onCopy={(e) => e.preventDefault()}
-                onCut={(e) => e.preventDefault()}
-                style={{ userSelect: "none", WebkitUserSelect: "none" }}
-              >
-                {/* Glowing Green Success Header */}
-                <div className="flex flex-col items-center justify-center text-center space-y-3 pb-4 border-b border-white/10">
-                  <div className="w-16 h-16 rounded-full bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center text-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.35)]">
-                    <FaCheckCircle className="text-3xl" />
-                  </div>
-                  <span className="font-mono text-xs uppercase tracking-widest text-emerald-400 font-bold">
-                    [ REGISTRATION SUCCESSFUL ]
-                  </span>
-                  <h2
-                    className="text-2xl md:text-3xl font-black text-white uppercase tracking-wider"
-                    style={{ fontFamily: 'var(--font-orbitron)' }}
-                  >
-                    Application Received!
-                  </h2>
-                  <p className="font-mono text-gray-300 text-xs sm:text-sm max-w-md mx-auto leading-relaxed">
-                    Your application for <strong className="text-white">{submittedDept} Department</strong> ({submittedYear}) has been submitted successfully.
-                  </p>
-                </div>
-
-                {/* WhatsApp Group Dedicated Card */}
-                <div
-                  className="p-5 sm:p-6 rounded-xl border border-emerald-500/40 bg-emerald-950/25 space-y-4 text-left shadow-2xl relative overflow-hidden"
-                  onContextMenu={(e) => e.preventDefault()}
-                  onCopy={(e) => e.preventDefault()}
-                >
-                  <div className="flex items-center justify-between gap-2 border-b border-emerald-500/20 pb-3">
-                    <div className="flex items-center gap-2">
-                      <FaWhatsapp className="text-2xl text-emerald-400" />
-                      <span className="font-mono text-sm sm:text-base font-bold text-white uppercase tracking-wider">
-                        Official WhatsApp Group
-                      </span>
-                    </div>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                      MANDATORY JOIN
-                    </span>
-                  </div>
-
-                  <p className="font-mono text-xs sm:text-sm text-gray-300 leading-relaxed">
-                    All interview slots, schedule updates, assignment tasks, and announcements will be shared exclusively inside the official applicants WhatsApp group. Please join immediately:
-                  </p>
-
-                  <div className="p-3 rounded-lg bg-black/60 border border-white/10 flex items-center gap-2.5 text-gray-400 font-mono text-[11px] leading-relaxed">
-                    <FaShieldAlt className="text-amber-400 text-sm flex-shrink-0" />
-                    <span>
-                      Security protocol: Direct access link for registered applicants only. Copying or forwarding the URL is disabled.
-                    </span>
-                  </div>
-
-                  {/* Anti-copy WhatsApp Button */}
-                  <div className="pt-2">
-                    <button
-                      type="button"
-                      onClick={handleJoinWhatsApp}
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        return false;
-                      }}
-                      draggable={false}
-                      onDragStart={(e) => e.preventDefault()}
-                      onCopy={(e) => e.preventDefault()}
-                      className="w-full py-4 px-6 rounded-lg bg-[#25D366] hover:bg-[#1EBE5D] text-black font-mono font-bold text-sm sm:text-base uppercase tracking-wider flex items-center justify-center gap-3 transition-all duration-300 shadow-[0_0_25px_rgba(37,211,102,0.35)] hover:shadow-[0_0_35px_rgba(37,211,102,0.5)] cursor-pointer select-none"
-                      style={{ userSelect: "none", WebkitUserSelect: "none" }}
-                    >
-                      <FaWhatsapp className="text-2xl text-black" />
-                      <span>[ JOIN WHATSAPP GROUP ]</span>
-                      <FaArrowRight className="text-sm" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Interview Syllabus Download Card */}
-                <div className="p-5 sm:p-6 rounded-xl border border-white/20 bg-black/40 space-y-4 text-left shadow-2xl mt-4">
-                  <div className="flex items-center gap-2 border-b border-white/10 pb-3">
-                    <FaFilePdf className="text-xl text-rose-400" />
-                    <span className="font-mono text-sm sm:text-base font-bold text-white uppercase tracking-wider">
-                      Interview Syllabus
-                    </span>
-                  </div>
-
-                  <p className="font-mono text-xs sm:text-sm text-gray-300 leading-relaxed">
-                    Please download the interview syllabus according to your current year of study to prepare for the upcoming recruitment process.
-                  </p>
-
-                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                    <a
-                      href="/1st year.pdf"
-                      download="1st_year_syllabus.pdf"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 py-3 px-4 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white font-mono font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all duration-300 cursor-pointer"
-                    >
-                      <FaDownload className="text-sm" />
-                      <span>1st Year</span>
-                    </a>
-                    <a
-                      href="/2nd years.pdf"
-                      download="2nd_year_syllabus.pdf"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 py-3 px-4 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white font-mono font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all duration-300 cursor-pointer"
-                    >
-                      <FaDownload className="text-sm" />
-                      <span>2nd Year</span>
-                    </a>
-                  </div>
-                </div>
-              </div>
-            ) : selectedForm && (
+            {selectedForm ? (
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between border-b border-white/10 pb-5">
                   <div>
@@ -802,7 +837,18 @@ export default function RecruitmentPage() {
                 </div>
 
                 {message && (
-                  <div className="rounded-lg border border-white/30 bg-white/10 px-4 py-3 font-mono text-sm text-white">
+                  <div
+                    className={`rounded-lg border px-4 py-3 font-mono text-sm leading-relaxed ${
+                      message.toLowerCase().includes("already") ||
+                      message.toLowerCase().includes("cannot") ||
+                      message.toLowerCase().includes("failed") ||
+                      message.toLowerCase().includes("please") ||
+                      message.toLowerCase().includes("error") ||
+                      message.toLowerCase().includes("not allowed")
+                        ? "border-rose-500/60 bg-rose-950/60 text-rose-200 shadow-[0_0_20px_rgba(244,63,94,0.25)]"
+                        : "border-emerald-500/60 bg-emerald-950/60 text-emerald-200"
+                    }`}
+                  >
                     {message}
                   </div>
                 )}
@@ -815,7 +861,7 @@ export default function RecruitmentPage() {
                   {submitting ? "Submitting..." : "[ SUBMIT APPLICATION ]"}
                 </button>
               </form>
-            )}
+            ) : null}
           </div>
         </div>
       </div>

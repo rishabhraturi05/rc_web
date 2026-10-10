@@ -343,3 +343,9 @@ html {
   50% { opacity: 1; }
 }
 
+/* Hide global navigation bar when review/admin modals are active */
+body.admin-modal-open nav {
+  display: none !important;
+}
+
+

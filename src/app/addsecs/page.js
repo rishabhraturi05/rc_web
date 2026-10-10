@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSession, signIn, signOut } from "next-auth/react";
@@ -122,6 +123,25 @@ export default function AddSecDashboard() {
   const [showResumeSplit, setShowResumeSplit] = useState(true);
   const [newPositiveInput, setNewPositiveInput] = useState("");
   const [newNegativeInput, setNewNegativeInput] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (modalOpen) {
+      document.body.style.overflow = "hidden";
+      document.body.classList.add("admin-modal-open");
+    } else {
+      document.body.style.overflow = "";
+      document.body.classList.remove("admin-modal-open");
+    }
+    return () => {
+      document.body.style.overflow = "";
+      document.body.classList.remove("admin-modal-open");
+    };
+  }, [modalOpen]);
 
   // Department name from session
   const departmentName = session?.user?.department || "Department";
@@ -1746,14 +1766,15 @@ export default function AddSecDashboard() {
       </div>
 
       {/* Detailed Candidate Review Modal */}
-      {modalOpen && currentModalApp && (() => {
-        const resumeInfo = getApplicantResumeInfo(currentModalApp.responses, activeForm?.fields);
-        const hasResume = resumeInfo.hasResume;
-        const isSplit = hasResume && showResumeSplit;
+      {modalOpen && currentModalApp && mounted && typeof document !== "undefined" && createPortal(
+        (() => {
+          const resumeInfo = getApplicantResumeInfo(currentModalApp.responses, activeForm?.fields);
+          const hasResume = resumeInfo.hasResume;
+          const isSplit = hasResume && showResumeSplit;
 
-        return (
-          <div className={`fixed inset-0 z-[100] flex ${isSplit ? "items-center justify-center p-2 sm:p-4" : "items-start justify-center pt-24 sm:pt-28 pb-8 px-2.5 sm:px-4 md:px-6 overflow-y-auto"} bg-black/85 backdrop-blur-sm`}>
-            <div className={`glass-panel w-full ${isSplit ? "max-w-[96vw] xl:max-w-7xl h-[92vh] max-h-[92vh]" : "max-w-3xl max-h-[calc(100vh-7.5rem)] sm:max-h-[calc(100vh-8.5rem)] overflow-y-auto"} border border-white/25 shadow-2xl flex flex-col rounded-xl my-auto transition-all duration-300`}>
+          return (
+            <div className={`fixed inset-0 z-[99999] flex ${isSplit ? "items-center justify-center p-2 sm:p-4" : "items-start justify-center pt-24 sm:pt-28 pb-8 px-2.5 sm:px-4 md:px-6 overflow-y-auto"} bg-black/90 backdrop-blur-md`}>
+              <div className={`glass-panel w-full ${isSplit ? "max-w-[96vw] xl:max-w-7xl h-[92vh] max-h-[92vh]" : "max-w-3xl max-h-[calc(100vh-7.5rem)] sm:max-h-[calc(100vh-8.5rem)] overflow-y-auto"} border border-white/25 shadow-2xl flex flex-col rounded-xl my-auto transition-all duration-300`}>
               {/* Modal Header */}
               <div className="p-3.5 sm:p-5 border-b border-white/15 flex items-center justify-between sticky top-0 bg-black/95 backdrop-blur z-20 gap-2">
                 <div className="min-w-0 flex-1 pr-2">
@@ -2318,7 +2339,9 @@ export default function AddSecDashboard() {
           </div>
         </div>
         );
-      })()}
+      })(),
+      document.body
+    )}
     </div>
   );
 }

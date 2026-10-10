@@ -130,34 +130,85 @@ export async function POST(req, { params }) {
       );
     }
 
-    if (emailFieldNames.length) {
-      const whatsappLink =
-        process.env.NEXT_PUBLIC_RECRUITMENT_WHATSAPP_LINK ||
-        process.env.RECRUITMENT_WHATSAPP_LINK ||
-        "https://chat.whatsapp.com/FoMYMW3X0DnK4EpoeSO9Em?s=sw&p=a&mlu=4&ilr=4";
-
-      for (const d of depts) {
-        const duplicateQuery = {
-          formId: form._id,
-          department: String(d).trim(),
-          $or: emailFieldNames.map((fieldName) => ({ [`responses.${fieldName}`]: applicantEmail })),
-        };
-
-        const existingApplication = await RecruitmentApplication.findOne(duplicateQuery).lean();
-        if (existingApplication) {
-          return NextResponse.json(
-            {
-              success: true,
-              alreadyApplied: true,
-              message: `You are already registered for ${d} department.`,
-              department: existingApplication.department || d,
-              year: existingApplication.year || applicantYear,
-              data: existingApplication,
-              whatsappLink,
-            },
-            { status: 200 }
-          );
+    // Identify roll number fields and extract applicant roll number
+    let applicantRoll = "";
+    const rollFieldNames = ["rollno", "rollNumber", "roll_no", "roll"];
+    for (const field of form.fields || []) {
+      const fName = String(field?.name || "").toLowerCase();
+      const fLabel = String(field?.label || "").toLowerCase();
+      if (fName.includes("roll") || fLabel.includes("roll")) {
+        if (!rollFieldNames.includes(field.name)) {
+          rollFieldNames.push(field.name);
         }
+      }
+    }
+
+    for (const name of rollFieldNames) {
+      const val = validatedResponses[name] ?? cleanedResponses[name];
+      if (val !== undefined && val !== null && String(val).trim()) {
+        applicantRoll = String(val).trim().toLowerCase();
+        break;
+      }
+    }
+
+    // Constraint: If email OR roll number has already applied to this recruitment drive, cannot apply again
+    const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const duplicateConditions = [];
+
+    if (applicantEmail) {
+      const emailRegex = new RegExp(`^\\s*${escapeRegex(applicantEmail.trim())}\\s*$`, "i");
+      const targetEmailFields = Array.from(new Set([...emailFieldNames, "email"]));
+      for (const fieldName of targetEmailFields) {
+        duplicateConditions.push({ [`responses.${fieldName}`]: emailRegex });
+      }
+    }
+
+    if (applicantRoll) {
+      const rollRegex = new RegExp(`^\\s*${escapeRegex(applicantRoll.trim())}\\s*$`, "i");
+      const targetRollFields = Array.from(new Set([...rollFieldNames, "rollno", "rollNumber"]));
+      for (const fieldName of targetRollFields) {
+        duplicateConditions.push({ [`responses.${fieldName}`]: rollRegex });
+      }
+    }
+
+    if (duplicateConditions.length > 0) {
+      const existingApplication = await RecruitmentApplication.findOne({
+        formId: form._id,
+        $or: duplicateConditions,
+      }).lean();
+
+      if (existingApplication) {
+        const existingEmail = String(existingApplication.responses?.email || "").trim().toLowerCase();
+        const existingRoll = String(
+          existingApplication.responses?.rollno ||
+          existingApplication.responses?.rollNumber ||
+          existingApplication.responses?.roll ||
+          ""
+        ).trim().toLowerCase();
+
+        const isEmailMatch = applicantEmail && (existingEmail === applicantEmail.toLowerCase());
+        const isRollMatch = applicantRoll && (existingRoll === applicantRoll.toLowerCase());
+
+        let duplicateMsg = "You have already applied. Each applicant can only submit one application.";
+        if (isEmailMatch && isRollMatch) {
+          duplicateMsg = `Application already submitted with email "${applicantEmail}" and roll number "${applicantRoll.toUpperCase()}". You cannot apply again.`;
+        } else if (isEmailMatch) {
+          duplicateMsg = `An application has already been submitted with email "${applicantEmail}". You cannot apply again.`;
+        } else if (isRollMatch) {
+          duplicateMsg = `An application has already been submitted with roll number "${applicantRoll.toUpperCase()}". You cannot apply again.`;
+        }
+
+        return NextResponse.json(
+          {
+            success: false,
+            alreadyApplied: true,
+            message: duplicateMsg,
+            department: existingApplication.department,
+            year: existingApplication.year || applicantYear,
+            data: existingApplication,
+          },
+          { status: 400 }
+        );
       }
     }
 
