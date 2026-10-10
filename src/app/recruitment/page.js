@@ -12,6 +12,7 @@ import {
   FaTrash,
   FaEye,
   FaSpinner,
+  FaDownload,
 } from "react-icons/fa";
 
 const defaultFormState = {};
@@ -291,7 +292,7 @@ export default function RecruitmentPage() {
   const [selectedFormId, setSelectedFormId] = useState("");
   const [selectedForm, setSelectedForm] = useState(null);
   const [formValues, setFormValues] = useState(defaultFormState);
-  const [department, setDepartment] = useState("");
+  const [departments, setDepartments] = useState([]);
   const [year, setYear] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
@@ -336,7 +337,7 @@ export default function RecruitmentPage() {
             const firstForm = result.data[0];
             setSelectedFormId(firstForm._id);
             setSelectedForm(firstForm);
-            setDepartment(firstForm.departments?.[0] || "");
+            setDepartments([]);
             setYear("");
             if (firstForm.whatsappLink) {
               setWhatsappGroupLink(firstForm.whatsappLink);
@@ -369,7 +370,7 @@ export default function RecruitmentPage() {
 
   useEffect(() => {
     if (!selectedForm) return;
-    setDepartment(selectedForm.departments?.[0] || "");
+    setDepartments([]);
     setYear("");
     setFormValues({});
   }, [selectedForm]);
@@ -385,8 +386,13 @@ export default function RecruitmentPage() {
     event.preventDefault();
     if (!selectedForm) return;
 
-    if (!department) {
-      setMessage("Please select a department.");
+    if (!departments || departments.length === 0) {
+      setMessage("Please select at least one department.");
+      return;
+    }
+
+    if (departments.length > 2) {
+      setMessage("You can select a maximum of 2 departments.");
       return;
     }
 
@@ -425,7 +431,7 @@ export default function RecruitmentPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          department,
+          departments,
           year,
           responses: {
             ...formValues,
@@ -439,7 +445,7 @@ export default function RecruitmentPage() {
       if (!result.success) {
         if (result.alreadyApplied || result.message?.toLowerCase().includes("already")) {
           setSubmittedSuccess(true);
-          setSubmittedDept(result.department || department || "Robotics Club");
+          setSubmittedDept(result.department || departments.join(" & ") || "Robotics Club");
           setSubmittedYear(result.year || year || "");
           if (result.whatsappLink) {
             setWhatsappGroupLink(result.whatsappLink);
@@ -455,14 +461,14 @@ export default function RecruitmentPage() {
       }
 
       setSubmittedSuccess(true);
-      setSubmittedDept(result.department || department);
+      setSubmittedDept(result.department || departments.join(" & "));
       setSubmittedYear(result.year || year);
       if (result.whatsappLink) {
         setWhatsappGroupLink(result.whatsappLink);
       }
       setMessage("Application submitted successfully.");
       setFormValues({});
-      setDepartment(selectedForm.departments?.[0] || "");
+      setDepartments([]);
       setYear("");
       if (typeof window !== "undefined") {
         window.scrollTo({ top: 120, behavior: "smooth" });
@@ -539,7 +545,7 @@ export default function RecruitmentPage() {
                   onClick={() => {
                     setSelectedFormId(form._id);
                     setSelectedForm(form);
-                    setDepartment(form.departments?.[0] || "");
+                    setDepartments([]);
                     setYear("");
                     setSubmittedSuccess(false);
                     setMessage("");
@@ -652,6 +658,43 @@ export default function RecruitmentPage() {
                     </button>
                   </div>
                 </div>
+
+                {/* Interview Syllabus Download Card */}
+                <div className="p-5 sm:p-6 rounded-xl border border-white/20 bg-black/40 space-y-4 text-left shadow-2xl mt-4">
+                  <div className="flex items-center gap-2 border-b border-white/10 pb-3">
+                    <FaFilePdf className="text-xl text-rose-400" />
+                    <span className="font-mono text-sm sm:text-base font-bold text-white uppercase tracking-wider">
+                      Interview Syllabus
+                    </span>
+                  </div>
+
+                  <p className="font-mono text-xs sm:text-sm text-gray-300 leading-relaxed">
+                    Please download the interview syllabus according to your current year of study to prepare for the upcoming recruitment process.
+                  </p>
+
+                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                    <a
+                      href="/1st year.pdf"
+                      download="1st_year_syllabus.pdf"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 py-3 px-4 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white font-mono font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all duration-300 cursor-pointer"
+                    >
+                      <FaDownload className="text-sm" />
+                      <span>1st Year</span>
+                    </a>
+                    <a
+                      href="/2nd years.pdf"
+                      download="2nd_year_syllabus.pdf"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 py-3 px-4 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white font-mono font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all duration-300 cursor-pointer"
+                    >
+                      <FaDownload className="text-sm" />
+                      <span>2nd Year</span>
+                    </a>
+                  </div>
+                </div>
               </div>
             ) : selectedForm && (
               <form onSubmit={handleSubmit} className="space-y-6">
@@ -689,21 +732,32 @@ export default function RecruitmentPage() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <label className="mb-2 block font-mono text-xs md:text-sm font-semibold text-gray-300 uppercase tracking-wider">
-                      Department <span className="text-red-400">*</span>
+                      Department(s) <span className="text-red-400">*</span> <span className="text-gray-500 text-xs normal-case">(Max 2)</span>
                     </label>
-                    <select
-                      value={department}
-                      onChange={(event) => setDepartment(event.target.value)}
-                      className="w-full rounded-lg border border-white/20 bg-black/40 px-3.5 py-2.5 font-mono text-sm text-white focus:border-white focus:outline-none transition-colors"
-                      required
-                    >
-                      <option value="" className="bg-black text-gray-400">Select department</option>
+                    <div className="flex flex-col gap-2">
                       {formOptions.map((option) => (
-                        <option key={option.value} value={option.value} className="bg-black text-white">
-                          {option.label}
-                        </option>
+                        <label key={option.value} className="flex items-center gap-3 font-mono text-sm text-gray-200 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={departments.includes(option.value)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                if (departments.length < 2) {
+                                  setDepartments([...departments, option.value]);
+                                } else {
+                                  setMessage("You can only select up to 2 departments.");
+                                }
+                              } else {
+                                setDepartments(departments.filter((d) => d !== option.value));
+                                setMessage(""); // Clear message if user deselects
+                              }
+                            }}
+                            className="h-4 w-4 accent-white cursor-pointer"
+                          />
+                          <span>{option.label}</span>
+                        </label>
                       ))}
-                    </select>
+                    </div>
                   </div>
 
                   <div>

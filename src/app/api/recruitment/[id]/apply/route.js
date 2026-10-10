@@ -10,7 +10,8 @@ export async function POST(req, { params }) {
   try {
     const { id } = await params;
     const body = await req.json();
-    const { department, year, responses } = body || {};
+    const { departments, department, year, responses } = body || {};
+    const depts = departments || (department ? [department] : []);
 
     await connectDB();
 
@@ -30,11 +31,20 @@ export async function POST(req, { params }) {
     }
 
     const availableDepartments = Array.isArray(form.departments) ? form.departments : [];
-    if (!department || !availableDepartments.includes(String(department).trim())) {
+    if (!depts || depts.length === 0 || depts.length > 2) {
       return NextResponse.json(
-        { success: false, message: "Please choose a valid department for this application." },
+        { success: false, message: "Please select 1 or 2 valid departments." },
         { status: 400 }
       );
+    }
+
+    for (const d of depts) {
+      if (!availableDepartments.includes(String(d).trim())) {
+        return NextResponse.json(
+          { success: false, message: `Please choose a valid department for this application: ${d}.` },
+          { status: 400 }
+        );
+      }
     }
 
     const availableYears =
@@ -121,42 +131,49 @@ export async function POST(req, { params }) {
     }
 
     if (emailFieldNames.length) {
-      const duplicateQuery = {
-        formId: form._id,
-        $or: emailFieldNames.map((fieldName) => ({ [`responses.${fieldName}`]: applicantEmail })),
-      };
-
       const whatsappLink =
         process.env.NEXT_PUBLIC_RECRUITMENT_WHATSAPP_LINK ||
         process.env.RECRUITMENT_WHATSAPP_LINK ||
         "https://chat.whatsapp.com/FoMYMW3X0DnK4EpoeSO9Em?s=sw&p=a&mlu=4&ilr=4";
 
-      const existingApplication = await RecruitmentApplication.findOne(duplicateQuery).lean();
-      if (existingApplication) {
-        return NextResponse.json(
-          {
-            success: true,
-            alreadyApplied: true,
-            message: "You are already registered for this recruitment drive.",
-            department: existingApplication.department || department,
-            year: existingApplication.year || applicantYear,
-            data: existingApplication,
-            whatsappLink,
-          },
-          { status: 200 }
-        );
+      for (const d of depts) {
+        const duplicateQuery = {
+          formId: form._id,
+          department: String(d).trim(),
+          $or: emailFieldNames.map((fieldName) => ({ [`responses.${fieldName}`]: applicantEmail })),
+        };
+
+        const existingApplication = await RecruitmentApplication.findOne(duplicateQuery).lean();
+        if (existingApplication) {
+          return NextResponse.json(
+            {
+              success: true,
+              alreadyApplied: true,
+              message: `You are already registered for ${d} department.`,
+              department: existingApplication.department || d,
+              year: existingApplication.year || applicantYear,
+              data: existingApplication,
+              whatsappLink,
+            },
+            { status: 200 }
+          );
+        }
       }
     }
 
-    const application = await RecruitmentApplication.create({
-      formId: form._id,
-      department: String(department).trim(),
-      year: applicantYear,
-      responses: {
-        ...validatedResponses,
+    const createdApplications = [];
+    for (const d of depts) {
+      const application = await RecruitmentApplication.create({
+        formId: form._id,
+        department: String(d).trim(),
         year: applicantYear,
-      },
-    });
+        responses: {
+          ...validatedResponses,
+          year: applicantYear,
+        },
+      });
+      createdApplications.push(application);
+    }
 
     const whatsappLink =
       process.env.NEXT_PUBLIC_RECRUITMENT_WHATSAPP_LINK ||
@@ -164,7 +181,12 @@ export async function POST(req, { params }) {
       "https://chat.whatsapp.com/FoMYMW3X0DnK4EpoeSO9Em?s=sw&p=a&mlu=4&ilr=4";
 
     return NextResponse.json(
-      { success: true, data: application, whatsappLink },
+      { 
+        success: true, 
+        data: createdApplications.length === 1 ? createdApplications[0] : createdApplications, 
+        department: depts.join(" & "),
+        whatsappLink 
+      },
       { status: 201 }
     );
   } catch (error) {
