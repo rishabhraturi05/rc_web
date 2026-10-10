@@ -1,14 +1,16 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
-import { FaEnvelope, FaUserAstronaut } from "react-icons/fa";
+import { FaEnvelope, FaUserAstronaut, FaKey } from "react-icons/fa";
+import ChangeCredentialsModal from "@/app/components/ChangeCredentialsModal";
 
 export default function AdminDashboard() {
   const router = useRouter();
   const { data: session, status } = useSession();
+  const [credsModalOpen, setCredsModalOpen] = useState(false);
 
   useEffect(() => {
     if (status === "loading") return;
@@ -53,12 +55,22 @@ export default function AdminDashboard() {
                 Welcome, {session.user?.username || "sysadmin"}
               </p>
             </div>
-            <button
-              onClick={handleLogout}
-              className="px-6 py-2 bg-transparent border border-white text-white font-mono rounded hover:bg-white hover:text-black transition-colors uppercase text-sm tracking-widest"
-            >
-              [ LOGOUT ]
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={() => setCredsModalOpen(true)}
+                className="px-5 py-2 bg-white/10 border border-white/30 text-white font-mono rounded hover:bg-white hover:text-black transition-colors uppercase text-sm tracking-widest flex items-center gap-2 cursor-pointer"
+                title="Change User ID and Password"
+              >
+                <FaKey className="text-cyan-400" />
+                [ CREDENTIALS ]
+              </button>
+              <button
+                onClick={handleLogout}
+                className="px-6 py-2 bg-transparent border border-white text-white font-mono rounded hover:bg-white hover:text-black transition-colors uppercase text-sm tracking-widest cursor-pointer"
+              >
+                [ LOGOUT ]
+              </button>
+            </div>
           </div>
 
           <div className="grid sm:grid-cols-2 gap-6">
@@ -97,6 +109,12 @@ export default function AdminDashboard() {
           </div>
         </div>
       </div>
+      {/* Change Credentials Modal */}
+      <ChangeCredentialsModal
+        isOpen={credsModalOpen}
+        onClose={() => setCredsModalOpen(false)}
+        session={session}
+      />
     </div>
   );
 }

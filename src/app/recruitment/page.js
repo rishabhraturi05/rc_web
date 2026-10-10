@@ -304,19 +304,21 @@ export default function RecruitmentPage() {
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
   const [submittedDept, setSubmittedDept] = useState("");
   const [submittedYear, setSubmittedYear] = useState("");
-  const [whatsappGroupLink, setWhatsappGroupLink] = useState(
-    process.env.NEXT_PUBLIC_RECRUITMENT_WHATSAPP_LINK || ""
-  );
+  const [whatsappGroupLink, setWhatsappGroupLink] = useState("");
 
   const handleJoinWhatsApp = (e) => {
     e.preventDefault();
     try {
-      // Dynamic WhatsApp invite link from env / API without exposing raw plaintext in DOM
+      // Dynamic WhatsApp invite link from the selected recruitment form
       const targetUrl =
         whatsappGroupLink ||
         selectedForm?.whatsappLink ||
-        process.env.NEXT_PUBLIC_RECRUITMENT_WHATSAPP_LINK ||
-        "https://chat.whatsapp.com/FoMYMW3X0DnK4EpoeSO9Em?s=sw&p=a&mlu=4&ilr=4";
+        "";
+
+      if (!targetUrl) {
+        alert("WhatsApp invite link has not been configured for this recruitment drive.");
+        return;
+      }
 
       window.open(targetUrl, "_blank", "noopener,noreferrer");
     } catch (err) {
@@ -341,9 +343,7 @@ export default function RecruitmentPage() {
             setSelectedForm(firstForm);
             setDepartments([]);
             setYear("");
-            if (firstForm.whatsappLink) {
-              setWhatsappGroupLink(firstForm.whatsappLink);
-            }
+            setWhatsappGroupLink(firstForm.whatsappLink || "");
           }
         }
       } catch (error) {
@@ -539,14 +539,9 @@ export default function RecruitmentPage() {
                   </span>
                 </div>
 
-                <p className="font-mono text-[11px] sm:text-xs text-gray-200 leading-snug mb-2.5">
+                <p className="font-mono text-[11px] sm:text-xs text-gray-200 leading-snug mb-4">
                   All interview slots, schedule updates, assignment tasks, and announcements will be shared exclusively inside the official applicants WhatsApp group.
                 </p>
-
-                <div className="p-2 sm:p-2.5 rounded-lg bg-black/80 border border-white/15 flex items-center gap-2 text-gray-300 font-mono text-[10px] sm:text-[11px] leading-tight mb-3">
-                  <FaShieldAlt className="text-amber-400 text-xs shrink-0" />
-                  <span>Security protocol: Direct link for applicants only. Forwarding disabled.</span>
-                </div>
               </div>
 
               {/* Anti-copy WhatsApp Button */}
@@ -853,9 +848,7 @@ export default function RecruitmentPage() {
                     setYear("");
                     setSubmittedSuccess(false);
                     setMessage("");
-                    if (form.whatsappLink) {
-                      setWhatsappGroupLink(form.whatsappLink);
-                    }
+                    setWhatsappGroupLink(form.whatsappLink || "");
                   }}
                   className={`w-full text-left rounded-xl border p-5 transition-all cursor-pointer ${
                     isSelected
@@ -947,6 +940,16 @@ export default function RecruitmentPage() {
                     </div>
                   </div>
                 )}
+
+                {/* WhatsApp Group Notification Banner */}
+                <div className="p-3 sm:p-3.5 rounded-xl border border-emerald-500/40 bg-emerald-950/20 flex items-center gap-3 shadow-md">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                    <FaWhatsapp className="text-emerald-400 text-lg" />
+                  </div>
+                  <p className="font-mono text-xs sm:text-sm text-emerald-200/90 leading-snug">
+                    WhatsApp group invite link will be provided immediately upon submitting your application.
+                  </p>
+                </div>
 
                 {/* Department & Year of Study in 2 Columns */}
                 <div className="grid gap-4 sm:grid-cols-2">

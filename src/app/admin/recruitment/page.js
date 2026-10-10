@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 import {
   FaArrowLeft,
@@ -33,6 +33,7 @@ import {
   FaWhatsapp,
   FaPhoneAlt,
   FaUserTie,
+  FaSignOutAlt,
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import {
@@ -1259,6 +1260,16 @@ export default function RecruitmentAdminPage() {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await signOut({ redirect: false });
+      router.push("/admin/login");
+      router.refresh();
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
+
   if (status === "loading" || loading) {
     return (
       <div className="relative min-h-screen text-white flex items-center justify-center pt-24">
@@ -1286,7 +1297,7 @@ export default function RecruitmentAdminPage() {
               Manage recruitment forms, deadlines, departments, and applications
             </p>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {!showEditor && (
               <button
                 type="button"
@@ -1296,6 +1307,13 @@ export default function RecruitmentAdminPage() {
                 <FaPlus /> [ + CREATE NEW FORM ]
               </button>
             )}
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-5 py-2.5 border border-white/30 text-gray-300 hover:text-white hover:border-red-500/50 hover:bg-red-600/30 bg-transparent rounded transition-colors font-mono uppercase text-sm tracking-widest cursor-pointer"
+            >
+              <FaSignOutAlt /> [ LOGOUT ]
+            </button>
           </div>
         </div>
 
@@ -1446,7 +1464,7 @@ export default function RecruitmentAdminPage() {
                   className="w-full rounded border border-white/20 bg-black/60 px-3.5 py-2 font-mono text-sm text-white placeholder:text-gray-500 focus:border-emerald-400 focus:outline-none transition-colors"
                 />
                 <p className="font-mono text-xs text-gray-400 mt-1.5 leading-relaxed">
-                  Applicants who submit this recruitment form will receive this link to join the official WhatsApp group for interview slot notifications and drive updates. (Leave blank to use default club group).
+                  Applicants who submit this recruitment form will receive this link to join the official WhatsApp group for interview slot notifications and drive updates.
                 </p>
               </div>
 

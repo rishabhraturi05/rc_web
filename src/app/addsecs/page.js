@@ -35,9 +35,11 @@ import {
   FaFilePdf,
   FaColumns,
   FaExternalLinkAlt,
+  FaKey,
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import { getRecruitmentFormTitle, getApplicantResumeInfo } from "@/app/lib/recruitment";
+import ChangeCredentialsModal from "@/app/components/ChangeCredentialsModal";
 
 const DEPARTMENTS = [
   {
@@ -76,6 +78,7 @@ export default function AddSecDashboard() {
   const [loading, setLoading] = useState(true);
   const [loadingApps, setLoadingApps] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState({ text: "", type: "info" });
+  const [credsModalOpen, setCredsModalOpen] = useState(false);
 
   // Direct Inline Login State when unauthenticated
   const [loginCreds, setLoginCreds] = useState({ username: "", password: "" });
@@ -1037,6 +1040,14 @@ export default function AddSecDashboard() {
 
               <div className="flex flex-wrap items-center gap-2">
                 <button
+                  onClick={() => setCredsModalOpen(true)}
+                  className="px-4 py-2 bg-white/5 hover:bg-white/15 text-gray-200 hover:text-white border border-white/20 hover:border-cyan-400 rounded font-mono text-xs uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer"
+                  title="Change User ID and Password"
+                >
+                  <FaKey className="text-xs text-cyan-400" />
+                  [ Change Credentials ]
+                </button>
+                <button
                   onClick={handleLogout}
                   className="px-4 py-2 bg-transparent hover:bg-red-600/30 text-gray-300 hover:text-white border border-white/20 hover:border-red-500/50 rounded font-mono text-xs uppercase tracking-wider flex items-center gap-2 transition-colors"
                 >
@@ -1161,6 +1172,14 @@ export default function AddSecDashboard() {
             {/* Top Header Bar */}
             <div className="glass-panel p-5 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-white/20">
               <div>
+                <button
+                  type="button"
+                  onClick={() => setActiveFormId(null)}
+                  className="inline-flex items-center gap-2 text-gray-400 hover:text-white font-mono text-xs mb-2.5 transition-colors cursor-pointer"
+                  title="Return to AddSec Portal Home"
+                >
+                  <FaArrowLeft size={11} /> Back to AddSec Home
+                </button>
                 <div className="flex flex-wrap items-center gap-2 mb-1">
                   <span className="px-2.5 py-0.5 rounded text-xs font-mono font-bold uppercase tracking-wider bg-white/10 text-white border border-white/30">
                     {departmentName} Department
@@ -1180,15 +1199,15 @@ export default function AddSecDashboard() {
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => setActiveFormId(null)}
-                  className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/30 rounded font-mono text-xs uppercase tracking-wider flex items-center gap-2 transition-colors"
-                  title="Return to recruitment selection"
+                  className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/30 rounded font-mono text-xs uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer"
+                  title="Return to AddSec Home"
                 >
                   <FaArrowLeft className="text-xs" />
-                  [ Switch Recruitment ]
+                  [ Back to Home ]
                 </button>
                 <button
                   onClick={exportAllForms}
-                  className="px-4 py-2 bg-white/5 hover:bg-white/10 text-gray-200 border border-white/20 rounded font-mono text-xs uppercase tracking-wider flex items-center gap-2 transition-colors"
+                  className="px-4 py-2 bg-white/5 hover:bg-white/10 text-gray-200 border border-white/20 rounded font-mono text-xs uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer"
                   title="Download all entries for your department across all recruitment forms"
                 >
                   <FaDownload className="text-xs" />
@@ -1196,7 +1215,7 @@ export default function AddSecDashboard() {
                 </button>
                 <button
                   onClick={handleLogout}
-                  className="px-4 py-2 bg-transparent hover:bg-red-600/30 text-gray-300 hover:text-white border border-white/20 hover:border-red-500/50 rounded font-mono text-xs uppercase tracking-wider flex items-center gap-2 transition-colors"
+                  className="px-4 py-2 bg-transparent hover:bg-red-600/30 text-gray-300 hover:text-white border border-white/20 hover:border-red-500/50 rounded font-mono text-xs uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer"
                 >
                   <FaSignOutAlt className="text-xs" />
                   [ Logout ]
@@ -2342,6 +2361,13 @@ export default function AddSecDashboard() {
       })(),
       document.body
     )}
+
+      {/* Change User ID and Password Modal */}
+      <ChangeCredentialsModal
+        isOpen={credsModalOpen}
+        onClose={() => setCredsModalOpen(false)}
+        session={session}
+      />
     </div>
   );
 }

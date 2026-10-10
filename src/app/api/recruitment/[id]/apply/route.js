@@ -226,10 +226,7 @@ export async function POST(req, { params }) {
       createdApplications.push(application);
     }
 
-    const whatsappLink =
-      process.env.NEXT_PUBLIC_RECRUITMENT_WHATSAPP_LINK ||
-      process.env.RECRUITMENT_WHATSAPP_LINK ||
-      "https://chat.whatsapp.com/FoMYMW3X0DnK4EpoeSO9Em?s=sw&p=a&mlu=4&ilr=4";
+    const whatsappLink = (form.whatsappLink && form.whatsappLink.trim()) || "";
 
     return NextResponse.json(
       { 

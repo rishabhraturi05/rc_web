@@ -73,17 +73,7 @@ export const authOptions = {
 
           if (adminUser) {
             console.log(`[AUTH] Found Admin record for: "${adminUser.username}"`);
-            let isMatch = await bcrypt.compare(password, adminUser.password);
-
-            // Self-healing: If user provided the official seed password "roboticsclub@2027",
-            // but the hash in Mongo was different, sync the hash in Mongo so it works!
-            if (!isMatch && password === "roboticsclub@2027") {
-              console.log("[AUTH] Provided password matches 'roboticsclub@2027'. Syncing password hash in Mongo...");
-              adminUser.password = await bcrypt.hash("roboticsclub@2027", 10);
-              await adminUser.save();
-              console.log("[AUTH] Admin password hash synced successfully.");
-              isMatch = true;
-            }
+            const isMatch = await bcrypt.compare(password, adminUser.password);
 
             if (isMatch) {
               console.log(`[AUTH] Admin login SUCCESS for ${adminUser.username}`);
@@ -135,14 +125,6 @@ export const authOptions = {
             // Also check un-trimmed password in case original had intentional spaces
             if (!isMatch && cleanPass !== password) {
               isMatch = await bcrypt.compare(password, addSecUser.password);
-            }
-
-            // Self-healing: If password matches the default configured password for this AddSec, sync it
-            if (!isMatch && defaultAddSec && (cleanPass === defaultAddSec.password || password === defaultAddSec.password)) {
-              console.log(`[AUTH] Syncing AddSec password for ${addSecUser.username}...`);
-              addSecUser.password = await bcrypt.hash(defaultAddSec.password, 10);
-              await addSecUser.save();
-              isMatch = true;
             }
 
             if (isMatch) {
