@@ -12,7 +12,7 @@ export const allmembers = {
         {
             "name": "Ibrahim Azeem",
             "email": "bss10i19ibrahimazeem@gmail.com",
-            "img": "/members/embedded/Ibrahim Azeem.jpg",
+            "img": "/members/2026/Ibrahim Azeem.jpg",
             "linkedin": "https://www.linkedin.com/in/ibrahim-azeem/",
             "instagram": "/"
         },
@@ -35,14 +35,7 @@ export const allmembers = {
             "email": "shivapranav95@gmsil.com",
             "img": "/members/2026/shiva_pranav_thalla.webp",
             "linkedin": "https://www.linkedin.com/in/shivapranav-thalla-3b337733b/",
-            "instagram": "https://www.instagram.com/_sp._95/"
-        },
-        {
-            "name": "Eesh Tripathi",
-            "email": "et23eeb0a04@student.nitw.ac.in",
-            "img": "/members/2026/eesh_tripathi.webp",
-            "linkedin": "https://www.linkedin.com/in/eesh-tripathi-778ab4273/",
-            "instagram": "https://www.instagram.com/tripathi_eesh?igsi=MWpkYjNuaDh4dG1wbA=="
+            "instagram": "_sp._95/"
         },
         {
             "name": "Kabir Gavashande",
@@ -110,7 +103,7 @@ export const allmembers = {
         {
             "name": "Shravya Rangu",
             "email": "rs24eeb0b51@student.nitw.ac.in",
-            "img": "/members/embedded/Shravya_Rangu.jpeg",
+            "img": "/members/2026/Shravya_Rangu.jpeg",
             "linkedin": "https://www.linkedin.com/in/shravya-rangu-a02908261",
             "instagram": "https://www.instagram.com/shravya__rangu"
         },
@@ -175,7 +168,7 @@ export const allmembers = {
         {
             "name": "Rishabh Raturi",
             "email": "rishabhraturi05@gmail.com",
-            "img": "/members/software/Rishab_Raturi.jpg",
+            "img": "/members/2026/Rishab_Raturi.jpg",
             "linkedin": "https://www.linkedin.com/in/rishabh-raturi-18961626a/",
             "instagram": "https://www.instagram.com/therishabhraturi/"
         },
@@ -234,6 +227,13 @@ export const allmembers = {
             "img": "/members/2026/vedant_jadhav.webp",
             "linkedin": "https://www.linkedin.com/in/vedant-jadhav-00029b388",
             "instagram": "https://www.instagram.com/vedant.j.29"
+        },
+        {
+            "name": "Dhanvanth Chandrasekaran",
+            "email": "",
+            "img": "/members/2026/DhanvanthChandrasekaran - Dhanvanth Chandrasekaran.jpg",
+            "linkedin": "#",
+            "instagram": "#"
         }
     ],
     "mechanical": [
@@ -261,7 +261,7 @@ export const allmembers = {
         {
             "name": "Amit Sarkar",
             "email": "sa23meb0a20@student.nitw.ac.in",
-            "img": "/members/PR/Amit_Sarkar.jpeg",
+            "img": "/members/2026/Amit_Sarkar.jpeg",
             "linkedin": "https://www.linkedin.com/in/amit-sarkar-690610350",
             "instagram": "https://www.instagram.com/amitsarkar_5810"
         },
@@ -389,14 +389,14 @@ export const allmembers = {
         {
             "name": "Amit Sarkar",
             "email": "sa23meb0a20@student.nitw.ac.in",
-            "img": "/members/PR/Amit_Sarkar.jpeg",
+            "img": "/members/2026/Amit_Sarkar.jpeg",
             "linkedin": "https://www.linkedin.com/in/amit-sarkar-690610350",
             "instagram": "https://www.instagram.com/amitsarkar_5810"
         },
         {
             "name": "Shravya Rangu",
             "email": "rs24eeb0b51@student.nitw.ac.in",
-            "img": "/members/embedded/Shravya_Rangu.jpeg",
+            "img": "/members/2026/Shravya_Rangu.jpeg",
             "linkedin": "https://www.linkedin.com/in/shravya-rangu-a02908261",
             "instagram": "https://www.instagram.com/shravya__rangu"
         },
@@ -484,7 +484,7 @@ export const allmembers = {
         {
             "name": "Rishabh Raturi",
             "email": "rishabhraturi05@gmail.com",
-            "img": "/members/software/Rishab_Raturi.jpg",
+            "img": "/members/2026/Rishab_Raturi.jpg",
             "linkedin": "https://www.linkedin.com/in/rishabh-raturi-18961626a/",
             "instagram": "https://www.instagram.com/therishabhraturi/"
         },
@@ -505,7 +505,7 @@ export const allmembers = {
         {
             "name": "Shravya Rangu",
             "email": "rs24eeb0b51@student.nitw.ac.in",
-            "img": "/members/embedded/Shravya_Rangu.jpeg",
+            "img": "/members/2026/Shravya_Rangu.jpeg",
             "linkedin": "https://www.linkedin.com/in/shravya-rangu-a02908261",
             "instagram": "https://www.instagram.com/shravya__rangu"
         }

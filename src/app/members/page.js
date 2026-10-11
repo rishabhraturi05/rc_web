@@ -1,16 +1,18 @@
 "use client";
 import Link from 'next/link';
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { FaLinkedin, FaInstagram, FaEnvelope, FaNetworkWired, FaMicrochip, FaCode, FaCogs, FaBullhorn } from 'react-icons/fa'
+import {
+  FaLinkedin,
+  FaInstagram,
+  FaEnvelope,
+  FaNetworkWired,
+  FaMicrochip,
+  FaCode,
+  FaCogs,
+  FaBullhorn
+} from 'react-icons/fa'
 import { allmembers } from '../components/Membersarray';
-
-const profiles = {
-  professor: allmembers.facad,
-  secretaries: allmembers.secretaries,
-  addlSecretaries: allmembers.addlSecretaries,
-}
-const allofthemembers = allmembers;
 
 const tabs = [
   { id: 'core', label: 'Core Command', icon: <FaNetworkWired /> },
@@ -49,7 +51,14 @@ const ProfileCard = ({ person, size = 'md', index = 0 }) => {
       className="group relative overflow-hidden glass-panel glass-panel-hover"
     >
       <div className={`relative ${isExtraSmall ? 'h-50' : isSmall ? 'h-74' : 'h-68'} w-full`}>
-        <img src={person.img} alt={person.name} className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+        <img
+          src={person.img || person.imageUrl || "/members/2026/aryan_roy.webp"}
+          alt={person.name}
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+          onError={(e) => {
+            e.currentTarget.src = "/favicon.ico";
+          }}
+        />
       </div>
 
       {/* Cyberpunk gradient overlay */}
@@ -61,24 +70,38 @@ const ProfileCard = ({ person, size = 'md', index = 0 }) => {
       <div className="absolute inset-x-0 bottom-0 p-4 text-white transform transition-transform duration-300">
         <div className="flex flex-col gap-2">
           <p className={`${isExtraSmall ? 'text-xs' : isSmall ? 'text-sm' : 'text-base'} font-bold font-mono tracking-tight text-cyan-50`}>{person.name}</p>
+          {person.role && (
+            <p className="text-xs font-mono text-gray-400 -mt-1">{person.role}</p>
+          )}
           <div className="flex gap-4 items-center">
-            <button
-              onClick={() => copyToClipboard(person.email, 'email')}
-              className="pointer-events-auto text-gray-400 hover:text-cyan-400 transition-colors"
-              title="Copy email"
-            >
-              <FaEnvelope size={16} />
-            </button>
-            <Link href={person.linkedin} target="_blank" rel="noreferrer" className="pointer-events-auto text-gray-400 hover:text-blue-400 transition-colors">
-              <FaLinkedin size={16} />
-            </Link>
-            <button
-              onClick={() => copyToClipboard(person.instagram, 'instagram')}
-              className="pointer-events-auto text-gray-400 hover:text-pink-400 transition-colors"
-              title="Copy Instagram"
-            >
-              <FaInstagram size={16} />
-            </button>
+            {person.email && (
+              <button
+                onClick={() => copyToClipboard(person.email, 'email')}
+                className="pointer-events-auto text-gray-400 hover:text-cyan-400 transition-colors cursor-pointer"
+                title="Copy email"
+              >
+                <FaEnvelope size={16} />
+              </button>
+            )}
+            {person.linkedin && person.linkedin !== "#" && (
+              <Link
+                href={person.linkedin.startsWith("http") ? person.linkedin : `https://${person.linkedin}`}
+                target="_blank"
+                rel="noreferrer"
+                className="pointer-events-auto text-gray-400 hover:text-blue-400 transition-colors"
+              >
+                <FaLinkedin size={16} />
+              </Link>
+            )}
+            {person.instagram && person.instagram !== "#" && (
+              <button
+                onClick={() => copyToClipboard(person.instagram, 'instagram')}
+                className="pointer-events-auto text-gray-400 hover:text-pink-400 transition-colors cursor-pointer"
+                title="Copy Instagram"
+              >
+                <FaInstagram size={16} />
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -93,7 +116,7 @@ const ProfileCard = ({ person, size = 'md', index = 0 }) => {
   )
 }
 
-const Section = ({ title, people, cols = 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4', cardSize = 'md' }) => (
+const Section = ({ title, people = [], cols = 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4', cardSize = 'md' }) => (
   <div className="mb-16">
     <div className="flex items-center gap-4 mb-10">
       <span className="w-12 h-[2px] bg-cyan-400"></span>
@@ -109,6 +132,45 @@ const Section = ({ title, people, cols = 'grid-cols-1 sm:grid-cols-2 md:grid-col
 
 const Page = () => {
   const [activeTab, setActiveTab] = useState('core');
+
+  const [profiles, setProfiles] = useState({
+    professor: allmembers.facad,
+    secretaries: allmembers.secretaries,
+    addlSecretaries: allmembers.addlSecretaries,
+  });
+
+  const [allofthemembers, setAllofthemembers] = useState({
+    software: allmembers.software,
+    embedded: allmembers.embedded,
+    mechanical: allmembers.mechanical,
+    pr: allmembers.pr,
+  });
+
+  // Fetch live members from MongoDB
+  useEffect(() => {
+    fetch('/api/members', { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((res) => {
+        if (res.success && res.data) {
+          const d = res.data;
+          setProfiles({
+            professor: Array.isArray(d.professor) && d.professor.length > 0 ? d.professor : allmembers.facad,
+            secretaries: Array.isArray(d.secretaries) ? d.secretaries : allmembers.secretaries,
+            addlSecretaries: Array.isArray(d.addlSecretaries) ? d.addlSecretaries : allmembers.addlSecretaries,
+          });
+
+          setAllofthemembers({
+            software: Array.isArray(d.software) ? d.software : allmembers.software,
+            embedded: Array.isArray(d.embedded) ? d.embedded : allmembers.embedded,
+            mechanical: Array.isArray(d.mechanical) ? d.mechanical : allmembers.mechanical,
+            pr: Array.isArray(d.pr) ? d.pr : allmembers.pr,
+          });
+        }
+      })
+      .catch((err) => {
+        console.error("Live members load notice:", err);
+      });
+  }, []);
 
   return (
     <main className="relative min-h-screen bg-transparent text-white overflow-x-hidden pb-24">
@@ -134,7 +196,7 @@ const Page = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-5 py-3 rounded-md font-mono text-xs md:text-sm uppercase tracking-widest transition-all duration-300 border-2 ${activeTab === tab.id
+              className={`flex items-center gap-2 px-5 py-3 rounded-md font-mono text-xs md:text-sm uppercase tracking-widest transition-all duration-300 border-2 cursor-pointer ${activeTab === tab.id
                   ? 'bg-cyan-500/20 border-cyan-400 text-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.4)] scale-105'
                   : 'bg-black/60 border-white/10 text-gray-400 hover:border-white/30 hover:text-white hover:bg-black/80'
                 } backdrop-blur-md`}
@@ -218,5 +280,3 @@ const Page = () => {
 }
 
 export default Page;
-
-

@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
-import { FaEnvelope, FaUserAstronaut, FaKey } from "react-icons/fa";
+import { FaEnvelope, FaUserAstronaut, FaKey, FaUsers } from "react-icons/fa";
 import ChangeCredentialsModal from "@/app/components/ChangeCredentialsModal";
 
 export default function AdminDashboard() {
@@ -61,7 +61,7 @@ export default function AdminDashboard() {
                 className="px-5 py-2 bg-white/10 border border-white/30 text-white font-mono rounded hover:bg-white hover:text-black transition-colors uppercase text-sm tracking-widest flex items-center gap-2 cursor-pointer"
                 title="Change User ID and Password"
               >
-                <FaKey className="text-cyan-400" />
+                <FaKey className="text-white" />
                 [ CREDENTIALS ]
               </button>
               <button
@@ -98,12 +98,23 @@ export default function AdminDashboard() {
 
             <Link
               href="/admin/recruitment"
-              className="group glass-panel p-8 glass-panel-hover flex flex-col sm:col-span-2"
+              className="group glass-panel p-8 glass-panel-hover flex flex-col"
             >
               <FaUserAstronaut className="text-3xl text-white mb-6 group-hover:scale-110 transition-transform" />
               <h2 className="font-mono text-xl font-bold mb-2 text-white">RECRUITMENT_MANAGEMENT</h2>
               <p className="font-mono text-gray-400 text-sm leading-relaxed">
                 Create and manage multiple recruitment forms, deadlines, departments, and applications
+              </p>
+            </Link>
+
+            <Link
+              href="/admin/members"
+              className="group glass-panel p-8 glass-panel-hover flex flex-col"
+            >
+              <FaUsers className="text-3xl text-white mb-6 group-hover:scale-110 transition-transform" />
+              <h2 className="font-mono text-xl font-bold mb-2 text-white">MANAGE_MEMBERS</h2>
+              <p className="font-mono text-gray-400 text-sm leading-relaxed">
+                View department-wise roster, assign performance scores, and add or delete members
               </p>
             </Link>
           </div>
