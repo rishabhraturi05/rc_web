@@ -38,7 +38,7 @@ import {
   FaKey,
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
-import { getRecruitmentFormTitle, getApplicantResumeInfo } from "@/app/lib/recruitment";
+import { getRecruitmentFormTitle, getApplicantResumeInfo, normalizeToTimeInputValue, formatTimeSlot } from "@/app/lib/recruitment";
 import ChangeCredentialsModal from "@/app/components/ChangeCredentialsModal";
 
 const DEPARTMENTS = [
@@ -119,6 +119,8 @@ export default function AddSecDashboard() {
 
   // Inline edits state: { [appId]: { points, comments, feedback, positiveRemarks, negativeRemarks, isDirty, isSaving, savedRecently } }
   const [inlineEdits, setInlineEdits] = useState({});
+  const [slotSavingId, setSlotSavingId] = useState(null);
+  const [slotSavedId, setSlotSavedId] = useState(null);
 
   // Review Modal state
   const [modalAppIndex, setModalAppIndex] = useState(null); // index in filteredApplications
@@ -212,7 +214,10 @@ export default function AddSecDashboard() {
     if (!formId) return;
     setLoadingApps(true);
     try {
-      const response = await fetch(`/api/addsecs/forms/${formId}/applications`);
+      const response = await fetch(`/api/addsecs/forms/${formId}/applications`, {
+        cache: "no-store",
+        headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
+      });
       const result = await response.json();
 
       if (result.success) {
@@ -358,11 +363,18 @@ export default function AddSecDashboard() {
           .map((v) => String(v).toLowerCase())
           .join(" ");
 
+        const cSlot = String(
+          inlineEdits[app._id]?.interviewSlot !== undefined
+            ? inlineEdits[app._id].interviewSlot
+            : app.interviewSlot || ""
+        ).toLowerCase();
+
         const matches =
           candidateName.includes(query) ||
           candidateRoll.includes(query) ||
           candidateEmail.includes(query) ||
           candidateComments.includes(query) ||
+          cSlot.includes(query) ||
           allAnswers.includes(query);
 
         if (!matches) return false;
@@ -465,6 +477,7 @@ export default function AddSecDashboard() {
           feedback: edit.feedback,
           positiveRemarks: edit.positiveRemarks || [],
           negativeRemarks: edit.negativeRemarks || [],
+          interviewSlot: edit.interviewSlot,
         }),
       });
 
@@ -478,23 +491,64 @@ export default function AddSecDashboard() {
         return;
       }
 
-      // Update local application record
+      // Helper to match candidate sibling applications across departments
+      const targetApp = applications.find((a) => a._id === appId);
+      const targetEmail = String(targetApp?.responses?.email || "").trim().toLowerCase();
+      const targetRoll = String(
+        targetApp?.responses?.rollno ||
+        targetApp?.responses?.rollNumber ||
+        targetApp?.responses?.roll ||
+        ""
+      ).trim().toLowerCase();
+
+      const isCandidateMatch = (app) => {
+        if (app._id === appId) return true;
+        const e = String(app.responses?.email || "").trim().toLowerCase();
+        const r = String(app.responses?.rollno || app.responses?.rollNumber || app.responses?.roll || "").trim().toLowerCase();
+        return (targetEmail && e && e === targetEmail) || (targetRoll && r && r === targetRoll);
+      };
+
+      // Update local application record (syncing slot across all of candidate's applications)
       setApplications((prev) =>
-        prev.map((app) =>
-          app._id === appId
-            ? {
-                ...app,
-                points: edit.points,
-                comments: edit.comments,
-                feedback: edit.feedback,
-                positiveRemarks: edit.positiveRemarks || [],
-                negativeRemarks: edit.negativeRemarks || [],
-                evaluatedBy: result.data?.evaluatedBy,
-                evaluatedAt: result.data?.evaluatedAt,
-              }
-            : app
-        )
+        prev.map((app) => {
+          if (app._id === appId) {
+            return {
+              ...app,
+              points: edit.points,
+              comments: edit.comments,
+              feedback: edit.feedback,
+              positiveRemarks: edit.positiveRemarks || [],
+              negativeRemarks: edit.negativeRemarks || [],
+              interviewSlot: edit.interviewSlot !== undefined ? edit.interviewSlot : app.interviewSlot,
+              evaluatedBy: result.data?.evaluatedBy,
+              evaluatedAt: result.data?.evaluatedAt,
+            };
+          }
+          if (edit.interviewSlot !== undefined && isCandidateMatch(app)) {
+            return {
+              ...app,
+              interviewSlot: edit.interviewSlot,
+            };
+          }
+          return app;
+        })
       );
+
+      // Also sync inline edits for sibling applications if slot was updated
+      if (edit.interviewSlot !== undefined) {
+        setInlineEdits((prev) => {
+          const next = { ...prev };
+          applications.forEach((app) => {
+            if (isCandidateMatch(app) && app._id !== appId) {
+              next[app._id] = {
+                ...(next[app._id] || {}),
+                interviewSlot: edit.interviewSlot,
+              };
+            }
+          });
+          return next;
+        });
+      }
 
       setInlineEdits((prev) => ({
         ...prev,
@@ -515,6 +569,77 @@ export default function AddSecDashboard() {
         ...prev,
         [appId]: { ...(prev[appId] || {}), isSaving: false },
       }));
+    }
+  };
+
+  // Dedicated interview slot updater (allows quick inline saving from table)
+  const saveInterviewSlot = async (appId, slotValue) => {
+    if (!activeForm || !appId) return;
+    setSlotSavingId(appId);
+    try {
+      const trimmed = String(slotValue ?? "").trim();
+      const response = await fetch(`/api/addsecs/forms/${activeForm._id}/applications`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId: appId,
+          interviewSlot: trimmed,
+        }),
+      });
+
+      const result = await response.json();
+      if (!result.success) {
+        showToast(result.message || "Failed to update interview slot.", "error");
+        return;
+      }
+
+      // Find candidate matching details so sibling applications update in state
+      const targetApp = applications.find((a) => a._id === appId);
+      const targetEmail = String(targetApp?.responses?.email || "").trim().toLowerCase();
+      const targetRoll = String(
+        targetApp?.responses?.rollno ||
+        targetApp?.responses?.rollNumber ||
+        targetApp?.responses?.roll ||
+        ""
+      ).trim().toLowerCase();
+
+      const isCandidateMatch = (app) => {
+        if (app._id === appId) return true;
+        const e = String(app.responses?.email || "").trim().toLowerCase();
+        const r = String(app.responses?.rollno || app.responses?.rollNumber || app.responses?.roll || "").trim().toLowerCase();
+        return (targetEmail && e && e === targetEmail) || (targetRoll && r && r === targetRoll);
+      };
+
+      setApplications((prev) =>
+        prev.map((app) =>
+          isCandidateMatch(app) ? { ...app, interviewSlot: trimmed } : app
+        )
+      );
+
+      setInlineEdits((prev) => {
+        const next = { ...prev };
+        applications.forEach((app) => {
+          if (isCandidateMatch(app)) {
+            next[app._id] = {
+              ...(next[app._id] || {}),
+              interviewSlot: trimmed,
+              isDirty: false,
+            };
+          }
+        });
+        return next;
+      });
+
+      setSlotSavedId(appId);
+      showToast("Interview slot updated.", "success");
+      setTimeout(() => {
+        setSlotSavedId((prev) => (prev === appId ? null : prev));
+      }, 2500);
+    } catch (err) {
+      console.error("Save interview slot error:", err);
+      showToast("Error updating interview slot.", "error");
+    } finally {
+      setSlotSavingId(null);
     }
   };
 
@@ -687,6 +812,7 @@ export default function AddSecDashboard() {
       row["Points / Score"] = scoreInfo.isEvaluated ? scoreInfo.scoreFormatted : "";
       row["Positive Remarks (+1)"] = Array.isArray(posRemarks) ? posRemarks.join("; ") : "";
       row["Negative Remarks (-1)"] = Array.isArray(negRemarks) ? negRemarks.join("; ") : "";
+      row["Interview Slot"] = formatTimeSlot(edit.interviewSlot !== undefined ? edit.interviewSlot : app.interviewSlot);
       row["Comments / Remarks"] = commentsVal;
       row["Evaluated By"] = app.evaluatedBy || "";
       row["Evaluated At"] = app.evaluatedAt ? new Date(app.evaluatedAt).toLocaleString() : "";
@@ -793,6 +919,7 @@ export default function AddSecDashboard() {
         row["Points / Score"] = scoreInfo.isEvaluated ? scoreInfo.scoreFormatted : "";
         row["Positive Remarks (+1)"] = Array.isArray(posRemarks) ? posRemarks.join("; ") : "";
         row["Negative Remarks (-1)"] = Array.isArray(negRemarks) ? negRemarks.join("; ") : "";
+        row["Interview Slot"] = formatTimeSlot(edit.interviewSlot !== undefined ? edit.interviewSlot : app.interviewSlot);
         row["Comments / Remarks"] = commentsVal;
         row["Evaluated By"] = app.evaluatedBy || "";
         row["Evaluated At"] = app.evaluatedAt ? new Date(app.evaluatedAt).toLocaleString() : "";
@@ -1590,6 +1717,61 @@ export default function AddSecDashboard() {
                           </div>
                         )}
 
+                        {/* Interview Time Slot on Mobile */}
+                        {(() => {
+                          const currentSlot = edit.interviewSlot !== undefined ? edit.interviewSlot : (app.interviewSlot || "");
+                          const isSaving = slotSavingId === app._id;
+                          const isSaved = slotSavedId === app._id;
+                          const isDirty = edit.interviewSlot !== undefined && edit.interviewSlot !== (app.interviewSlot || "");
+
+                          return (
+                            <div className="py-2.5 space-y-1.5 border-b border-white/10">
+                              <div className="flex items-center justify-between text-[11px] font-mono text-gray-400 font-semibold uppercase tracking-wider">
+                                <div className="flex items-center gap-1.5">
+                                  <FaClock className="text-cyan-400 text-xs" />
+                                  <span>Interview Time Slot</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="time"
+                                  value={normalizeToTimeInputValue(currentSlot)}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    handleInlineChange(app._id, "interviewSlot", val);
+                                    saveInterviewSlot(app._id, val);
+                                  }}
+                                  style={{ colorScheme: "dark" }}
+                                  className={`flex-1 px-2.5 py-1.5 rounded text-xs font-mono transition-all border focus:outline-none cursor-pointer ${
+                                    currentSlot
+                                      ? "bg-cyan-950/40 border-cyan-500/50 text-cyan-200 focus:border-cyan-400"
+                                      : "bg-black/60 border-white/15 text-gray-400 focus:border-cyan-500/50"
+                                  }`}
+                                  title="Click to select interview time"
+                                />
+                                {currentSlot ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleInlineChange(app._id, "interviewSlot", "");
+                                      saveInterviewSlot(app._id, "");
+                                    }}
+                                    className="text-gray-500 hover:text-rose-400 text-xs px-1.5 py-1 rounded transition-colors cursor-pointer shrink-0"
+                                    title="Clear time slot"
+                                  >
+                                    <FaTimes />
+                                  </button>
+                                ) : null}
+                                {isSaving ? (
+                                  <span className="text-[10px] font-mono text-cyan-400 animate-pulse px-1">...</span>
+                                ) : isSaved ? (
+                                  <FaCheckCircle className="text-emerald-400 text-xs shrink-0" title="Saved" />
+                                ) : null}
+                              </div>
+                            </div>
+                          );
+                        })()}
+
                         {/* Card Actions Footer */}
                         <div className="pt-2.5 flex items-center justify-between text-xs font-mono mt-1">
                           <div className="text-[10px] text-gray-500">
@@ -1624,157 +1806,208 @@ export default function AddSecDashboard() {
 
                 {/* 2. DESKTOP & TABLET HIGH-DENSITY DATA TABLE (hidden on mobile, visible on md and up) */}
                 <div className="hidden md:block glass-panel border border-white/15 overflow-hidden rounded-xl">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left font-mono text-xs">
-                      <thead className="bg-white/5 border-b border-white/15 text-gray-400 uppercase tracking-wider">
-                        <tr>
-                          <th className="py-3 px-3 w-12 text-center">#</th>
-                          <th className="py-3 px-4 min-w-[200px]">Applicant Info</th>
-                          <th className="py-3 px-3 min-w-[85px]">Year</th>
-                          <th className="py-3 px-3 min-w-[120px]">
-                            <div className="flex items-center gap-1">
-                              <FaStar className="text-amber-400 text-xs" />
-                              <span>Score</span>
-                            </div>
-                          </th>
-                          <th className="py-3 px-4 min-w-[260px]">
-                            <div className="flex items-center gap-1">
-                              <FaRegCommentDots className="text-blue-400 text-xs" />
-                              <span>Positive / Negative Points</span>
-                            </div>
-                          </th>
-                          <th className="py-3 px-3 min-w-[110px] text-center">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/10">
-                        {filteredApplications.map((app, index) => {
-                          const edit = inlineEdits[app._id] || {};
-                          const scoreInfo = getCandidateScoreInfo(app, edit);
-                          const appResume = getApplicantResumeInfo(app.responses, activeForm?.fields);
-                          const candidateName = app.responses?.name || app.responses?.fullName || "Applicant";
-                          const candidateRoll = app.responses?.rollno || app.responses?.rollNumber || "—";
-                          const candidateEmail = app.responses?.email || "—";
-                          const candidateYear = app.year || app.responses?.year || "—";
+                  <table className="w-full table-fixed text-left font-mono text-xs">
+                    <thead className="bg-white/5 border-b border-white/15 text-gray-400 uppercase tracking-wider text-[11px]">
+                      <tr>
+                        <th className="py-2.5 px-2 w-[4%] text-center">#</th>
+                        <th className="py-2.5 px-3 w-[24%]">Applicant Info</th>
+                        <th className="py-2.5 px-2 w-[8%] text-center">Year</th>
+                        <th className="py-2.5 px-2 w-[9%] text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <FaStar className="text-amber-400 text-xs" />
+                            <span>Score</span>
+                          </div>
+                        </th>
+                        <th className="py-2.5 px-2.5 w-[23%]">
+                          <div className="flex items-center gap-1">
+                            <FaRegCommentDots className="text-blue-400 text-xs" />
+                            <span>Remarks</span>
+                          </div>
+                        </th>
+                        <th className="py-2.5 px-2.5 w-[19%]">
+                          <div className="flex items-center gap-1.5">
+                            <FaClock className="text-cyan-400 text-xs" />
+                            <span>Interview Slot</span>
+                          </div>
+                        </th>
+                        <th className="py-2.5 px-2 w-[13%] text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/10">
+                      {filteredApplications.map((app, index) => {
+                        const edit = inlineEdits[app._id] || {};
+                        const scoreInfo = getCandidateScoreInfo(app, edit);
+                        const appResume = getApplicantResumeInfo(app.responses, activeForm?.fields);
+                        const candidateName = app.responses?.name || app.responses?.fullName || "Applicant";
+                        const candidateRoll = app.responses?.rollno || app.responses?.rollNumber || "—";
+                        const candidateEmail = app.responses?.email || "—";
+                        const candidateYear = app.year || app.responses?.year || "—";
 
-                          return (
-                            <tr
-                              key={app._id}
-                              className={`transition-colors group ${
-                                scoreInfo.status === "positive"
-                                  ? "border-l-4 border-l-emerald-500 bg-emerald-950/20 hover:bg-emerald-950/30"
-                                  : scoreInfo.status === "zero" && scoreInfo.isEvaluated
-                                  ? "border-l-4 border-l-amber-400 bg-amber-950/20 hover:bg-amber-950/30"
-                                  : scoreInfo.status === "negative"
-                                  ? "border-l-4 border-l-rose-500 bg-rose-950/20 hover:bg-rose-950/30"
-                                  : "hover:bg-white/[0.03]"
-                              }`}
-                            >
-                              {/* Index */}
-                              <td className="py-3 px-3 text-center text-gray-500">{index + 1}</td>
+                        return (
+                          <tr
+                            key={app._id}
+                            className={`transition-colors group ${
+                              scoreInfo.status === "positive"
+                                ? "border-l-4 border-l-emerald-500 bg-emerald-950/20 hover:bg-emerald-950/30"
+                                : scoreInfo.status === "zero" && scoreInfo.isEvaluated
+                                ? "border-l-4 border-l-amber-400 bg-amber-950/20 hover:bg-amber-950/30"
+                                : scoreInfo.status === "negative"
+                                ? "border-l-4 border-l-rose-500 bg-rose-950/20 hover:bg-rose-950/30"
+                                : "hover:bg-white/[0.03]"
+                            }`}
+                          >
+                            {/* Index */}
+                            <td className="py-2.5 px-2 text-center text-gray-500 text-[11px] overflow-hidden">{index + 1}</td>
 
-                              {/* Applicant Info */}
-                              <td className="py-3 px-4">
-                                <div className="font-bold text-white text-sm">{candidateName}</div>
-                                <div className="text-gray-400 text-[11px] flex items-center gap-2 mt-0.5">
-                                  <span>Roll: <strong className="text-gray-300">{candidateRoll}</strong></span>
-                                </div>
-                                <div className="text-gray-500 text-[10px] truncate max-w-[200px]" title={candidateEmail}>
-                                  {candidateEmail}
-                                </div>
-                                <div className="text-gray-500 text-[10px] mt-0.5">
-                                  Submitted: {new Date(app.createdAt).toLocaleDateString()}
-                                </div>
-                              </td>
+                            {/* Applicant Info */}
+                            <td className="py-2.5 px-3 overflow-hidden">
+                              <div className="font-bold text-white text-xs truncate" title={candidateName}>{candidateName}</div>
+                              <div className="text-gray-400 text-[10px] truncate mt-0.5">
+                                Roll: <strong className="text-gray-300">{candidateRoll}</strong>
+                              </div>
+                              <div className="text-gray-500 text-[10px] truncate" title={candidateEmail}>
+                                {candidateEmail}
+                              </div>
+                              <div className="text-gray-500 text-[9px] truncate">
+                                {new Date(app.createdAt).toLocaleDateString()}
+                              </div>
+                            </td>
 
-                              {/* Year */}
-                              <td className="py-3 px-3">
-                                <span className="px-2 py-0.5 rounded text-[11px] bg-white/10 text-gray-300 border border-white/20 whitespace-nowrap">
-                                  {candidateYear}
+                            {/* Year */}
+                            <td className="py-2.5 px-2 text-center overflow-hidden">
+                              <span className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 text-gray-300 border border-white/20 whitespace-nowrap">
+                                {candidateYear}
+                              </span>
+                            </td>
+
+                            {/* Read-only Score Badge */}
+                            <td className="py-2.5 px-2 text-center overflow-hidden">
+                              {scoreInfo.isEvaluated ? (
+                                <span
+                                  className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold font-mono ${
+                                    scoreInfo.status === "positive"
+                                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/60"
+                                      : scoreInfo.status === "negative"
+                                      ? "bg-rose-500/20 text-rose-300 border border-rose-500/60"
+                                      : "bg-amber-400/20 text-amber-300 border border-amber-400/60"
+                                  }`}
+                                >
+                                  <span>{scoreInfo.scoreFormatted}</span>
+                                  <span className="text-[8px] opacity-75 ml-0.5">pts</span>
                                 </span>
-                              </td>
+                              ) : (
+                                <span className="text-gray-500 font-mono text-[11px]">—</span>
+                              )}
+                            </td>
 
-                              {/* Read-only Score Badge */}
-                              <td className="py-3 px-3">
-                                {scoreInfo.isEvaluated ? (
-                                  <span
-                                    className={`inline-flex items-center px-2.5 py-1 rounded text-xs font-bold font-mono ${
-                                      scoreInfo.status === "positive"
-                                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/60 shadow-[0_0_8px_rgba(16,185,129,0.25)]"
-                                        : scoreInfo.status === "negative"
-                                        ? "bg-rose-500/20 text-rose-300 border border-rose-500/60 shadow-[0_0_8px_rgba(244,63,94,0.25)]"
-                                        : "bg-amber-400/20 text-amber-300 border border-amber-400/60 shadow-[0_0_8px_rgba(251,191,36,0.25)]"
-                                    }`}
-                                  >
-                                    <span>{scoreInfo.scoreFormatted}</span>
-                                    <span className="text-[10px] opacity-75 ml-1">pts</span>
-                                  </span>
-                                ) : (
-                                  <span className="text-gray-500 font-mono text-xs">—</span>
+                            {/* Read-only Remarks & Comments Preview */}
+                            <td className="py-2.5 px-2.5 overflow-hidden">
+                              <div className="space-y-0.5">
+                                {(scoreInfo.posCount > 0 || scoreInfo.negCount > 0) && (
+                                  <div className="flex items-center gap-1 flex-wrap">
+                                    {scoreInfo.posCount > 0 && (
+                                      <span className="inline-flex items-center gap-0.5 text-[9px] font-mono font-bold px-1 py-0.5 rounded bg-emerald-950/70 text-emerald-300 border border-emerald-500/40">
+                                        +{scoreInfo.posCount}
+                                      </span>
+                                    )}
+                                    {scoreInfo.negCount > 0 && (
+                                      <span className="inline-flex items-center gap-0.5 text-[9px] font-mono font-bold px-1 py-0.5 rounded bg-rose-950/70 text-rose-300 border border-rose-500/40">
+                                        -{scoreInfo.negCount}
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
-                              </td>
+                                {scoreInfo.comments ? (
+                                  <div className="text-[10px] text-gray-300 truncate font-mono" title={scoreInfo.comments}>
+                                    {scoreInfo.comments}
+                                  </div>
+                                ) : !scoreInfo.posCount && !scoreInfo.negCount ? (
+                                  <span className="text-gray-600 text-[10px] italic">None</span>
+                                ) : null}
+                              </div>
+                            </td>
 
-                              {/* Read-only Remarks & Comments Preview (NO TEXTAREA) */}
-                              <td className="py-3 px-4 max-w-[280px]">
-                                <div className="space-y-1">
-                                  {(scoreInfo.posCount > 0 || scoreInfo.negCount > 0) && (
-                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                      {scoreInfo.posCount > 0 && (
-                                        <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-950/70 text-emerald-300 border border-emerald-500/40">
-                                          +{scoreInfo.posCount} Pos
-                                        </span>
-                                      )}
-                                      {scoreInfo.negCount > 0 && (
-                                        <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-rose-950/70 text-rose-300 border border-rose-500/40">
-                                          -{scoreInfo.negCount} Neg
-                                        </span>
-                                      )}
-                                    </div>
-                                  )}
-                                  {scoreInfo.comments ? (
-                                    <div className="text-xs text-gray-300 line-clamp-2 break-words font-mono" title={scoreInfo.comments}>
-                                      {scoreInfo.comments}
-                                    </div>
-                                  ) : !scoreInfo.posCount && !scoreInfo.negCount ? (
-                                    <span className="text-gray-500 text-xs italic">No remarks yet</span>
-                                  ) : null}
-                                  {app.evaluatedBy && (
-                                    <div className="text-[10px] text-gray-500">
-                                      By {app.evaluatedBy} • {app.evaluatedAt ? new Date(app.evaluatedAt).toLocaleDateString() : ""}
-                                    </div>
-                                  )}
-                                </div>
-                              </td>
+                            {/* Interview Time Slot */}
+                            <td className="py-2.5 px-2.5 overflow-hidden">
+                              {(() => {
+                                const currentSlot = edit.interviewSlot !== undefined ? edit.interviewSlot : (app.interviewSlot || "");
+                                const isSaving = slotSavingId === app._id;
+                                const isSaved = slotSavedId === app._id;
+                                const isDirty = edit.interviewSlot !== undefined && edit.interviewSlot !== (app.interviewSlot || "");
 
-                              {/* Review Actions */}
-                              <td className="py-3 px-3 text-center">
-                                <div className="flex items-center justify-center gap-1.5">
-                                  {appResume.hasResume && (
-                                    <button
-                                      type="button"
-                                      onClick={() => openModal(index, true)}
-                                      className="px-2.5 py-1.5 bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 border border-rose-500/40 rounded text-xs font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-1"
-                                      title="Open resume in parallel view & grade"
-                                    >
-                                      <FaFilePdf className="text-[11px]" />
-                                      <span>Resume</span>
-                                    </button>
-                                  )}
+                                return (
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="time"
+                                      value={normalizeToTimeInputValue(currentSlot)}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        handleInlineChange(app._id, "interviewSlot", val);
+                                        saveInterviewSlot(app._id, val);
+                                      }}
+                                      style={{ colorScheme: "dark" }}
+                                      className={`w-full min-w-0 px-2 py-1 rounded text-[11px] font-mono transition-all border focus:outline-none cursor-pointer ${
+                                        currentSlot
+                                          ? "bg-cyan-950/40 border-cyan-500/50 text-cyan-200 focus:border-cyan-400"
+                                          : "bg-black/60 border-white/15 text-gray-400 focus:border-cyan-500/50"
+                                      }`}
+                                      title="Click to select interview time"
+                                    />
+
+                                    {currentSlot ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          handleInlineChange(app._id, "interviewSlot", "");
+                                          saveInterviewSlot(app._id, "");
+                                        }}
+                                        className="text-gray-500 hover:text-rose-400 text-[10px] px-1 py-0.5 rounded transition-colors cursor-pointer shrink-0"
+                                        title="Clear time slot"
+                                      >
+                                        <FaTimes />
+                                      </button>
+                                    ) : null}
+
+                                    {isSaving ? (
+                                      <span className="text-[9px] font-mono text-cyan-400 animate-pulse">...</span>
+                                    ) : isSaved ? (
+                                      <span className="text-[10px] text-emerald-400 shrink-0" title="Saved!">
+                                        <FaCheckCircle />
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                );
+                              })()}
+                            </td>
+
+                            {/* Review Actions */}
+                            <td className="py-2.5 px-2 text-center overflow-hidden">
+                              <div className="flex items-center justify-center gap-1">
+                                {appResume.hasResume && (
                                   <button
                                     type="button"
-                                    onClick={() => openModal(index)}
-                                    className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white border border-white/25 rounded text-xs font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer"
-                                    title="Open candidate detailed review modal to edit remarks and score"
+                                    onClick={() => openModal(index, true)}
+                                    className="px-1.5 py-1 bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 border border-rose-500/40 rounded text-[10px] font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-0.5"
+                                    title="Open resume"
                                   >
-                                    Review
+                                    <FaFilePdf className="text-[10px]" />
                                   </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => openModal(index)}
+                                  className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white border border-white/25 rounded text-[10px] font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                                  title="Review candidate"
+                                >
+                                  Review
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </>
             )}
@@ -2291,6 +2524,59 @@ export default function AddSecDashboard() {
                       </div>
                     </div>
 
+                    {/* Interview Time Slot */}
+                    <div className="p-3.5 rounded-lg bg-cyan-950/20 border border-cyan-500/30">
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-xs font-mono text-cyan-300 uppercase tracking-wider flex items-center gap-1.5 font-bold">
+                          <FaClock className="text-cyan-400 text-xs" />
+                          <span>Interview Time Slot</span>
+                        </label>
+                        {slotSavedId === currentModalApp._id && (
+                          <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
+                            <FaCheckCircle /> Slot Saved
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="time"
+                          value={normalizeToTimeInputValue(modalEdit.interviewSlot !== undefined ? modalEdit.interviewSlot : (currentModalApp.interviewSlot || ""))}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            handleInlineChange(currentModalApp._id, "interviewSlot", val);
+                            saveInterviewSlot(currentModalApp._id, val);
+                          }}
+                          style={{ colorScheme: "dark" }}
+                          className="flex-1 px-3 py-2 bg-black/80 rounded text-xs font-mono text-cyan-200 border border-cyan-500/30 focus:border-cyan-400 focus:outline-none cursor-pointer"
+                          title="Click to select interview time"
+                        />
+                        {(modalEdit.interviewSlot !== undefined ? modalEdit.interviewSlot : currentModalApp.interviewSlot) ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleInlineChange(currentModalApp._id, "interviewSlot", "");
+                              saveInterviewSlot(currentModalApp._id, "");
+                            }}
+                            className="px-2.5 py-2 border border-rose-500/30 hover:border-rose-500 text-rose-400 font-mono text-xs rounded transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                            title="Clear time slot"
+                          >
+                            <FaTimes className="text-[10px]" />
+                            <span>Clear</span>
+                          </button>
+                        ) : null}
+                        {slotSavingId === currentModalApp._id ? (
+                          <span className="text-xs font-mono text-cyan-400 animate-pulse px-2">Saving...</span>
+                        ) : slotSavedId === currentModalApp._id ? (
+                          <span className="text-xs font-mono text-emerald-400 flex items-center gap-1 px-2">
+                            <FaCheckCircle /> Saved
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="text-[10px] font-mono text-gray-400 mt-1.5">
+                        Set the interview time slot. Any changes automatically save and reflect in the admin recruitment portal.
+                      </p>
+                    </div>
+
                     {/* Optional Overall Comments / Notes */}
                     <div>
                       <label className="block text-xs font-mono text-gray-300 mb-1 uppercase tracking-wider">
@@ -2320,8 +2606,13 @@ export default function AddSecDashboard() {
                         type="button"
                         onClick={() =>
                           saveEvaluation(currentModalApp._id, {
+                            ...modalEdit,
                             feedback: autoScore > 0 ? "positive" : autoScore < 0 ? "negative" : "waitlist",
                             points: displayScore,
+                            interviewSlot:
+                              modalEdit.interviewSlot !== undefined
+                                ? modalEdit.interviewSlot
+                                : currentModalApp.interviewSlot,
                           })
                         }
                         disabled={modalEdit.isSaving}

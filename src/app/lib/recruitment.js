@@ -329,3 +329,56 @@ export function getApplicantResumeInfo(responses = {}, formFields = []) {
   return { hasResume: false, url: "", filename: "", label: "" };
 }
 
+export function normalizeToTimeInputValue(str) {
+  if (!str || typeof str !== "string") return "";
+  const trimmed = str.trim();
+  if (!trimmed) return "";
+
+  // 24h format HH:mm
+  const match24 = trimmed.match(/^([01]?[0-9]|2[0-3]):([0-5][0-9])$/);
+  if (match24) {
+    return `${match24[1].padStart(2, "0")}:${match24[2]}`;
+  }
+
+  // 12h format e.g. "10:30 AM", "2:30 pm", "4:30PM"
+  const match12 = trimmed.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(am|pm)?$/i);
+  if (match12) {
+    let hours = parseInt(match12[1], 10);
+    const minutes = match12[2];
+    const modifier = match12[3]?.toLowerCase();
+
+    if (modifier === "pm" && hours < 12) hours += 12;
+    if (modifier === "am" && hours === 12) hours = 0;
+
+    return `${String(hours).padStart(2, "0")}:${minutes}`;
+  }
+
+  // Fallback: search for time substring like "4:30 PM" or "14:30" in text
+  const matchSub = trimmed.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i);
+  if (matchSub) {
+    let hours = parseInt(matchSub[1], 10);
+    const minutes = matchSub[2];
+    const modifier = matchSub[3]?.toLowerCase();
+
+    if (modifier === "pm" && hours < 12) hours += 12;
+    if (modifier === "am" && hours === 12) hours = 0;
+
+    return `${String(hours).padStart(2, "0")}:${minutes}`;
+  }
+
+  return "";
+}
+
+export function formatTimeSlot(timeStr) {
+  if (!timeStr || typeof timeStr !== "string") return "Not Scheduled";
+  const normalized = normalizeToTimeInputValue(timeStr);
+  if (!normalized) return timeStr || "Not Scheduled";
+
+  const [hStr, mStr] = normalized.split(":");
+  let hours = parseInt(hStr, 10);
+  const minutes = mStr;
+  const period = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12 || 12;
+  return `${String(hours).padStart(2, "0")}:${minutes} ${period}`;
+}
+

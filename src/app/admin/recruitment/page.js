@@ -45,6 +45,8 @@ import {
   isDepartmentField,
   isYearField,
   getApplicantResumeInfo,
+  normalizeToTimeInputValue,
+  formatTimeSlot,
 } from "@/app/lib/recruitment";
 
 const DEFAULT_DEADLINE = "2026-12-31T23:59";
@@ -191,6 +193,7 @@ function buildSheetRows(form, applications, inlineEdits = {}) {
       "Points / Score": scoreInfo.isEvaluated ? scoreInfo.scoreFormatted : "",
       "Positive Remarks (+1)": Array.isArray(posRemarks) ? posRemarks.join("; ") : "",
       "Negative Remarks (-1)": Array.isArray(negRemarks) ? negRemarks.join("; ") : "",
+      "Interview Slot": formatTimeSlot(edit.interviewSlot !== undefined ? edit.interviewSlot : application.interviewSlot),
       "Comments / Remarks": commentsVal,
       "Evaluated By": application.evaluatedBy || "Pending",
       "Evaluated At": application.evaluatedAt ? new Date(application.evaluatedAt).toLocaleString() : "",
@@ -244,6 +247,8 @@ export default function RecruitmentAdminPage() {
 
   // Inline edits state: { [appId]: { points, comments, feedback, positiveRemarks, negativeRemarks, isDirty, isSaving, savedRecently } }
   const [inlineEdits, setInlineEdits] = useState({});
+  const [slotSavingId, setSlotSavingId] = useState(null);
+  const [slotSavedId, setSlotSavedId] = useState(null);
 
   // Review Modal state
   const [modalAppIndex, setModalAppIndex] = useState(null);
@@ -390,6 +395,13 @@ export default function RecruitmentAdminPage() {
         const cDepts = group.deptApplications.map((d) => String(d.department || "").toLowerCase()).join(" ");
         const cComments = deptScoreInfos.map((i) => String(i.comments).toLowerCase()).join(" ");
 
+        const cSlots = group.deptApplications
+          .map((d) => {
+            const editSlot = inlineEdits[d._id]?.interviewSlot;
+            return String(editSlot !== undefined ? editSlot : d.interviewSlot || "").toLowerCase();
+          })
+          .join(" ");
+
         const allAnswers = group.deptApplications
           .flatMap((d) => Object.values(d.responses || {}))
           .map((v) => String(v).toLowerCase())
@@ -401,6 +413,7 @@ export default function RecruitmentAdminPage() {
           cEmail.includes(query) ||
           cDepts.includes(query) ||
           cComments.includes(query) ||
+          cSlots.includes(query) ||
           allAnswers.includes(query);
 
         if (!matches) return false;
@@ -533,6 +546,7 @@ export default function RecruitmentAdminPage() {
           feedback: edit.feedback,
           positiveRemarks: edit.positiveRemarks || [],
           negativeRemarks: edit.negativeRemarks || [],
+          interviewSlot: edit.interviewSlot,
         }),
       });
 
@@ -557,23 +571,64 @@ export default function RecruitmentAdminPage() {
         },
       }));
 
-      // Update in applications list as well
+      // Helper to match candidate sibling applications across departments
+      const targetApp = applications.find((a) => a._id === appId);
+      const targetEmail = String(targetApp?.responses?.email || "").trim().toLowerCase();
+      const targetRoll = String(
+        targetApp?.responses?.rollno ||
+        targetApp?.responses?.rollNumber ||
+        targetApp?.responses?.roll ||
+        ""
+      ).trim().toLowerCase();
+
+      const isCandidateMatch = (app) => {
+        if (app._id === appId) return true;
+        const e = String(app.responses?.email || "").trim().toLowerCase();
+        const r = String(app.responses?.rollno || app.responses?.rollNumber || app.responses?.roll || "").trim().toLowerCase();
+        return (targetEmail && e && e === targetEmail) || (targetRoll && r && r === targetRoll);
+      };
+
+      // Update in applications list as well (syncing slot across all of candidate's applications)
       setApplications((prev) =>
-        prev.map((app) =>
-          app._id === appId
-            ? {
-                ...app,
-                points: edit.points,
-                comments: edit.comments,
-                feedback: edit.feedback,
-                positiveRemarks: edit.positiveRemarks || [],
-                negativeRemarks: edit.negativeRemarks || [],
-                evaluatedBy: result.data?.evaluatedBy || session?.user?.username || "admin",
-                evaluatedAt: result.data?.evaluatedAt || new Date().toISOString(),
-              }
-            : app
-        )
+        prev.map((app) => {
+          if (app._id === appId) {
+            return {
+              ...app,
+              points: edit.points,
+              comments: edit.comments,
+              feedback: edit.feedback,
+              positiveRemarks: edit.positiveRemarks || [],
+              negativeRemarks: edit.negativeRemarks || [],
+              interviewSlot: edit.interviewSlot !== undefined ? edit.interviewSlot : app.interviewSlot,
+              evaluatedBy: result.data?.evaluatedBy || session?.user?.username || "admin",
+              evaluatedAt: result.data?.evaluatedAt || new Date().toISOString(),
+            };
+          }
+          if (edit.interviewSlot !== undefined && isCandidateMatch(app)) {
+            return {
+              ...app,
+              interviewSlot: edit.interviewSlot,
+            };
+          }
+          return app;
+        })
       );
+
+      // Also sync inline edits for sibling applications if slot was updated
+      if (edit.interviewSlot !== undefined) {
+        setInlineEdits((prev) => {
+          const next = { ...prev };
+          applications.forEach((app) => {
+            if (isCandidateMatch(app) && app._id !== appId) {
+              next[app._id] = {
+                ...(next[app._id] || {}),
+                interviewSlot: edit.interviewSlot,
+              };
+            }
+          });
+          return next;
+        });
+      }
 
       setTimeout(() => {
         setInlineEdits((prev) => ({
@@ -588,6 +643,76 @@ export default function RecruitmentAdminPage() {
         ...prev,
         [appId]: { ...(prev[appId] || {}), isSaving: false },
       }));
+    }
+  };
+
+  // Dedicated interview slot updater (allows quick inline saving from table)
+  const saveInterviewSlot = async (appId, slotValue) => {
+    if (!selectedForm || !appId) return;
+    setSlotSavingId(appId);
+    try {
+      const trimmed = String(slotValue ?? "").trim();
+      const response = await fetch(`/api/admin/recruitment/${selectedForm._id}/applications`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId: appId,
+          interviewSlot: trimmed,
+        }),
+      });
+
+      const result = await response.json();
+      if (!result.success) {
+        setMessage(result.message || "Failed to update interview slot.");
+        return;
+      }
+
+      // Find candidate matching details so sibling applications update in state
+      const targetApp = applications.find((a) => a._id === appId);
+      const targetEmail = String(targetApp?.responses?.email || "").trim().toLowerCase();
+      const targetRoll = String(
+        targetApp?.responses?.rollno ||
+        targetApp?.responses?.rollNumber ||
+        targetApp?.responses?.roll ||
+        ""
+      ).trim().toLowerCase();
+
+      const isCandidateMatch = (app) => {
+        if (app._id === appId) return true;
+        const e = String(app.responses?.email || "").trim().toLowerCase();
+        const r = String(app.responses?.rollno || app.responses?.rollNumber || app.responses?.roll || "").trim().toLowerCase();
+        return (targetEmail && e && e === targetEmail) || (targetRoll && r && r === targetRoll);
+      };
+
+      setApplications((prev) =>
+        prev.map((app) =>
+          isCandidateMatch(app) ? { ...app, interviewSlot: trimmed } : app
+        )
+      );
+
+      setInlineEdits((prev) => {
+        const next = { ...prev };
+        applications.forEach((app) => {
+          if (isCandidateMatch(app)) {
+            next[app._id] = {
+              ...(next[app._id] || {}),
+              interviewSlot: trimmed,
+              isDirty: false,
+            };
+          }
+        });
+        return next;
+      });
+
+      setSlotSavedId(appId);
+      setTimeout(() => {
+        setSlotSavedId((prev) => (prev === appId ? null : prev));
+      }, 2500);
+    } catch (error) {
+      console.error("Save interview slot error:", error);
+      setMessage("Error updating interview slot.");
+    } finally {
+      setSlotSavingId(null);
     }
   };
 
@@ -2345,6 +2470,66 @@ export default function RecruitmentAdminPage() {
                           })}
                         </div>
 
+                        {/* Interview Time Slot on Mobile */}
+                        {(() => {
+                          const candidateApp = group.primaryApp;
+                          const candidateSlotApp = group.deptApplications.find(
+                            (d) => (inlineEdits[d._id]?.interviewSlot !== undefined ? inlineEdits[d._id].interviewSlot : d.interviewSlot)
+                          );
+                          const currentSlot = candidateSlotApp
+                            ? (inlineEdits[candidateSlotApp._id]?.interviewSlot !== undefined ? inlineEdits[candidateSlotApp._id].interviewSlot : candidateSlotApp.interviewSlot)
+                            : (inlineEdits[candidateApp._id]?.interviewSlot !== undefined ? inlineEdits[candidateApp._id].interviewSlot : candidateApp.interviewSlot) || "";
+                          const isSaving = group.deptApplications.some((d) => slotSavingId === d._id) || slotSavingId === candidateApp._id;
+                          const isSaved = group.deptApplications.some((d) => slotSavedId === d._id) || slotSavedId === candidateApp._id;
+
+                          return (
+                            <div className="py-2.5 space-y-1.5 border-b border-white/10">
+                              <div className="flex items-center justify-between text-[11px] font-mono text-gray-400 font-semibold uppercase tracking-wider">
+                                <div className="flex items-center gap-1.5">
+                                  <FaClock className="text-cyan-400 text-xs" />
+                                  <span>Interview Time Slot</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="time"
+                                  value={normalizeToTimeInputValue(currentSlot)}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    handleInlineChange(candidateApp._id, "interviewSlot", val);
+                                    saveInterviewSlot(candidateApp._id, val);
+                                  }}
+                                  style={{ colorScheme: "dark" }}
+                                  className={`flex-1 px-2.5 py-1.5 rounded text-xs font-mono transition-all border focus:outline-none cursor-pointer ${
+                                    currentSlot
+                                      ? "bg-cyan-950/40 border-cyan-500/50 text-cyan-200 focus:border-cyan-400"
+                                      : "bg-black/60 border-white/15 text-gray-400 focus:border-cyan-500/50"
+                                  }`}
+                                  title="Click to select interview time"
+                                />
+                                {currentSlot ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleInlineChange(candidateApp._id, "interviewSlot", "");
+                                      saveInterviewSlot(candidateApp._id, "");
+                                    }}
+                                    className="text-gray-500 hover:text-rose-400 text-xs px-1.5 py-1 rounded transition-colors cursor-pointer shrink-0"
+                                    title="Clear time slot"
+                                  >
+                                    <FaTimes />
+                                  </button>
+                                ) : null}
+                                {isSaving ? (
+                                  <span className="text-[10px] font-mono text-cyan-400 animate-pulse px-1">...</span>
+                                ) : isSaved ? (
+                                  <FaCheckCircle className="text-emerald-400 text-xs shrink-0" title="Saved" />
+                                ) : null}
+                              </div>
+                            </div>
+                          );
+                        })()}
+
                         {/* Card Actions Footer */}
                         <div className="pt-2.5 flex items-center justify-between text-xs font-mono mt-1 gap-2 flex-wrap">
                           <div className="text-[10px] text-gray-500 truncate">
@@ -2399,234 +2584,294 @@ export default function RecruitmentAdminPage() {
 
                 {/* 2. Desktop High-Density Data Table (visible on md+) */}
                 <div className="hidden md:block glass-panel border border-white/15 overflow-hidden rounded-xl">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left font-mono text-xs">
-                      <thead className="bg-white/5 border-b border-white/15 text-gray-400 uppercase tracking-wider">
-                        <tr>
-                          <th className="py-3 px-3 w-10 text-center">#</th>
-                          <th className="py-3 px-3 min-w-[190px]">Applicant Info</th>
-                          <th className="py-3 px-2 min-w-[130px]">Department</th>
-                          <th className="py-3 px-2 min-w-[80px]">Year</th>
-                          <th className="py-3 px-3 min-w-[140px]">
-                            <div className="flex items-center gap-1">
-                              <FaStar className="text-amber-400 text-xs" />
-                              <span>Score</span>
-                            </div>
-                          </th>
-                          <th className="py-3 px-3 min-w-[240px]">
-                            <div className="flex items-center gap-1">
-                              <FaRegCommentDots className="text-blue-400 text-xs" />
-                              <span>Positive / Negative Points</span>
-                            </div>
-                          </th>
-                          <th className="py-3 px-3 min-w-[200px] text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/10">
-                        {groupedApplications.map((group, index) => {
-                          const primaryApp = group.primaryApp;
-                          const candidateName = group.candidateName;
-                          const candidateRoll = group.candidateRoll;
-                          const candidateEmail = group.candidateEmail;
-                          const candidateYear = group.candidateYear;
-                          const appResume = getApplicantResumeInfo(primaryApp.responses, selectedForm?.fields);
+                  <table className="w-full table-fixed text-left font-mono text-xs">
+                    <thead className="bg-white/5 border-b border-white/15 text-gray-400 uppercase tracking-wider text-[11px]">
+                      <tr>
+                        <th className="py-2.5 px-2 w-[3.5%] text-center">#</th>
+                        <th className="py-2.5 px-2.5 w-[20%]">Applicant Info</th>
+                        <th className="py-2.5 px-2 w-[11%]">Dept</th>
+                        <th className="py-2.5 px-1.5 w-[7%] text-center">Year</th>
+                        <th className="py-2.5 px-2 w-[8.5%] text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <FaStar className="text-amber-400 text-xs" />
+                            <span>Score</span>
+                          </div>
+                        </th>
+                        <th className="py-2.5 px-2 w-[19%]">
+                          <div className="flex items-center gap-1">
+                            <FaRegCommentDots className="text-blue-400 text-xs" />
+                            <span>Remarks</span>
+                          </div>
+                        </th>
+                        <th className="py-2.5 px-2 w-[18%]">
+                          <div className="flex items-center gap-1">
+                            <FaClock className="text-cyan-400 text-xs" />
+                            <span>Interview Slot</span>
+                          </div>
+                        </th>
+                        <th className="py-2.5 px-2.5 w-[13%] text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/10">
+                      {groupedApplications.map((group, index) => {
+                        const primaryApp = group.primaryApp;
+                        const candidateName = group.candidateName;
+                        const candidateRoll = group.candidateRoll;
+                        const candidateEmail = group.candidateEmail;
+                        const candidateYear = group.candidateYear;
+                        const appResume = getApplicantResumeInfo(primaryApp.responses, selectedForm?.fields);
 
-                          const allScoreInfos = group.deptApplications.map((d) =>
-                            getCandidateScoreInfo(d, inlineEdits[d._id])
-                          );
-                          const hasPositive = allScoreInfos.some((s) => s.status === "positive");
-                          const hasNegative = allScoreInfos.some((s) => s.status === "negative");
-                          const hasZero = allScoreInfos.some((s) => s.status === "zero" && s.isEvaluated);
+                        const allScoreInfos = group.deptApplications.map((d) =>
+                          getCandidateScoreInfo(d, inlineEdits[d._id])
+                        );
+                        const hasPositive = allScoreInfos.some((s) => s.status === "positive");
+                        const hasNegative = allScoreInfos.some((s) => s.status === "negative");
+                        const hasZero = allScoreInfos.some((s) => s.status === "zero" && s.isEvaluated);
 
-                          return (
-                            <tr
-                              key={group.key}
-                              className={`transition-colors group ${
-                                hasPositive
-                                  ? "border-l-4 border-l-emerald-500 bg-emerald-950/20 hover:bg-emerald-950/30"
-                                  : hasZero
-                                  ? "border-l-4 border-l-amber-400 bg-amber-950/20 hover:bg-amber-950/30"
-                                  : hasNegative
-                                  ? "border-l-4 border-l-rose-500 bg-rose-950/20 hover:bg-rose-950/30"
-                                  : "hover:bg-white/[0.03]"
-                              }`}
-                            >
-                              {/* Index */}
-                              <td className="py-3 px-3 text-center text-gray-500">{index + 1}</td>
+                        return (
+                          <tr
+                            key={group.key}
+                            className={`transition-colors group ${
+                              hasPositive
+                                ? "border-l-4 border-l-emerald-500 bg-emerald-950/20 hover:bg-emerald-950/30"
+                                : hasZero
+                                ? "border-l-4 border-l-amber-400 bg-amber-950/20 hover:bg-amber-950/30"
+                                : hasNegative
+                                ? "border-l-4 border-l-rose-500 bg-rose-950/20 hover:bg-rose-950/30"
+                                : "hover:bg-white/[0.03]"
+                            }`}
+                          >
+                            {/* Index */}
+                            <td className="py-2.5 px-2 text-center text-gray-500 text-[11px] overflow-hidden">{index + 1}</td>
 
-                              {/* Applicant Info */}
-                              <td className="py-3 px-3">
-                                <div className="font-bold text-white text-sm">{candidateName}</div>
-                                <div className="text-gray-400 text-[11px] flex items-center gap-2 mt-0.5">
-                                  <span>Roll: <strong className="text-gray-200">{candidateRoll}</strong></span>
-                                </div>
-                                <div className="text-gray-500 text-[10px] truncate max-w-[190px]" title={candidateEmail}>
-                                  {candidateEmail}
-                                </div>
-                                <div className="text-gray-500 text-[10px] mt-0.5">
-                                  Submitted: {new Date(group.createdAt).toLocaleDateString()}
-                                </div>
-                              </td>
+                            {/* Applicant Info */}
+                            <td className="py-2.5 px-2.5 overflow-hidden">
+                              <div className="font-bold text-white text-xs truncate" title={candidateName}>
+                                {candidateName}
+                              </div>
+                              <div className="text-gray-400 text-[10px] truncate mt-0.5">
+                                Roll: <strong className="text-gray-200">{candidateRoll}</strong>
+                              </div>
+                              <div className="text-gray-500 text-[10px] truncate" title={candidateEmail}>
+                                {candidateEmail}
+                              </div>
+                              <div className="text-gray-500 text-[9px] truncate">
+                                {new Date(group.createdAt).toLocaleDateString()}
+                              </div>
+                            </td>
 
-                              {/* Department Badges (shows all applied departments) */}
-                              <td className="py-3 px-2">
-                                <div className="flex flex-wrap gap-1.5">
-                                  {group.deptApplications.map((deptApp) => {
-                                    const deptLower = String(deptApp.department || "").toLowerCase();
-                                    const deptBadgeClass = deptLower.includes("soft")
-                                      ? "text-blue-400 border-blue-500/40 bg-blue-950/30"
-                                      : deptLower.includes("mech")
-                                      ? "text-amber-400 border-amber-500/40 bg-amber-950/30"
-                                      : deptLower.includes("embed")
-                                      ? "text-emerald-400 border-emerald-500/40 bg-emerald-950/30"
-                                      : deptLower.includes("pr")
-                                      ? "text-purple-400 border-purple-500/40 bg-purple-950/30"
-                                      : "text-white border-white/20 bg-white/10";
+                            {/* Department Badges (shows all applied departments) */}
+                            <td className="py-2.5 px-2 overflow-hidden">
+                              <div className="flex flex-wrap gap-1">
+                                {group.deptApplications.map((deptApp) => {
+                                  const deptLower = String(deptApp.department || "").toLowerCase();
+                                  const deptBadgeClass = deptLower.includes("soft")
+                                    ? "text-blue-400 border-blue-500/40 bg-blue-950/30"
+                                    : deptLower.includes("mech")
+                                    ? "text-amber-400 border-amber-500/40 bg-amber-950/30"
+                                    : deptLower.includes("embed")
+                                    ? "text-emerald-400 border-emerald-500/40 bg-emerald-950/30"
+                                    : deptLower.includes("pr")
+                                    ? "text-purple-400 border-purple-500/40 bg-purple-950/30"
+                                    : "text-white border-white/20 bg-white/10";
 
-                                    return (
-                                      <span
-                                        key={deptApp._id}
-                                        className={`px-2 py-0.5 rounded text-[11px] border whitespace-nowrap font-medium ${deptBadgeClass}`}
-                                      >
-                                        {deptApp.department}
-                                      </span>
-                                    );
-                                  })}
-                                </div>
-                              </td>
-
-                              {/* Year */}
-                              <td className="py-3 px-2">
-                                <span className="px-2 py-0.5 rounded text-[11px] bg-white/10 text-gray-300 border border-white/20 whitespace-nowrap">
-                                  {candidateYear}
-                                </span>
-                              </td>
-
-                              {/* Read-only Score Badges (separate for each applied dept) */}
-                              <td className="py-3 px-3">
-                                <div className="space-y-1.5">
-                                  {group.deptApplications.map((deptApp) => {
-                                    const edit = inlineEdits[deptApp._id] || {};
-                                    const scoreInfo = getCandidateScoreInfo(deptApp, edit);
-                                    return (
-                                      <div key={deptApp._id} className="flex items-center gap-1.5">
-                                        {group.deptApplications.length > 1 && (
-                                          <span className="text-[10px] text-gray-400 font-mono w-16 truncate" title={deptApp.department}>
-                                            {deptApp.department}:
-                                          </span>
-                                        )}
-                                        {scoreInfo.isEvaluated ? (
-                                          <span
-                                            className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold font-mono ${
-                                              scoreInfo.status === "positive"
-                                                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/60 shadow-[0_0_8px_rgba(16,185,129,0.25)]"
-                                                : scoreInfo.status === "negative"
-                                                ? "bg-rose-500/20 text-rose-300 border border-rose-500/60 shadow-[0_0_8px_rgba(244,63,94,0.25)]"
-                                                : "bg-amber-400/20 text-amber-300 border border-amber-400/60 shadow-[0_0_8px_rgba(251,191,36,0.25)]"
-                                            }`}
-                                          >
-                                            <span>{scoreInfo.scoreFormatted}</span>
-                                            <span className="text-[9px] opacity-75 ml-1">pts</span>
-                                          </span>
-                                        ) : (
-                                          <span className="text-gray-500 font-mono text-xs">—</span>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </td>
-
-                              {/* Read-only Remarks & Comments Preview per Department */}
-                              <td className="py-3 px-3 max-w-[280px]">
-                                <div className="space-y-2">
-                                  {group.deptApplications.map((deptApp) => {
-                                    const edit = inlineEdits[deptApp._id] || {};
-                                    const scoreInfo = getCandidateScoreInfo(deptApp, edit);
-                                    return (
-                                      <div key={deptApp._id} className="space-y-0.5">
-                                        {group.deptApplications.length > 1 && (
-                                          <div className="text-[10px] font-bold text-gray-400 font-mono uppercase">
-                                            [{deptApp.department}]
-                                          </div>
-                                        )}
-                                        {(scoreInfo.posCount > 0 || scoreInfo.negCount > 0) && (
-                                          <div className="flex items-center gap-1.5 flex-wrap">
-                                            {scoreInfo.posCount > 0 && (
-                                              <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-950/70 text-emerald-300 border border-emerald-500/40">
-                                                +{scoreInfo.posCount} Pos
-                                              </span>
-                                            )}
-                                            {scoreInfo.negCount > 0 && (
-                                              <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-rose-950/70 text-rose-300 border border-rose-500/40">
-                                                -{scoreInfo.negCount} Neg
-                                              </span>
-                                            )}
-                                          </div>
-                                        )}
-                                        {scoreInfo.comments ? (
-                                          <div className="text-xs text-gray-300 line-clamp-1 break-words font-mono" title={scoreInfo.comments}>
-                                            {scoreInfo.comments}
-                                          </div>
-                                        ) : !scoreInfo.posCount && !scoreInfo.negCount ? (
-                                          <span className="text-gray-500 text-[11px] italic">No remarks yet</span>
-                                        ) : null}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </td>
-
-                              {/* Actions: Review per applied dept, Edit, Delete */}
-                              <td className="py-3 px-3 text-right whitespace-nowrap">
-                                <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                                  {appResume.hasResume && (
-                                    <button
-                                      type="button"
-                                      onClick={() => openModal(index, group.deptApplications[0]._id, true)}
-                                      className="cursor-pointer font-mono text-[10px] uppercase tracking-wider text-rose-300 hover:text-white border border-rose-500/40 hover:border-rose-400 bg-rose-950/30 rounded px-2.5 py-1 transition-colors font-bold flex items-center gap-1"
-                                      title="Open resume in parallel view & grade"
-                                    >
-                                      <FaFilePdf className="text-[10px]" /> Resume
-                                    </button>
-                                  )}
-
-                                  {group.deptApplications.map((deptApp) => (
-                                    <button
+                                  return (
+                                    <span
                                       key={deptApp._id}
-                                      type="button"
-                                      onClick={() => openModal(index, deptApp._id)}
-                                      className="cursor-pointer font-mono text-[10px] uppercase tracking-wider text-blue-400 hover:text-white border border-blue-500/30 hover:border-blue-400 bg-blue-950/20 rounded px-2.5 py-1 transition-colors font-bold whitespace-nowrap"
-                                      title={`Review & Score for ${deptApp.department}`}
+                                      className={`px-1.5 py-0.5 rounded text-[10px] border truncate font-medium ${deptBadgeClass}`}
+                                      title={deptApp.department}
                                     >
-                                      {group.deptApplications.length > 1 ? `Review: ${deptApp.department}` : "Review"}
-                                    </button>
-                                  ))}
+                                      {deptApp.department}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            </td>
 
+                            {/* Year */}
+                            <td className="py-2.5 px-1.5 text-center overflow-hidden">
+                              <span className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 text-gray-300 border border-white/20 whitespace-nowrap">
+                                {candidateYear}
+                              </span>
+                            </td>
+
+                            {/* Read-only Score Badges */}
+                            <td className="py-2.5 px-2 text-center overflow-hidden">
+                              <div className="space-y-1">
+                                {group.deptApplications.map((deptApp) => {
+                                  const edit = inlineEdits[deptApp._id] || {};
+                                  const scoreInfo = getCandidateScoreInfo(deptApp, edit);
+                                  return (
+                                    <div key={deptApp._id} className="flex items-center justify-center gap-1">
+                                      {scoreInfo.isEvaluated ? (
+                                        <span
+                                          className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold font-mono ${
+                                            scoreInfo.status === "positive"
+                                              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/60"
+                                              : scoreInfo.status === "negative"
+                                              ? "bg-rose-500/20 text-rose-300 border border-rose-500/60"
+                                              : "bg-amber-400/20 text-amber-300 border border-amber-400/60"
+                                          }`}
+                                        >
+                                          <span>{scoreInfo.scoreFormatted}</span>
+                                          <span className="text-[8px] opacity-75 ml-0.5">pts</span>
+                                        </span>
+                                      ) : (
+                                        <span className="text-gray-500 font-mono text-[11px]">—</span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </td>
+
+                            {/* Remarks Preview */}
+                            <td className="py-2.5 px-2 overflow-hidden">
+                              <div className="space-y-1">
+                                {group.deptApplications.map((deptApp) => {
+                                  const edit = inlineEdits[deptApp._id] || {};
+                                  const scoreInfo = getCandidateScoreInfo(deptApp, edit);
+                                  return (
+                                    <div key={deptApp._id} className="space-y-0.5">
+                                      {group.deptApplications.length > 1 && (
+                                        <div className="text-[9px] font-bold text-gray-400 font-mono uppercase truncate">
+                                          [{deptApp.department}]
+                                        </div>
+                                      )}
+                                      {(scoreInfo.posCount > 0 || scoreInfo.negCount > 0) && (
+                                        <div className="flex items-center gap-1">
+                                          {scoreInfo.posCount > 0 && (
+                                            <span className="text-[9px] font-mono font-bold px-1 py-0.5 rounded bg-emerald-950/70 text-emerald-300 border border-emerald-500/40">
+                                              +{scoreInfo.posCount}
+                                            </span>
+                                          )}
+                                          {scoreInfo.negCount > 0 && (
+                                            <span className="text-[9px] font-mono font-bold px-1 py-0.5 rounded bg-rose-950/70 text-rose-300 border border-rose-500/40">
+                                              -{scoreInfo.negCount}
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
+                                      {scoreInfo.comments ? (
+                                        <div className="text-[10px] text-gray-300 truncate font-mono" title={scoreInfo.comments}>
+                                          {scoreInfo.comments}
+                                        </div>
+                                      ) : !scoreInfo.posCount && !scoreInfo.negCount ? (
+                                        <span className="text-gray-600 text-[10px] italic">None</span>
+                                      ) : null}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </td>
+
+                            {/* Interview Time Slot */}
+                            <td className="py-2.5 px-2 overflow-hidden">
+                              {(() => {
+                                const candidateApp = group.primaryApp;
+                                const candidateSlotApp = group.deptApplications.find(
+                                  (d) => (inlineEdits[d._id]?.interviewSlot !== undefined ? inlineEdits[d._id].interviewSlot : d.interviewSlot)
+                                );
+                                const currentSlot = candidateSlotApp
+                                  ? (inlineEdits[candidateSlotApp._id]?.interviewSlot !== undefined ? inlineEdits[candidateSlotApp._id].interviewSlot : candidateSlotApp.interviewSlot)
+                                  : (inlineEdits[candidateApp._id]?.interviewSlot !== undefined ? inlineEdits[candidateApp._id].interviewSlot : candidateApp.interviewSlot) || "";
+                                const isSaving = group.deptApplications.some((d) => slotSavingId === d._id) || slotSavingId === candidateApp._id;
+                                const isSaved = group.deptApplications.some((d) => slotSavedId === d._id) || slotSavedId === candidateApp._id;
+
+                                return (
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="time"
+                                      value={normalizeToTimeInputValue(currentSlot)}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        handleInlineChange(candidateApp._id, "interviewSlot", val);
+                                        saveInterviewSlot(candidateApp._id, val);
+                                      }}
+                                      style={{ colorScheme: "dark" }}
+                                      className={`w-full min-w-0 px-2 py-1 rounded text-[11px] font-mono transition-all border focus:outline-none cursor-pointer ${
+                                        currentSlot
+                                          ? "bg-cyan-950/40 border-cyan-500/50 text-cyan-200 focus:border-cyan-400"
+                                          : "bg-black/60 border-white/15 text-gray-400 focus:border-cyan-500/50"
+                                      }`}
+                                      title="Click to select interview time"
+                                    />
+
+                                    {currentSlot ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          handleInlineChange(candidateApp._id, "interviewSlot", "");
+                                          saveInterviewSlot(candidateApp._id, "");
+                                        }}
+                                        className="text-gray-500 hover:text-rose-400 text-[10px] px-1 py-0.5 rounded transition-colors cursor-pointer shrink-0"
+                                        title="Clear time slot"
+                                      >
+                                        <FaTimes />
+                                      </button>
+                                    ) : null}
+
+                                    {isSaving ? (
+                                      <span className="text-[9px] font-mono text-cyan-400 animate-pulse">...</span>
+                                    ) : isSaved ? (
+                                      <span className="text-[10px] text-emerald-400 shrink-0" title="Saved!">
+                                        <FaCheckCircle />
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                );
+                              })()}
+                            </td>
+
+                            {/* Actions */}
+                            <td className="py-2.5 px-2.5 text-right overflow-hidden">
+                              <div className="flex items-center justify-end gap-1 flex-wrap">
+                                {appResume.hasResume && (
                                   <button
                                     type="button"
-                                    onClick={() => openApplicationEditor(group.primaryApp)}
-                                    className="cursor-pointer font-mono text-[10px] uppercase tracking-wider text-gray-300 hover:text-white border border-white/20 hover:border-white rounded px-2 py-1 transition-colors"
-                                    title="Edit raw response fields"
+                                    onClick={() => openModal(index, group.deptApplications[0]._id, true)}
+                                    className="cursor-pointer text-[10px] text-rose-300 hover:text-white border border-rose-500/40 hover:border-rose-400 bg-rose-950/30 rounded px-1.5 py-1 transition-colors font-bold flex items-center gap-0.5"
+                                    title="View Resume"
                                   >
-                                    Edit
+                                    <FaFilePdf className="text-[10px]" />
                                   </button>
+                                )}
+
+                                {group.deptApplications.map((deptApp) => (
                                   <button
+                                    key={deptApp._id}
                                     type="button"
-                                    onClick={() => deleteApplicantGroup(group)}
-                                    className="cursor-pointer font-mono text-[10px] uppercase tracking-wider text-red-400 hover:text-red-300 border border-red-500/30 hover:border-red-400 rounded px-2 py-1 transition-colors"
-                                    title="Delete candidate response"
+                                    onClick={() => openModal(index, deptApp._id)}
+                                    className="cursor-pointer font-mono text-[10px] uppercase text-blue-400 hover:text-white border border-blue-500/30 hover:border-blue-400 bg-blue-950/20 rounded px-2 py-1 transition-colors font-bold whitespace-nowrap"
+                                    title={`Review ${deptApp.department}`}
                                   >
-                                    Delete
+                                    {group.deptApplications.length > 1 ? deptApp.department.slice(0, 4) : "Review"}
                                   </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                                ))}
+
+                                <button
+                                  type="button"
+                                  onClick={() => openApplicationEditor(group.primaryApp)}
+                                  className="cursor-pointer text-gray-400 hover:text-white border border-white/20 hover:border-white rounded p-1 transition-colors"
+                                  title="Edit raw response"
+                                >
+                                  <FaEdit className="text-[10px]" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => deleteApplicantGroup(group)}
+                                  className="cursor-pointer text-red-400 hover:text-red-300 border border-red-500/30 hover:border-red-400 rounded p-1 transition-colors"
+                                  title="Delete applicant"
+                                >
+                                  <FaTrash className="text-[10px]" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </>
             )}
@@ -3362,6 +3607,59 @@ export default function RecruitmentAdminPage() {
                         </div>
                       </div>
 
+                      {/* Interview Time Slot */}
+                      <div className="p-3.5 rounded-lg bg-cyan-950/20 border border-cyan-500/30">
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="text-xs font-mono text-cyan-300 uppercase tracking-wider flex items-center gap-1.5 font-bold">
+                            <FaClock className="text-cyan-400 text-xs" />
+                            <span>Interview Time Slot</span>
+                          </label>
+                          {slotSavedId === currentModalApp._id && (
+                            <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
+                              <FaCheckCircle /> Slot Saved
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="time"
+                            value={normalizeToTimeInputValue(modalEdit.interviewSlot !== undefined ? modalEdit.interviewSlot : (currentModalApp.interviewSlot || ""))}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              handleInlineChange(currentModalApp._id, "interviewSlot", val);
+                              saveInterviewSlot(currentModalApp._id, val);
+                            }}
+                            style={{ colorScheme: "dark" }}
+                            className="flex-1 px-3 py-2 bg-black/80 rounded text-xs font-mono text-cyan-200 border border-cyan-500/30 focus:border-cyan-400 focus:outline-none cursor-pointer"
+                            title="Click to select interview time"
+                          />
+                          {(modalEdit.interviewSlot !== undefined ? modalEdit.interviewSlot : currentModalApp.interviewSlot) ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleInlineChange(currentModalApp._id, "interviewSlot", "");
+                                saveInterviewSlot(currentModalApp._id, "");
+                              }}
+                              className="px-2.5 py-2 border border-rose-500/30 hover:border-rose-500 text-rose-400 font-mono text-xs rounded transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                              title="Clear time slot"
+                            >
+                              <FaTimes className="text-[10px]" />
+                              <span>Clear</span>
+                            </button>
+                          ) : null}
+                          {slotSavingId === currentModalApp._id ? (
+                            <span className="text-xs font-mono text-cyan-400 animate-pulse px-2">Saving...</span>
+                          ) : slotSavedId === currentModalApp._id ? (
+                            <span className="text-xs font-mono text-emerald-400 flex items-center gap-1 px-2">
+                              <FaCheckCircle /> Saved
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="text-[10px] font-mono text-gray-400 mt-1.5">
+                          Set the interview time slot. Any changes automatically save and reflect in all department views.
+                        </p>
+                      </div>
+
                       {/* Optional Overall Comments / Notes */}
                       <div>
                         <label className="block text-xs font-mono text-gray-300 mb-1 uppercase tracking-wider">
@@ -3398,6 +3696,10 @@ export default function RecruitmentAdminPage() {
                               points: displayScore || autoScoreFormatted,
                               positiveRemarks: currentPos,
                               negativeRemarks: currentNeg,
+                              interviewSlot:
+                                modalEdit.interviewSlot !== undefined
+                                  ? modalEdit.interviewSlot
+                                  : currentModalApp.interviewSlot,
                             });
                           }}
                           disabled={modalEdit.isSaving}

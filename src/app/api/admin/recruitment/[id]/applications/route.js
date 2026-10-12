@@ -94,6 +94,7 @@ export async function PUT(req, { params }) {
       feedback,
       positiveRemarks,
       negativeRemarks,
+      interviewSlot,
     } = body || {};
 
     if (!applicationId) {
@@ -152,6 +153,36 @@ export async function PUT(req, { params }) {
     if (negativeRemarks !== undefined) {
       application.negativeRemarks = Array.isArray(negativeRemarks) ? negativeRemarks : [];
     }
+    if (interviewSlot !== undefined) {
+      const cleanSlot = String(interviewSlot || "").trim();
+      application.interviewSlot = cleanSlot;
+
+      // Synchronize interviewSlot across all applications of this candidate in this recruitment drive
+      const candidateEmail = String(application.responses?.email || "").trim();
+      const candidateRoll = String(
+        application.responses?.rollno ||
+        application.responses?.rollNumber ||
+        application.responses?.roll ||
+        ""
+      ).trim();
+
+      const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const siblingFilter = [];
+      if (candidateEmail) {
+        siblingFilter.push({ "responses.email": new RegExp(`^\\s*${escapeRegex(candidateEmail)}\\s*$`, "i") });
+      }
+      if (candidateRoll) {
+        siblingFilter.push({ "responses.rollno": new RegExp(`^\\s*${escapeRegex(candidateRoll)}\\s*$`, "i") });
+        siblingFilter.push({ "responses.rollNumber": new RegExp(`^\\s*${escapeRegex(candidateRoll)}\\s*$`, "i") });
+      }
+
+      if (siblingFilter.length > 0) {
+        await RecruitmentApplication.updateMany(
+          { formId: id, $or: siblingFilter },
+          { $set: { interviewSlot: cleanSlot } }
+        );
+      }
+    }
 
     if (
       points !== undefined ||
@@ -166,11 +197,18 @@ export async function PUT(req, { params }) {
 
     await application.save();
 
-    return NextResponse.json({
-      success: true,
-      message: "Application updated successfully.",
-      data: application,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        message: "Application updated successfully.",
+        data: application,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        },
+      }
+    );
   } catch (error) {
     console.error("UPDATE RECRUITMENT APPLICATION ERROR:", error);
     return NextResponse.json(

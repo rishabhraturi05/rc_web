@@ -16,6 +16,7 @@ const RecruitmentApplicationSchema = new mongoose.Schema(
     positiveRemarks: { type: [String], default: [] },
     negativeRemarks: { type: [String], default: [] },
     feedback: { type: String, default: "", trim: true }, // "positive" | "waitlist" | "negative" | ""
+    interviewSlot: { type: String, default: "", trim: true },
     evaluatedBy: { type: String, default: "" },
     evaluatedAt: { type: Date, default: null },
   },
