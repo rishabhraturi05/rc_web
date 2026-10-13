@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
-import { FaEnvelope, FaUserAstronaut, FaKey, FaUsers } from "react-icons/fa";
+import { FaEnvelope, FaUserAstronaut, FaKey, FaUsers, FaIdCard } from "react-icons/fa";
 import ChangeCredentialsModal from "@/app/components/ChangeCredentialsModal";
 
 export default function AdminDashboard() {
@@ -93,6 +93,17 @@ export default function AdminDashboard() {
               <h2 className="font-mono text-xl font-bold mb-2 text-white">FRESHERS_REGISTRATION</h2>
               <p className="font-mono text-gray-400 text-sm leading-relaxed">
                 Manage team registrations, attendance, and walk-in entries
+              </p>
+            </Link>
+
+            <Link
+              href="/admin/technozian"
+              className="group glass-panel p-8 glass-panel-hover flex flex-col"
+            >
+              <FaIdCard className="text-3xl text-white mb-6 group-hover:scale-110 transition-transform" />
+              <h2 className="font-mono text-xl font-bold mb-2 text-white">TECHNOZIAN_REGISTRATION</h2>
+              <p className="font-mono text-gray-400 text-sm leading-relaxed">
+                Manage RFID smart-box scanner entries, roll numbers, and attendance
               </p>
             </Link>
 
