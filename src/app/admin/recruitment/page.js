@@ -34,8 +34,12 @@ import {
   FaPhoneAlt,
   FaUserTie,
   FaSignOutAlt,
+  FaUserClock,
+  FaCheck,
+  FaUsers,
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
+import InterviewQueuePanel from "@/app/components/InterviewQueuePanel";
 import {
   DEFAULT_DEPARTMENT_OPTIONS,
   DEFAULT_YEAR_OPTIONS,
@@ -194,6 +198,13 @@ function buildSheetRows(form, applications, inlineEdits = {}) {
       "Positive Remarks (+1)": Array.isArray(posRemarks) ? posRemarks.join("; ") : "",
       "Negative Remarks (-1)": Array.isArray(negRemarks) ? negRemarks.join("; ") : "",
       "Interview Slot": formatTimeSlot(edit.interviewSlot !== undefined ? edit.interviewSlot : application.interviewSlot),
+      "Interview Status":
+        application.interviewStatus === "in_queue"
+          ? `In Queue (${application.queueDepartment || application.department})`
+          : application.interviewStatus === "completed"
+          ? "Interview Done"
+          : "Pending",
+      "Interview Done At": application.interviewCompletedAt ? new Date(application.interviewCompletedAt).toLocaleString() : "",
       "Comments / Remarks": commentsVal,
       "Evaluated By": application.evaluatedBy || "Pending",
       "Evaluated At": application.evaluatedAt ? new Date(application.evaluatedAt).toLocaleString() : "",
@@ -244,6 +255,13 @@ export default function RecruitmentAdminPage() {
   const [evaluationFilter, setEvaluationFilter] = useState("all"); // 'all', 'evaluated', 'pending'
   const [scoreFilter, setScoreFilter] = useState("all"); // 'all', 'positive', 'zero', 'negative', 'pending'
   const [sortBy, setSortBy] = useState("newest"); // 'newest', 'oldest', 'points_desc', 'points_asc', 'name_asc'
+  const [interviewStatusFilter, setInterviewStatusFilter] = useState("all"); // 'all', 'in_queue', 'completed', 'pending'
+
+  // Interview Queue state
+  const [isQueueOpen, setIsQueueOpen] = useState(false);
+  const [loadingQueueActionId, setLoadingQueueActionId] = useState(null);
+  const [openQueueMenuId, setOpenQueueMenuId] = useState(null);
+  const [queueModalCandidate, setQueueModalCandidate] = useState(null);
 
   // Inline edits state: { [appId]: { points, comments, feedback, positiveRemarks, negativeRemarks, isDirty, isSaving, savedRecently } }
   const [inlineEdits, setInlineEdits] = useState({});
@@ -264,7 +282,17 @@ export default function RecruitmentAdminPage() {
   }, []);
 
   useEffect(() => {
-    if (modalOpen || editingApplication) {
+    const handleGlobalClick = (e) => {
+      if (openQueueMenuId && !e.target.closest(".relative")) {
+        setOpenQueueMenuId(null);
+      }
+    };
+    window.addEventListener("click", handleGlobalClick);
+    return () => window.removeEventListener("click", handleGlobalClick);
+  }, [openQueueMenuId]);
+
+  useEffect(() => {
+    if (modalOpen || editingApplication || queueModalCandidate) {
       document.body.style.overflow = "hidden";
       document.body.classList.add("admin-modal-open");
     } else {
@@ -275,7 +303,7 @@ export default function RecruitmentAdminPage() {
       document.body.style.overflow = "";
       document.body.classList.remove("admin-modal-open");
     };
-  }, [modalOpen, editingApplication]);
+  }, [modalOpen, editingApplication, queueModalCandidate]);
 
   useEffect(() => {
     if (status === "loading") return;
@@ -386,7 +414,21 @@ export default function RecruitmentAdminPage() {
         if (!anyPending) return false;
       }
 
-      // 5. Search query
+      // 5. Interview status filter
+      if (interviewStatusFilter === "in_queue") {
+        const anyInQueue = group.deptApplications.some((d) => d.interviewStatus === "in_queue");
+        if (!anyInQueue) return false;
+      } else if (interviewStatusFilter === "completed") {
+        const anyCompleted = group.deptApplications.some((d) => d.interviewStatus === "completed");
+        if (!anyCompleted) return false;
+      } else if (interviewStatusFilter === "pending") {
+        const anyPendingOrUnmarked = group.deptApplications.some(
+          (d) => !d.interviewStatus || d.interviewStatus === "pending"
+        );
+        if (!anyPendingOrUnmarked) return false;
+      }
+
+      // 6. Search query
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim();
         const cName = group.candidateName.toLowerCase();
@@ -470,6 +512,7 @@ export default function RecruitmentAdminPage() {
     selectedYear,
     evaluationFilter,
     scoreFilter,
+    interviewStatusFilter,
     searchQuery,
     sortBy,
     inlineEdits,
@@ -523,6 +566,205 @@ export default function RecruitmentAdminPage() {
         savedRecently: false,
       },
     }));
+  };
+
+  // Queue Position & Status Helpers
+  const getQueuePositionInfo = (appId) => {
+    const targetApp = applications.find((a) => a._id === appId);
+    if (!targetApp || targetApp.interviewStatus !== "in_queue") return null;
+
+    const dept = targetApp.queueDepartment || targetApp.department || "Software";
+    const deptQueue = applications
+      .filter(
+        (a) =>
+          a.interviewStatus === "in_queue" &&
+          (a.queueDepartment === dept || a.department === dept)
+      )
+      .sort((a, b) => {
+        const orderA = a.queueOrder !== undefined ? a.queueOrder : 0;
+        const orderB = b.queueOrder !== undefined ? b.queueOrder : 0;
+        if (orderA !== orderB) return orderA - orderB;
+        const timeA = a.queueAddedAt ? new Date(a.queueAddedAt).getTime() : new Date(a.createdAt).getTime();
+        const timeB = b.queueAddedAt ? new Date(b.queueAddedAt).getTime() : new Date(b.createdAt).getTime();
+        return timeA - timeB;
+      });
+
+    const index = deptQueue.findIndex((a) => a._id === appId);
+    return {
+      department: dept,
+      position: index !== -1 ? index + 1 : 1,
+      totalInDeptQueue: deptQueue.length,
+      isNext: index === 0,
+    };
+  };
+
+  const totalInQueueCount = useMemo(() => {
+    return applications.filter((app) => app.interviewStatus === "in_queue").length;
+  }, [applications]);
+
+  const getDeptQueueCount = (dept) => {
+    return applications.filter(
+      (a) =>
+        a.interviewStatus === "in_queue" &&
+        (a.queueDepartment === dept || a.department === dept)
+    ).length;
+  };
+
+  // Add applicant to department queue (supports being in multiple queues simultaneously)
+  const handleAddToQueue = async (sourceAppId, targetDept) => {
+    if (!selectedForm?._id || !sourceAppId) return;
+
+    setLoadingQueueActionId(sourceAppId);
+    setOpenQueueMenuId(null);
+
+    const addedAt = new Date().toISOString();
+    const chosenDept = targetDept || "Software";
+
+    // Find candidate identity to check if they already have an application for this department
+    const sourceApp = applications.find((a) => a._id === sourceAppId);
+    const candidateEmail = String(sourceApp?.responses?.email || "").trim().toLowerCase();
+    const candidateRoll = String(
+      sourceApp?.responses?.rollno ||
+      sourceApp?.responses?.rollNumber ||
+      sourceApp?.responses?.roll ||
+      ""
+    ).trim().toLowerCase();
+
+    const existingTargetApp = applications.find((a) => {
+      const matchDept = (a.department || "").toLowerCase() === chosenDept.toLowerCase();
+      if (!matchDept) return false;
+      if (a._id === sourceAppId) return true;
+      const e = String(a.responses?.email || "").trim().toLowerCase();
+      const r = String(a.responses?.rollno || a.responses?.rollNumber || a.responses?.roll || "").trim().toLowerCase();
+      return (candidateEmail && e && e === candidateEmail) || (candidateRoll && r && r === candidateRoll);
+    });
+
+    setIsQueueOpen(true);
+
+    if (existingTargetApp) {
+      // Optimistic update of existing department application
+      setApplications((prev) =>
+        prev.map((app) =>
+          app._id === existingTargetApp._id
+            ? {
+                ...app,
+                interviewStatus: "in_queue",
+                queueDepartment: chosenDept,
+                queueAddedAt: addedAt,
+              }
+            : app
+        )
+      );
+
+      try {
+        const res = await fetch(`/api/admin/recruitment/${selectedForm._id}/applications`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            applicationId: existingTargetApp._id,
+            interviewStatus: "in_queue",
+            queueDepartment: chosenDept,
+            queueAddedAt: addedAt,
+          }),
+        });
+        const data = await res.json();
+        if (!data.success) {
+          console.error("Failed to add to queue:", data.message);
+          await fetchApplications(selectedForm._id);
+        }
+      } catch (err) {
+        console.error("Error adding to queue:", err);
+        await fetchApplications(selectedForm._id);
+      } finally {
+        setLoadingQueueActionId(null);
+      }
+    } else {
+      setMessage(`Candidate did not apply for ${chosenDept}. Candidates can only be queued in departments they applied for.`);
+      setLoadingQueueActionId(null);
+    }
+  };
+
+  // Remove applicant from queue (markDone = true => completed, markDone = false => pending/cancelled)
+  const handleRemoveFromQueue = async (applicationId, markDone = true) => {
+    if (!selectedForm?._id || !applicationId) return;
+
+    setLoadingQueueActionId(applicationId);
+    setOpenQueueMenuId(null);
+
+    const completedAt = markDone ? new Date().toISOString() : null;
+    const newStatus = markDone ? "completed" : "pending";
+
+    // Optimistic update
+    setApplications((prev) =>
+      prev.map((app) =>
+        app._id === applicationId
+          ? {
+              ...app,
+              interviewStatus: newStatus,
+              queueDepartment: "",
+              queueAddedAt: null,
+              interviewCompletedAt: completedAt,
+            }
+          : app
+      )
+    );
+
+    try {
+      const res = await fetch(`/api/admin/recruitment/${selectedForm._id}/applications`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId,
+          interviewStatus: newStatus,
+          queueDepartment: "",
+          queueAddedAt: null,
+          interviewCompletedAt: completedAt,
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        console.error("Failed to remove from queue:", data.message);
+        await fetchApplications(selectedForm._id);
+      }
+    } catch (err) {
+      console.error("Error removing from queue:", err);
+      await fetchApplications(selectedForm._id);
+    } finally {
+      setLoadingQueueActionId(null);
+    }
+  };
+
+  // Reorder queue
+  const handleReorderQueue = async (department, reorderedList) => {
+    if (!selectedForm?._id || !Array.isArray(reorderedList)) return;
+
+    const orderMap = new Map();
+    reorderedList.forEach((item, index) => {
+      orderMap.set(item._id, index);
+    });
+
+    setApplications((prev) =>
+      prev.map((app) =>
+        orderMap.has(app._id)
+          ? { ...app, queueOrder: orderMap.get(app._id) }
+          : app
+      )
+    );
+
+    try {
+      const queueUpdates = reorderedList.map((item, index) => ({
+        applicationId: item._id,
+        queueOrder: index,
+      }));
+
+      await fetch(`/api/admin/recruitment/${selectedForm._id}/applications`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ queueUpdates }),
+      });
+    } catch (err) {
+      console.error("Error reordering queue:", err);
+    }
   };
 
   // Save evaluation for a single applicant (points, comments, feedback, remarks)
@@ -2076,6 +2318,26 @@ export default function RecruitmentAdminPage() {
               </div>
 
               <div className="flex flex-wrap gap-3">
+                {/* 4-Department Interview Queue Toggle Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsQueueOpen((prev) => !prev)}
+                  className={`flex items-center gap-2 px-4 py-2 border rounded font-mono text-xs uppercase tracking-widest transition-all cursor-pointer ${
+                    isQueueOpen
+                      ? "bg-cyan-500/20 text-cyan-300 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.35)] ring-1 ring-cyan-400/50"
+                      : "bg-white/5 border-white/30 text-white hover:border-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
+                  }`}
+                  title={isQueueOpen ? "Close Interview Queue panel" : "Open 4 Department Interview Queue"}
+                >
+                  <FaUserClock className={isQueueOpen ? "text-cyan-400 animate-pulse text-sm" : "text-gray-300 text-sm"} />
+                  <span>{isQueueOpen ? "[ Close Queue ]" : "[ Open Queue ]"}</span>
+                  {totalInQueueCount > 0 && (
+                    <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-cyan-400 text-black shadow-sm">
+                      {totalInQueueCount}
+                    </span>
+                  )}
+                </button>
+
                 <button
                   type="button"
                   onClick={exportSelectedForm}
@@ -2207,8 +2469,18 @@ export default function RecruitmentAdminPage() {
               </div>
             </div>
 
-            {/* Search and Filters Bar */}
-            <div className="glass-panel p-4 rounded-xl border border-white/15 mb-6 space-y-3">
+            {/* Sliding Layout: Main Table (Left) + 4-Department Queue Section (Right) */}
+            <div className="relative flex flex-col lg:flex-row gap-6 items-start w-full transition-all duration-500 ease-in-out">
+              {/* Main Content Area (Slides smoothly left when queue opens, expands right when closed) */}
+              <div
+                className={`transition-all duration-500 ease-in-out min-w-0 ${
+                  isQueueOpen
+                    ? "w-full lg:flex-1 lg:max-w-[calc(100%-25rem)] xl:max-w-[calc(100%-27rem)]"
+                    : "w-full"
+                }`}
+              >
+                {/* Search and Filters Bar */}
+                <div className="glass-panel p-4 rounded-xl border border-white/15 mb-6 space-y-3">
               <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center">
                 {/* Search Input */}
                 <div className="relative flex-1 min-w-[200px]">
@@ -2303,6 +2575,21 @@ export default function RecruitmentAdminPage() {
                     </select>
                   </div>
 
+                  {/* Interview Status Filter */}
+                  <div className="flex flex-col xs:flex-row xs:items-center gap-1">
+                    <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Interview:</label>
+                    <select
+                      value={interviewStatusFilter}
+                      onChange={(e) => setInterviewStatusFilter(e.target.value)}
+                      className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-white w-full"
+                    >
+                      <option value="all">All Status</option>
+                      <option value="in_queue">🟢 In Queue ({applications.filter((a) => a.interviewStatus === "in_queue").length})</option>
+                      <option value="completed">✓ Completed ({applications.filter((a) => a.interviewStatus === "completed").length})</option>
+                      <option value="pending">⚪ Pending ({applications.filter((a) => !a.interviewStatus || a.interviewStatus === "pending").length})</option>
+                    </select>
+                  </div>
+
                   {/* Sort Filter */}
                   <div className="flex flex-col xs:flex-row xs:items-center gap-1">
                     <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Sort:</label>
@@ -2322,7 +2609,7 @@ export default function RecruitmentAdminPage() {
               </div>
 
               {/* Active Filter Clear Bar */}
-              {(searchQuery || selectedDepartment !== "all" || selectedYear !== "all" || evaluationFilter !== "all" || scoreFilter !== "all" || sortBy !== "newest") && (
+              {(searchQuery || selectedDepartment !== "all" || selectedYear !== "all" || evaluationFilter !== "all" || scoreFilter !== "all" || interviewStatusFilter !== "all" || sortBy !== "newest") && (
                 <div className="flex items-center justify-between text-xs font-mono text-gray-400 pt-2 border-t border-white/10">
                   <span>
                     Filtered: Showing <strong className="text-white">{groupedApplications.length}</strong> of <strong className="text-white">{new Set(applications.map(getCandidateKey)).size}</strong> candidates
@@ -2335,6 +2622,7 @@ export default function RecruitmentAdminPage() {
                       setSelectedYear("all");
                       setEvaluationFilter("all");
                       setScoreFilter("all");
+                      setInterviewStatusFilter("all");
                       setSortBy("newest");
                     }}
                     className="text-blue-400 hover:underline cursor-pointer"
@@ -2370,6 +2658,9 @@ export default function RecruitmentAdminPage() {
                     const hasNegative = allScoreInfos.some((s) => s.status === "negative");
                     const hasZero = allScoreInfos.some((s) => s.status === "zero" && s.isEvaluated);
 
+                    const queuedDeptApps = group.deptApplications.filter((d) => d.interviewStatus === "in_queue");
+                    const completedDeptApps = group.deptApplications.filter((d) => d.interviewStatus === "completed");
+
                     return (
                       <div
                         key={group.key}
@@ -2395,6 +2686,33 @@ export default function RecruitmentAdminPage() {
                             <div className="text-gray-400 font-mono text-[11px] mt-0.5">
                               Roll: <strong className="text-gray-200">{candidateRoll}</strong>
                             </div>
+                            {queuedDeptApps.length > 0 ? (
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {queuedDeptApps.map((qApp) => {
+                                  const qInfo = getQueuePositionInfo(qApp._id);
+                                  return (
+                                    <span
+                                      key={qApp._id}
+                                      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold font-mono border ${
+                                        qInfo?.isNext
+                                          ? "bg-emerald-500/20 text-emerald-300 border-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.3)] animate-pulse"
+                                          : "bg-cyan-500/20 text-cyan-300 border-cyan-400/50"
+                                      }`}
+                                    >
+                                      <span className={`w-1.5 h-1.5 rounded-full ${qInfo?.isNext ? "bg-emerald-400 animate-ping" : "bg-cyan-400"}`} />
+                                      <span>{qInfo?.isNext ? `#1 Next: ${qInfo?.department}` : `Queue: ${qInfo?.department} (#${qInfo?.position})`}</span>
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            ) : completedDeptApps.length > 0 ? (
+                              <div className="mt-1">
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold font-mono bg-emerald-950/40 text-emerald-400 border border-emerald-500/30">
+                                  <FaCheckCircle className="text-[9px]" />
+                                  <span>Done: {completedDeptApps.map((d) => d.department).join(", ")}</span>
+                                </span>
+                              </div>
+                            ) : null}
                           </div>
                           <div className="flex flex-col items-end gap-1">
                             <div className="flex items-center gap-1 flex-wrap justify-end">
@@ -2538,14 +2856,45 @@ export default function RecruitmentAdminPage() {
                               : "Not evaluated"}
                           </div>
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            {appResume.hasResume && (
+                            {/* Queue Button for Mobile */}
+                            {queuedDeptApps.length > 0 ? (
                               <button
                                 type="button"
-                                onClick={() => openModal(index, group.deptApplications[0]._id, true)}
-                                className="px-2.5 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 rounded text-xs font-mono uppercase tracking-wider flex items-center gap-1 cursor-pointer font-bold"
-                                title="Open resume in parallel view & grade"
+                                onClick={() => setQueueModalCandidate(group)}
+                                className="px-2.5 py-1.5 rounded text-xs font-mono uppercase tracking-wider flex items-center gap-1.5 cursor-pointer font-bold bg-cyan-950/50 text-cyan-300 border border-cyan-500/40"
+                                title="Manage Active Queues"
                               >
-                                <FaFilePdf className="text-xs" /> Resume
+                                <FaUserClock className="text-xs" />
+                                <span className="flex items-center gap-1 flex-wrap">
+                                  {queuedDeptApps.map((qApp) => {
+                                    const qInfo = getQueuePositionInfo(qApp._id);
+                                    const deptShort = (qApp.queueDepartment || qApp.department || "").slice(0, 4);
+                                    return (
+                                      <span
+                                        key={qApp._id}
+                                        className={`px-1 rounded text-[10px] font-bold ${
+                                          qInfo?.isNext ? "bg-emerald-500 text-black shadow-sm" : "bg-cyan-500/30 text-cyan-200"
+                                        }`}
+                                      >
+                                        {deptShort}:{qInfo?.isNext ? "#1" : `#${qInfo?.position || ""}`}
+                                      </span>
+                                    );
+                                  })}
+                                </span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setQueueModalCandidate(group)}
+                                className={`px-2.5 py-1.5 rounded text-xs font-mono uppercase tracking-wider flex items-center gap-1 cursor-pointer font-bold whitespace-nowrap ${
+                                  completedDeptApps.length > 0
+                                    ? "bg-white/5 text-gray-300 border border-white/20 hover:border-cyan-400 hover:text-cyan-300"
+                                    : "bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40"
+                                }`}
+                                title="Add to Interview Queue"
+                              >
+                                <FaPlus className="text-xs" />
+                                <span>Queue</span>
                               </button>
                             )}
 
@@ -2587,29 +2936,29 @@ export default function RecruitmentAdminPage() {
                   <table className="w-full table-fixed text-left font-mono text-xs">
                     <thead className="bg-white/5 border-b border-white/15 text-gray-400 uppercase tracking-wider text-[11px]">
                       <tr>
-                        <th className="py-2.5 px-2 w-[3.5%] text-center">#</th>
-                        <th className="py-2.5 px-2.5 w-[20%]">Applicant Info</th>
-                        <th className="py-2.5 px-2 w-[11%]">Dept</th>
-                        <th className="py-2.5 px-1.5 w-[7%] text-center">Year</th>
-                        <th className="py-2.5 px-2 w-[8.5%] text-center">
+                        <th className="py-2.5 px-1.5 w-[3%] text-center">#</th>
+                        <th className="py-2.5 px-2 w-[18.5%]">Applicant Info</th>
+                        <th className="py-2.5 px-1.5 w-[9%]">Dept</th>
+                        <th className="py-2.5 px-1 w-[9%] text-center">Year</th>
+                        <th className="py-2.5 px-1.5 w-[7.5%] text-center">
                           <div className="flex items-center justify-center gap-1">
                             <FaStar className="text-amber-400 text-xs" />
                             <span>Score</span>
                           </div>
                         </th>
-                        <th className="py-2.5 px-2 w-[19%]">
+                        <th className="py-2.5 px-2 w-[17.5%]">
                           <div className="flex items-center gap-1">
                             <FaRegCommentDots className="text-blue-400 text-xs" />
                             <span>Remarks</span>
                           </div>
                         </th>
-                        <th className="py-2.5 px-2 w-[18%]">
+                        <th className="py-2.5 px-2 w-[16.5%]">
                           <div className="flex items-center gap-1">
                             <FaClock className="text-cyan-400 text-xs" />
                             <span>Interview Slot</span>
                           </div>
                         </th>
-                        <th className="py-2.5 px-2.5 w-[13%] text-right">Actions</th>
+                        <th className="py-2.5 px-2 w-[19%] text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/10">
@@ -2627,6 +2976,9 @@ export default function RecruitmentAdminPage() {
                         const hasPositive = allScoreInfos.some((s) => s.status === "positive");
                         const hasNegative = allScoreInfos.some((s) => s.status === "negative");
                         const hasZero = allScoreInfos.some((s) => s.status === "zero" && s.isEvaluated);
+
+                        const queuedDeptApps = group.deptApplications.filter((d) => d.interviewStatus === "in_queue");
+                        const completedDeptApps = group.deptApplications.filter((d) => d.interviewStatus === "completed");
 
                         return (
                           <tr
@@ -2658,6 +3010,33 @@ export default function RecruitmentAdminPage() {
                               <div className="text-gray-500 text-[9px] truncate">
                                 {new Date(group.createdAt).toLocaleDateString()}
                               </div>
+                              {queuedDeptApps.length > 0 ? (
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                  {queuedDeptApps.map((qApp) => {
+                                    const qInfo = getQueuePositionInfo(qApp._id);
+                                    return (
+                                      <span
+                                        key={qApp._id}
+                                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold font-mono border ${
+                                          qInfo?.isNext
+                                            ? "bg-emerald-500/20 text-emerald-300 border-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.3)] animate-pulse"
+                                            : "bg-cyan-500/20 text-cyan-300 border-cyan-400/50"
+                                        }`}
+                                      >
+                                        <span className={`w-1.5 h-1.5 rounded-full ${qInfo?.isNext ? "bg-emerald-400 animate-ping" : "bg-cyan-400"}`} />
+                                        <span>{qInfo?.isNext ? `#1 Next: ${qInfo?.department}` : `Queue: ${qInfo?.department} (#${qInfo?.position})`}</span>
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              ) : completedDeptApps.length > 0 ? (
+                                <div className="mt-1">
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold font-mono bg-emerald-950/40 text-emerald-400 border border-emerald-500/30">
+                                    <FaCheckCircle className="text-[9px]" />
+                                    <span>Done: {completedDeptApps.map((d) => d.department).join(", ")}</span>
+                                  </span>
+                                </div>
+                              ) : null}
                             </td>
 
                             {/* Department Badges (shows all applied departments) */}
@@ -2689,8 +3068,8 @@ export default function RecruitmentAdminPage() {
                             </td>
 
                             {/* Year */}
-                            <td className="py-2.5 px-1.5 text-center overflow-hidden">
-                              <span className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 text-gray-300 border border-white/20 whitespace-nowrap">
+                            <td className="py-2.5 px-1 text-center whitespace-nowrap">
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] bg-white/10 text-gray-300 border border-white/20 whitespace-nowrap">
                                 {candidateYear}
                               </span>
                             </td>
@@ -2824,8 +3203,52 @@ export default function RecruitmentAdminPage() {
                             </td>
 
                             {/* Actions */}
-                            <td className="py-2.5 px-2.5 text-right overflow-hidden">
+                            <td className="py-2.5 px-2.5 text-right">
                               <div className="flex items-center justify-end gap-1 flex-wrap">
+                                {/* Queue Button for Desktop Table */}
+                                {queuedDeptApps.length > 0 ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setQueueModalCandidate(group)}
+                                    className="cursor-pointer font-mono text-[10px] uppercase border rounded px-1.5 py-1 transition-all font-bold flex items-center gap-1.5 bg-cyan-950/40 text-cyan-300 border-cyan-500/40 hover:border-cyan-400"
+                                    title="Manage Active Queues"
+                                  >
+                                    <FaUserClock className="text-[10px]" />
+                                    <span className="flex items-center gap-1">
+                                      {queuedDeptApps.map((qApp) => {
+                                        const qInfo = getQueuePositionInfo(qApp._id);
+                                        const deptShort = (qApp.queueDepartment || qApp.department || "").slice(0, 4);
+                                        return (
+                                          <span
+                                            key={qApp._id}
+                                            className={`px-1 py-0.2 rounded text-[9px] font-bold ${
+                                              qInfo?.isNext
+                                                ? "bg-emerald-500 text-black shadow-sm"
+                                                : "bg-cyan-500/30 text-cyan-200"
+                                            }`}
+                                          >
+                                            {deptShort}:{qInfo?.isNext ? "#1" : `#${qInfo?.position || ""}`}
+                                          </span>
+                                        );
+                                      })}
+                                    </span>
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => setQueueModalCandidate(group)}
+                                    className={`cursor-pointer font-mono text-[10px] uppercase border rounded px-1.5 py-1 transition-all font-bold flex items-center gap-1 ${
+                                      completedDeptApps.length > 0
+                                        ? "bg-white/5 text-gray-300 border border-white/20 hover:border-cyan-400 hover:text-cyan-300"
+                                        : "bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 hover:border-cyan-400 hover:bg-cyan-500/20"
+                                    }`}
+                                    title="Add to Interview Queue"
+                                  >
+                                    <FaPlus className="text-[9px]" />
+                                    <span>Queue</span>
+                                  </button>
+                                )}
+
                                 {appResume.hasResume && (
                                   <button
                                     type="button"
@@ -2876,6 +3299,29 @@ export default function RecruitmentAdminPage() {
               </>
             )}
           </div>
+
+          {/* 4-Department Queue Panel on the Right (Slides into view) */}
+          {isQueueOpen && (
+            <div className="w-full lg:w-[24rem] xl:w-[26rem] shrink-0 transition-all duration-500 ease-in-out">
+              <InterviewQueuePanel
+                isOpen={isQueueOpen}
+                onClose={() => setIsQueueOpen(false)}
+                applications={applications}
+                groupedApplications={groupedApplications}
+                onRemoveFromQueue={handleRemoveFromQueue}
+                onReorderQueue={handleReorderQueue}
+                onOpenReviewModal={(grp, deptAppId) => {
+                  const idx = groupedApplications.findIndex((g) => g.key === grp.key);
+                  if (idx !== -1) {
+                    openModal(idx, deptAppId);
+                  }
+                }}
+                loadingActionId={loadingQueueActionId}
+              />
+            </div>
+          )}
+        </div>
+      </div>
         ) : (
           <div className="glass-panel p-8 text-center border border-white/20">
             <p className="font-mono text-gray-400 text-sm">
@@ -3019,6 +3465,330 @@ export default function RecruitmentAdminPage() {
           </div>,
           document.body
         )}
+
+        {/* Interview Queue Candidate Modal (Portal) */}
+        {queueModalCandidate && mounted && typeof document !== "undefined" && (() => {
+          const liveGroup = groupedApplications.find((g) => g.key === queueModalCandidate.key) || queueModalCandidate;
+          const candidateName = liveGroup.primaryApp?.responses?.name || liveGroup.primaryApp?.responses?.fullName || "Applicant";
+          const candidateRoll = liveGroup.primaryApp?.responses?.rollno || liveGroup.primaryApp?.responses?.rollNumber || liveGroup.primaryApp?.responses?.roll || "N/A";
+          const candidateEmail = liveGroup.primaryApp?.responses?.email || "";
+          const candidateYear = liveGroup.primaryApp?.responses?.year || "";
+          const queuedDeptApps = (liveGroup.deptApplications || []).filter((d) => d.interviewStatus === "in_queue");
+          const completedDeptApps = (liveGroup.deptApplications || []).filter((d) => d.interviewStatus === "completed");
+
+          // Strictly filter to only the departments the candidate applied for
+          const seenDepts = new Set();
+          const candidateAppliedDepts = (liveGroup.deptApplications || []).filter((d) => {
+            if (!d || !d.department) return false;
+            const key = d.department.trim().toLowerCase();
+            if (seenDepts.has(key)) return false;
+            seenDepts.add(key);
+            return true;
+          });
+
+          return createPortal(
+            <div
+              className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto animate-fadeIn"
+              onClick={() => setQueueModalCandidate(null)}
+            >
+              <div
+                className="glass-panel w-full max-w-lg p-5 sm:p-7 border border-cyan-500/40 shadow-[0_0_50px_rgba(6,182,212,0.2)] my-auto relative"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div className="flex items-start justify-between gap-4 mb-4 border-b border-white/10 pb-4">
+                  <div className="flex items-start gap-3">
+                    <span className="p-2.5 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0 mt-0.5">
+                      <FaUserClock className="text-base" />
+                    </span>
+                    <div>
+                      <h2 className="font-mono text-lg font-bold uppercase tracking-wider text-white">
+                        [ Interview Queue Manager ]
+                      </h2>
+                      <div className="font-mono text-xs text-gray-300 mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        <span className="text-white font-bold">{candidateName}</span>
+                        <span className="text-gray-500">•</span>
+                        <span className="text-cyan-400">Roll: {candidateRoll}</span>
+                        {candidateYear && (
+                          <>
+                            <span className="text-gray-500">•</span>
+                            <span className="text-gray-400">{candidateYear}</span>
+                          </>
+                        )}
+                      </div>
+                      {candidateEmail && (
+                        <p className="font-mono text-[11px] text-gray-500 mt-0.5 truncate max-w-xs sm:max-w-sm">
+                          {candidateEmail}
+                        </p>
+                      )}
+
+                      {/* Explicit Applied Departments Banner */}
+                      <div className="mt-2.5 flex flex-wrap items-center gap-1.5 font-mono text-[11px]">
+                        <span className="text-gray-400 font-semibold uppercase text-[10px]">Applied for:</span>
+                        {candidateAppliedDepts.map((d) => {
+                          const dLower = String(d.department || "").toLowerCase();
+                          const dBadge = dLower.includes("soft")
+                            ? "bg-blue-500/20 text-blue-300 border-blue-500/40"
+                            : dLower.includes("mech")
+                            ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                            : dLower.includes("embed")
+                            ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                            : dLower.includes("pr")
+                            ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
+                            : "bg-white/10 text-white border-white/20";
+                          return (
+                            <span
+                              key={d._id}
+                              className={`px-2 py-0.5 rounded font-bold border ${dBadge}`}
+                            >
+                              {d.department}
+                            </span>
+                          );
+                        })}
+                        <span className="text-gray-500 text-[10px]">
+                          ({candidateAppliedDepts.length} department{candidateAppliedDepts.length > 1 ? "s" : ""})
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setQueueModalCandidate(null)}
+                    className="p-1.5 text-gray-400 hover:text-white border border-white/10 hover:border-white/30 rounded-lg transition-colors cursor-pointer shrink-0"
+                    title="Close"
+                  >
+                    <FaTimes className="text-sm" />
+                  </button>
+                </div>
+
+                {/* Modal Body */}
+                <div className="space-y-4">
+                  {/* Active Queues Summary Banner (if in any queue) */}
+                  {queuedDeptApps.length > 0 ? (
+                    <div className="p-3 rounded-xl bg-cyan-950/40 border border-cyan-500/40 flex items-center justify-between gap-3 flex-wrap">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-2.5 w-2.5 relative">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-400"></span>
+                          </span>
+                          <span className="font-mono text-xs font-bold uppercase text-white tracking-wide">
+                            Active in {queuedDeptApps.length} Queue{queuedDeptApps.length > 1 ? "s" : ""}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                          {queuedDeptApps.map((qApp) => {
+                            const qInfo = getQueuePositionInfo(qApp._id);
+                            return (
+                              <span
+                                key={qApp._id}
+                                className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
+                                  qInfo?.isNext
+                                    ? "bg-emerald-500 text-black border-emerald-400 animate-pulse"
+                                    : "bg-cyan-500/20 text-cyan-200 border-cyan-400/50"
+                                }`}
+                              >
+                                {qApp.queueDepartment || qApp.department}: {qInfo?.isNext ? "#1 NEXT" : `#${qInfo?.position || ""}`}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsQueueOpen(true);
+                          setQueueModalCandidate(null);
+                        }}
+                        className="px-2.5 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 font-mono text-[11px] font-bold uppercase tracking-wider shrink-0 flex items-center gap-1 cursor-pointer transition-colors"
+                      >
+                        <FaEye className="text-xs" />
+                        <span>Open Panel</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-400 font-mono text-[11px]">
+                      Candidate is not currently in any waiting line. Select below to add them to their applied queue.
+                    </div>
+                  )}
+
+                  {/* Applied Department Queue Cards (ONLY allows queuing in applied departments) */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-mono text-xs text-gray-300 uppercase tracking-wider font-bold">
+                        Applied Department Queue{candidateAppliedDepts.length > 1 ? "s" : ""} ({candidateAppliedDepts.length}):
+                      </p>
+                      <span className="text-[10px] text-cyan-400 font-mono font-semibold">
+                        {candidateAppliedDepts.length > 1
+                          ? "Candidate eligible for both applied queues"
+                          : "Candidate eligible for applied queue only"}
+                      </span>
+                    </div>
+
+                    {candidateAppliedDepts.length === 0 ? (
+                      <div className="p-4 rounded-xl bg-white/5 border border-white/10 text-center text-gray-400 text-xs font-mono">
+                        No applied departments found for this applicant.
+                      </div>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {candidateAppliedDepts.map((deptApp) => {
+                          const dept = deptApp.department;
+                          const isQueued = deptApp.interviewStatus === "in_queue";
+                          const isCompleted = deptApp.interviewStatus === "completed";
+                          const count = getDeptQueueCount(dept);
+                          const qInfo = isQueued ? getQueuePositionInfo(deptApp._id) : null;
+                          const targetId = deptApp._id;
+
+                          const deptLower = String(dept || "").toLowerCase();
+                          const deptColorBadge = deptLower.includes("soft")
+                            ? "bg-blue-500/20 text-blue-300 border-blue-500/40"
+                            : deptLower.includes("mech")
+                            ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                            : deptLower.includes("embed")
+                            ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                            : deptLower.includes("pr")
+                            ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
+                            : "bg-white/10 text-white border-white/20";
+
+                          return (
+                            <div
+                              key={deptApp._id}
+                              className={`p-3.5 rounded-xl border font-mono transition-all ${
+                                isQueued
+                                  ? qInfo?.isNext
+                                    ? "bg-emerald-950/30 border-emerald-400/60 shadow-[0_0_15px_rgba(16,185,129,0.15)]"
+                                    : "bg-cyan-950/30 border-cyan-500/50"
+                                  : isCompleted
+                                  ? "bg-white/[0.03] border-emerald-500/30"
+                                  : "bg-white/5 border-white/10"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-bold text-white text-xs uppercase tracking-wide">
+                                      {dept} Queue
+                                    </span>
+                                    <span className={`text-[9px] uppercase px-1.5 py-0.5 rounded font-bold border ${deptColorBadge}`}>
+                                      Applied
+                                    </span>
+                                    {isQueued && (
+                                      <span className={`text-[10px] uppercase px-2 py-0.5 rounded font-bold border ${
+                                        qInfo?.isNext
+                                          ? "bg-emerald-500 text-black border-emerald-400 animate-pulse"
+                                          : "bg-cyan-500/20 text-cyan-300 border-cyan-400/50"
+                                      }`}>
+                                        {qInfo?.isNext ? "⚡ #1 Next Up" : `Position #${qInfo?.position}`}
+                                      </span>
+                                    )}
+                                    {isCompleted && (
+                                      <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
+                                        ✓ Done
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[11px] text-gray-400 mt-1">
+                                    {isQueued
+                                      ? qInfo?.isNext
+                                        ? "Now Interviewing / Next Candidate up for this department."
+                                        : `Position #${qInfo?.position} (${(qInfo?.position || 1) - 1} ahead in line)`
+                                      : isCompleted
+                                      ? "Interview already completed for this department."
+                                      : count === 0
+                                      ? "Queue is empty — adding will be #1 Next Up!"
+                                      : `${count} waiting — adding will be #${count + 1}`}
+                                  </p>
+                                </div>
+
+                                {/* Department Actions */}
+                                <div className="shrink-0 flex items-center gap-1.5">
+                                  {isQueued ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          await handleRemoveFromQueue(deptApp._id, true);
+                                        }}
+                                        disabled={loadingQueueActionId === deptApp._id}
+                                        className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-black font-bold text-xs uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
+                                        title="Mark interview done for this department"
+                                      >
+                                        <FaCheck className="text-[10px]" />
+                                        <span>Done</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          await handleRemoveFromQueue(deptApp._id, false);
+                                        }}
+                                        disabled={loadingQueueActionId === deptApp._id}
+                                        className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs cursor-pointer transition-colors disabled:opacity-50"
+                                        title="Remove from this queue"
+                                      >
+                                        <FaTimes className="text-xs" />
+                                      </button>
+                                    </>
+                                  ) : isCompleted ? (
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        await handleAddToQueue(targetId, dept);
+                                      }}
+                                      disabled={loadingQueueActionId === targetId}
+                                      className="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-gray-300 border border-white/20 text-xs font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
+                                    >
+                                      <FaPlus className="text-[9px]" />
+                                      <span>Re-queue</span>
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        await handleAddToQueue(targetId, dept);
+                                      }}
+                                      disabled={loadingQueueActionId === targetId}
+                                      className="px-3 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500 text-cyan-300 hover:text-black border border-cyan-500/40 text-xs font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-all disabled:opacity-50"
+                                    >
+                                      <FaPlus className="text-[10px]" />
+                                      <span>Add to Queue</span>
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Completed Summary if any */}
+                  {completedDeptApps.length > 0 && (
+                    <div className="p-3 rounded-xl bg-emerald-950/20 border border-emerald-500/30 flex items-center gap-2">
+                      <FaCheckCircle className="text-emerald-400 text-xs shrink-0" />
+                      <span className="font-mono text-[11px] text-emerald-300">
+                        Interview completed for: <strong>{completedDeptApps.map((d) => d.department).join(", ")}</strong>
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer Close */}
+                <div className="flex items-center justify-end mt-4 pt-3 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setQueueModalCandidate(null)}
+                    className="px-4 py-2 border border-white/20 text-gray-300 rounded-lg font-mono text-xs uppercase tracking-wider hover:border-white hover:text-white transition-colors cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body
+          );
+        })()}
+
         {/* Detailed Candidate Review Modal (matching AddSec dashboard) */}
         {modalOpen && currentModalApp && mounted && typeof document !== "undefined" && createPortal(
           (() => {
@@ -3212,6 +3982,84 @@ export default function RecruitmentAdminPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Interview Queue Status & Quick Controls inside Review Modal */}
+                {(() => {
+                  const modalQueueInfo = getQueuePositionInfo(currentModalApp._id);
+                  const isQueued = currentModalApp.interviewStatus === "in_queue";
+                  const isDone = currentModalApp.interviewStatus === "completed";
+
+                  return (
+                    <div className="p-3 rounded-xl border border-white/15 bg-white/[0.03] flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-mono text-xs">
+                      <div className="flex items-center gap-2.5">
+                        <FaUserClock className="text-cyan-400 text-sm" />
+                        <div>
+                          <div className="text-gray-400 text-[10px] uppercase font-bold">Interview Status:</div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {isQueued ? (
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold border ${
+                                modalQueueInfo?.isNext
+                                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.3)] animate-pulse"
+                                  : "bg-cyan-500/20 text-cyan-300 border-cyan-400/50"
+                              }`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${modalQueueInfo?.isNext ? "bg-emerald-400 animate-ping" : "bg-cyan-400"}`} />
+                                <span>{modalQueueInfo?.isNext ? `#1 Next in Queue (${modalQueueInfo?.department})` : `In Queue: ${modalQueueInfo?.department} (#${modalQueueInfo?.position})`}</span>
+                              </span>
+                            ) : isDone ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-950/40 text-emerald-300 border border-emerald-500/40">
+                                <FaCheckCircle className="text-[10px]" />
+                                <span>Interview Completed</span>
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 text-[11px] italic">Not yet in queue</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {isQueued ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveFromQueue(currentModalApp._id, true)}
+                              className="px-3 py-1.5 rounded bg-emerald-500 hover:bg-emerald-400 text-black font-bold font-mono text-xs flex items-center gap-1.5 shadow-[0_0_12px_rgba(16,185,129,0.4)] cursor-pointer transition-colors"
+                            >
+                              <FaCheck className="text-xs" />
+                              <span>Mark Interview Done</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveFromQueue(currentModalApp._id, false)}
+                              className="px-2.5 py-1.5 rounded bg-white/5 hover:bg-rose-950/30 text-gray-300 hover:text-rose-300 border border-white/20 hover:border-rose-500/40 font-mono text-xs cursor-pointer transition-colors"
+                              title="Remove without marking done"
+                            >
+                              <FaTimes />
+                            </button>
+                          </>
+                        ) : isDone ? (
+                          <button
+                            type="button"
+                            onClick={() => handleAddToQueue(currentModalApp._id, currentModalApp.department)}
+                            className="px-3 py-1.5 rounded bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 font-bold font-mono text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                          >
+                            <FaPlus className="text-xs" />
+                            <span>Re-Queue for Interview</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleAddToQueue(currentModalApp._id, currentModalApp.department)}
+                            className="px-3 py-1.5 rounded bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 font-bold font-mono text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                          >
+                            <FaPlus className="text-xs" />
+                            <span>Add to {currentModalApp.department} Queue</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Quick Info Grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 font-mono text-xs">

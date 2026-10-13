@@ -77,6 +77,84 @@ export async function GET(req, { params }) {
   }
 }
 
+export async function POST(req, { params }) {
+  try {
+    const authResult = await validateAdmin();
+    if (authResult.response) return authResult.response;
+
+    const { id } = await params;
+    const body = await req.json();
+    const { sourceApplicationId, department, interviewStatus, queueDepartment, queueAddedAt } = body || {};
+
+    if (!sourceApplicationId || !department) {
+      return NextResponse.json(
+        { success: false, message: "sourceApplicationId and department are required." },
+        { status: 400 }
+      );
+    }
+
+    await connectDB();
+
+    const sourceApp = await RecruitmentApplication.findOne({ _id: sourceApplicationId, formId: id }).lean();
+    if (!sourceApp) {
+      return NextResponse.json(
+        { success: false, message: "Source application not found." },
+        { status: 404 }
+      );
+    }
+
+    const targetDept = String(department).trim();
+    const candidateEmail = String(sourceApp.responses?.email || "").trim();
+    const candidateRoll = String(
+      sourceApp.responses?.rollno ||
+      sourceApp.responses?.rollNumber ||
+      sourceApp.responses?.roll ||
+      ""
+    ).trim();
+
+    const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const siblingFilter = [];
+    if (candidateEmail) {
+      siblingFilter.push({ "responses.email": new RegExp(`^\\s*${escapeRegex(candidateEmail)}\\s*$`, "i") });
+    }
+    if (candidateRoll) {
+      siblingFilter.push({ "responses.rollno": new RegExp(`^\\s*${escapeRegex(candidateRoll)}\\s*$`, "i") });
+      siblingFilter.push({ "responses.rollNumber": new RegExp(`^\\s*${escapeRegex(candidateRoll)}\\s*$`, "i") });
+    }
+
+    let existingDeptApp = null;
+    if (siblingFilter.length > 0) {
+      existingDeptApp = await RecruitmentApplication.findOne({
+        formId: id,
+        department: targetDept,
+        $or: siblingFilter,
+      });
+    }
+
+    if (existingDeptApp) {
+      existingDeptApp.interviewStatus = interviewStatus || "in_queue";
+      existingDeptApp.queueDepartment = queueDepartment || targetDept;
+      existingDeptApp.queueAddedAt = queueAddedAt ? new Date(queueAddedAt) : new Date();
+      await existingDeptApp.save();
+      return NextResponse.json({ success: true, data: existingDeptApp });
+    }
+
+    return NextResponse.json(
+      {
+        success: false,
+        message: `Candidate did not apply for ${targetDept}. Candidates can only be queued in departments they applied for.`,
+      },
+      { status: 400 }
+    );
+  } catch (error) {
+    console.error("POST RECRUITMENT APPLICATION (ADD DEPT) ERROR:", error);
+    return NextResponse.json(
+      { success: false, message: "Server error" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PUT(req, { params }) {
   try {
     const authResult = await validateAdmin();
@@ -84,6 +162,34 @@ export async function PUT(req, { params }) {
 
     const { id } = await params;
     const body = await req.json();
+
+    await connectDB();
+
+    // Check if batch queue updates are provided
+    if (Array.isArray(body?.queueUpdates) && body.queueUpdates.length > 0) {
+      const bulkOps = body.queueUpdates.map((item) => ({
+        updateOne: {
+          filter: { _id: item.applicationId, formId: id },
+          update: {
+            $set: {
+              ...(item.interviewStatus !== undefined && { interviewStatus: String(item.interviewStatus).trim().toLowerCase() }),
+              ...(item.queueDepartment !== undefined && { queueDepartment: String(item.queueDepartment).trim() }),
+              ...(item.queueAddedAt !== undefined && { queueAddedAt: item.queueAddedAt ? new Date(item.queueAddedAt) : null }),
+              ...(item.queueOrder !== undefined && { queueOrder: Number(item.queueOrder) || 0 }),
+              ...(item.interviewCompletedAt !== undefined && { interviewCompletedAt: item.interviewCompletedAt ? new Date(item.interviewCompletedAt) : null }),
+            },
+          },
+        },
+      }));
+
+      await RecruitmentApplication.bulkWrite(bulkOps);
+
+      return NextResponse.json({
+        success: true,
+        message: "Queue updated successfully.",
+      });
+    }
+
     const {
       applicationId,
       department,
@@ -95,6 +201,11 @@ export async function PUT(req, { params }) {
       positiveRemarks,
       negativeRemarks,
       interviewSlot,
+      interviewStatus,
+      queueDepartment,
+      queueAddedAt,
+      queueOrder,
+      interviewCompletedAt,
     } = body || {};
 
     if (!applicationId) {
@@ -103,8 +214,6 @@ export async function PUT(req, { params }) {
         { status: 400 }
       );
     }
-
-    await connectDB();
 
     const application = await RecruitmentApplication.findOne({
       _id: applicationId,
@@ -182,6 +291,22 @@ export async function PUT(req, { params }) {
           { $set: { interviewSlot: cleanSlot } }
         );
       }
+    }
+
+    if (interviewStatus !== undefined) {
+      application.interviewStatus = String(interviewStatus).trim().toLowerCase();
+    }
+    if (queueDepartment !== undefined) {
+      application.queueDepartment = String(queueDepartment).trim();
+    }
+    if (queueAddedAt !== undefined) {
+      application.queueAddedAt = queueAddedAt ? new Date(queueAddedAt) : null;
+    }
+    if (queueOrder !== undefined) {
+      application.queueOrder = Number(queueOrder) || 0;
+    }
+    if (interviewCompletedAt !== undefined) {
+      application.interviewCompletedAt = interviewCompletedAt ? new Date(interviewCompletedAt) : null;
     }
 
     if (
