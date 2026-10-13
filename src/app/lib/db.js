@@ -1,4 +1,12 @@
 import mongoose from "mongoose";
+import dns from "node:dns";
+
+// Fix for Node.js "querySrv ECONNREFUSED" on networks/ISPs that fail DNS SRV records
+try {
+  dns.setServers(["8.8.8.8", "1.1.1.1", "8.8.4.4"]);
+} catch (err) {
+  // Ignored in restricted environments
+}
 
 const MONGODB_URI = process.env.MONGODB_URI;
 

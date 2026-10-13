@@ -53,6 +53,7 @@ import {
   normalizeToTimeInputValue,
   formatTimeSlot,
   formatInterviewDate,
+  parseTimeSlotToMinutes,
 } from "@/app/lib/recruitment";
 
 const DEFAULT_DEADLINE = "2026-12-31T23:59";
@@ -511,6 +512,30 @@ export default function RecruitmentAdminPage() {
     list = [...list].sort((a, b) => {
       if (sortBy === "oldest") {
         return new Date(a.createdAt) - new Date(b.createdAt);
+      }
+      if (sortBy === "slot_asc" || sortBy === "slot_desc") {
+        const getGroupSlotMinutes = (group) => {
+          const candidateSlotApp = group.deptApplications.find(
+            (d) => (inlineEdits[d._id]?.interviewSlot !== undefined ? inlineEdits[d._id].interviewSlot : d.interviewSlot)
+          );
+          const slotVal = candidateSlotApp
+            ? (inlineEdits[candidateSlotApp._id]?.interviewSlot !== undefined ? inlineEdits[candidateSlotApp._id].interviewSlot : candidateSlotApp.interviewSlot)
+            : (inlineEdits[group.primaryApp._id]?.interviewSlot !== undefined ? inlineEdits[group.primaryApp._id].interviewSlot : group.primaryApp.interviewSlot) || "";
+          return parseTimeSlotToMinutes(slotVal);
+        };
+
+        const minA = getGroupSlotMinutes(a);
+        const minB = getGroupSlotMinutes(b);
+
+        if (minA !== null && minB !== null) {
+          if (minA !== minB) {
+            return sortBy === "slot_asc" ? minA - minB : minB - minA;
+          }
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        }
+        if (minA !== null && minB === null) return -1;
+        if (minA === null && minB !== null) return 1;
+        return new Date(b.createdAt) - new Date(a.createdAt);
       }
       if (sortBy === "points_desc") {
         const maxScoreA = Math.max(
@@ -2750,6 +2775,8 @@ export default function RecruitmentAdminPage() {
                     >
                       <option value="newest">Newest First</option>
                       <option value="oldest">Oldest First</option>
+                      <option value="slot_asc">Time Slot: Earliest First (Asc)</option>
+                      <option value="slot_desc">Time Slot: Latest First (Desc)</option>
                       <option value="points_desc">Points: High to Low</option>
                       <option value="points_asc">Points: Low to High</option>
                       <option value="name_asc">Name: A to Z</option>

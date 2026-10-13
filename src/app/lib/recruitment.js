@@ -399,3 +399,16 @@ export function formatInterviewDate(dateStr) {
   return trimmed;
 }
 
+export function parseTimeSlotToMinutes(timeStr) {
+  if (!timeStr || typeof timeStr !== "string") return null;
+  const normalized = normalizeToTimeInputValue(timeStr);
+  if (!normalized) return null;
+  const parts = normalized.split(":");
+  if (parts.length < 2) return null;
+  const hours = parseInt(parts[0], 10);
+  const minutes = parseInt(parts[1], 10);
+  if (isNaN(hours) || isNaN(minutes)) return null;
+  return hours * 60 + minutes;
+}
+
+
