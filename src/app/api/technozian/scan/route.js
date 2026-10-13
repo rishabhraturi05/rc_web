@@ -6,7 +6,11 @@ import TechnozianRegistration from "@/app/models/TechnozianRegistration";
 const DEFAULT_API_KEY = "rc_technozian_rfid_2025";
 
 function verifyApiKey(req, bodyKey = null) {
-  const configuredKey = process.env.RFID_API_KEY || DEFAULT_API_KEY;
+  const configuredKey =
+    process.env.RFID_API_KEY ||
+    process.env.apiKey ||
+    process.env.API_KEY ||
+    DEFAULT_API_KEY;
 
   const headerKey =
     req.headers.get("x-api-key") ||
