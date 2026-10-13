@@ -17,6 +17,7 @@ const RecruitmentApplicationSchema = new mongoose.Schema(
     negativeRemarks: { type: [String], default: [] },
     feedback: { type: String, default: "", trim: true }, // "positive" | "waitlist" | "negative" | ""
     interviewSlot: { type: String, default: "", trim: true },
+    interviewDate: { type: String, default: "", trim: true },
     interviewStatus: { type: String, default: "pending", trim: true }, // "pending" | "in_queue" | "completed"
     queueDepartment: { type: String, default: "", trim: true },
     queueAddedAt: { type: Date, default: null },

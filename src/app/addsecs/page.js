@@ -36,9 +36,10 @@ import {
   FaColumns,
   FaExternalLinkAlt,
   FaKey,
+  FaCalendarAlt,
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
-import { getRecruitmentFormTitle, getApplicantResumeInfo, normalizeToTimeInputValue, formatTimeSlot } from "@/app/lib/recruitment";
+import { getRecruitmentFormTitle, getApplicantResumeInfo, normalizeToTimeInputValue, formatTimeSlot, formatInterviewDate } from "@/app/lib/recruitment";
 import ChangeCredentialsModal from "@/app/components/ChangeCredentialsModal";
 
 const DEPARTMENTS = [
@@ -119,8 +120,11 @@ export default function AddSecDashboard() {
 
   // Inline edits state: { [appId]: { points, comments, feedback, positiveRemarks, negativeRemarks, isDirty, isSaving, savedRecently } }
   const [inlineEdits, setInlineEdits] = useState({});
+  const [slotFilter, setSlotFilter] = useState("all");
   const [slotSavingId, setSlotSavingId] = useState(null);
   const [slotSavedId, setSlotSavedId] = useState(null);
+  const [dateSavingId, setDateSavingId] = useState(null);
+  const [dateSavedId, setDateSavedId] = useState(null);
 
   // Review Modal state
   const [modalAppIndex, setModalAppIndex] = useState(null); // index in filteredApplications
@@ -350,7 +354,23 @@ export default function AddSecDashboard() {
       if (scoreFilter === "negative" && scoreInfo.status !== "negative") return false;
       if (scoreFilter === "pending" && scoreInfo.isEvaluated) return false;
 
-      // 4. Search query
+      // 4. Interview Slot & Date filter
+      const appSlot = inlineEdits[app._id]?.interviewSlot !== undefined
+        ? inlineEdits[app._id].interviewSlot
+        : app.interviewSlot || "";
+      const appDate = inlineEdits[app._id]?.interviewDate !== undefined
+        ? inlineEdits[app._id].interviewDate
+        : app.interviewDate || "";
+
+      if (slotFilter === "slot_given" && !appSlot) return false;
+      if (slotFilter === "slot_not_given" && Boolean(appSlot)) return false;
+      if (slotFilter === "date_given" && !appDate) return false;
+      if (slotFilter === "date_not_given" && Boolean(appDate)) return false;
+      if (slotFilter === "both_given" && (!appSlot || !appDate)) return false;
+      if (slotFilter === "neither_given" && (Boolean(appSlot) || Boolean(appDate))) return false;
+      if (slotFilter === "slot_no_date" && (!appSlot || Boolean(appDate))) return false;
+
+      // 5. Search query
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim();
         const candidateName = String(app.responses?.name || app.responses?.fullName || "").toLowerCase();
@@ -363,11 +383,8 @@ export default function AddSecDashboard() {
           .map((v) => String(v).toLowerCase())
           .join(" ");
 
-        const cSlot = String(
-          inlineEdits[app._id]?.interviewSlot !== undefined
-            ? inlineEdits[app._id].interviewSlot
-            : app.interviewSlot || ""
-        ).toLowerCase();
+        const cSlot = String(appSlot).toLowerCase();
+        const cDate = String(appDate).toLowerCase();
 
         const matches =
           candidateName.includes(query) ||
@@ -375,6 +392,7 @@ export default function AddSecDashboard() {
           candidateEmail.includes(query) ||
           candidateComments.includes(query) ||
           cSlot.includes(query) ||
+          cDate.includes(query) ||
           allAnswers.includes(query);
 
         if (!matches) return false;
@@ -412,7 +430,7 @@ export default function AddSecDashboard() {
     });
 
     return list;
-  }, [applications, selectedYear, evaluationFilter, scoreFilter, searchQuery, sortBy, inlineEdits, getCandidateScoreInfo]);
+  }, [applications, selectedYear, evaluationFilter, scoreFilter, slotFilter, searchQuery, sortBy, inlineEdits, getCandidateScoreInfo]);
 
   // Overall Statistics for this Form & Department (Score-driven)
   const stats = useMemo(() => {
@@ -478,6 +496,7 @@ export default function AddSecDashboard() {
           positiveRemarks: edit.positiveRemarks || [],
           negativeRemarks: edit.negativeRemarks || [],
           interviewSlot: edit.interviewSlot,
+          interviewDate: edit.interviewDate,
         }),
       });
 
@@ -508,7 +527,7 @@ export default function AddSecDashboard() {
         return (targetEmail && e && e === targetEmail) || (targetRoll && r && r === targetRoll);
       };
 
-      // Update local application record (syncing slot across all of candidate's applications)
+      // Update local application record (syncing slot & date across all of candidate's applications)
       setApplications((prev) =>
         prev.map((app) => {
           if (app._id === appId) {
@@ -520,29 +539,31 @@ export default function AddSecDashboard() {
               positiveRemarks: edit.positiveRemarks || [],
               negativeRemarks: edit.negativeRemarks || [],
               interviewSlot: edit.interviewSlot !== undefined ? edit.interviewSlot : app.interviewSlot,
+              interviewDate: edit.interviewDate !== undefined ? edit.interviewDate : app.interviewDate,
               evaluatedBy: result.data?.evaluatedBy,
               evaluatedAt: result.data?.evaluatedAt,
             };
           }
-          if (edit.interviewSlot !== undefined && isCandidateMatch(app)) {
-            return {
-              ...app,
-              interviewSlot: edit.interviewSlot,
-            };
+          if (isCandidateMatch(app)) {
+            const updated = { ...app };
+            if (edit.interviewSlot !== undefined) updated.interviewSlot = edit.interviewSlot;
+            if (edit.interviewDate !== undefined) updated.interviewDate = edit.interviewDate;
+            return updated;
           }
           return app;
         })
       );
 
-      // Also sync inline edits for sibling applications if slot was updated
-      if (edit.interviewSlot !== undefined) {
+      // Also sync inline edits for sibling applications if slot or date was updated
+      if (edit.interviewSlot !== undefined || edit.interviewDate !== undefined) {
         setInlineEdits((prev) => {
           const next = { ...prev };
           applications.forEach((app) => {
             if (isCandidateMatch(app) && app._id !== appId) {
               next[app._id] = {
                 ...(next[app._id] || {}),
-                interviewSlot: edit.interviewSlot,
+                ...(edit.interviewSlot !== undefined && { interviewSlot: edit.interviewSlot }),
+                ...(edit.interviewDate !== undefined && { interviewDate: edit.interviewDate }),
               };
             }
           });
@@ -640,6 +661,77 @@ export default function AddSecDashboard() {
       showToast("Error updating interview slot.", "error");
     } finally {
       setSlotSavingId(null);
+    }
+  };
+
+  // Dedicated interview date updater (allows quick inline saving from table)
+  const saveInterviewDate = async (appId, dateValue) => {
+    if (!activeForm || !appId) return;
+    setDateSavingId(appId);
+    try {
+      const trimmed = String(dateValue ?? "").trim();
+      const response = await fetch(`/api/addsecs/forms/${activeForm._id}/applications`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId: appId,
+          interviewDate: trimmed,
+        }),
+      });
+
+      const result = await response.json();
+      if (!result.success) {
+        showToast(result.message || "Failed to update interview date.", "error");
+        return;
+      }
+
+      // Find candidate matching details so sibling applications update in state
+      const targetApp = applications.find((a) => a._id === appId);
+      const targetEmail = String(targetApp?.responses?.email || "").trim().toLowerCase();
+      const targetRoll = String(
+        targetApp?.responses?.rollno ||
+        targetApp?.responses?.rollNumber ||
+        targetApp?.responses?.roll ||
+        ""
+      ).trim().toLowerCase();
+
+      const isCandidateMatch = (app) => {
+        if (app._id === appId) return true;
+        const e = String(app.responses?.email || "").trim().toLowerCase();
+        const r = String(app.responses?.rollno || app.responses?.rollNumber || app.responses?.roll || "").trim().toLowerCase();
+        return (targetEmail && e && e === targetEmail) || (targetRoll && r && r === targetRoll);
+      };
+
+      setApplications((prev) =>
+        prev.map((app) =>
+          isCandidateMatch(app) ? { ...app, interviewDate: trimmed } : app
+        )
+      );
+
+      setInlineEdits((prev) => {
+        const next = { ...prev };
+        applications.forEach((app) => {
+          if (isCandidateMatch(app)) {
+            next[app._id] = {
+              ...(next[app._id] || {}),
+              interviewDate: trimmed,
+              isDirty: false,
+            };
+          }
+        });
+        return next;
+      });
+
+      setDateSavedId(appId);
+      showToast("Interview date updated.", "success");
+      setTimeout(() => {
+        setDateSavedId((prev) => (prev === appId ? null : prev));
+      }, 2500);
+    } catch (err) {
+      console.error("Save interview date error:", err);
+      showToast("Error updating interview date.", "error");
+    } finally {
+      setDateSavingId(null);
     }
   };
 
@@ -812,6 +904,7 @@ export default function AddSecDashboard() {
       row["Points / Score"] = scoreInfo.isEvaluated ? scoreInfo.scoreFormatted : "";
       row["Positive Remarks (+1)"] = Array.isArray(posRemarks) ? posRemarks.join("; ") : "";
       row["Negative Remarks (-1)"] = Array.isArray(negRemarks) ? negRemarks.join("; ") : "";
+      row["Interview Date"] = formatInterviewDate(edit.interviewDate !== undefined ? edit.interviewDate : app.interviewDate);
       row["Interview Slot"] = formatTimeSlot(edit.interviewSlot !== undefined ? edit.interviewSlot : app.interviewSlot);
       row["Comments / Remarks"] = commentsVal;
       row["Evaluated By"] = app.evaluatedBy || "";
@@ -919,6 +1012,7 @@ export default function AddSecDashboard() {
         row["Points / Score"] = scoreInfo.isEvaluated ? scoreInfo.scoreFormatted : "";
         row["Positive Remarks (+1)"] = Array.isArray(posRemarks) ? posRemarks.join("; ") : "";
         row["Negative Remarks (-1)"] = Array.isArray(negRemarks) ? negRemarks.join("; ") : "";
+        row["Interview Date"] = formatInterviewDate(edit.interviewDate !== undefined ? edit.interviewDate : app.interviewDate);
         row["Interview Slot"] = formatTimeSlot(edit.interviewSlot !== undefined ? edit.interviewSlot : app.interviewSlot);
         row["Comments / Remarks"] = commentsVal;
         row["Evaluated By"] = app.evaluatedBy || "";
@@ -1539,6 +1633,25 @@ export default function AddSecDashboard() {
                   </select>
                 </div>
 
+                {/* Slot & Date Filter */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Slot / Date:</label>
+                  <select
+                    value={slotFilter}
+                    onChange={(e) => setSlotFilter(e.target.value)}
+                    className="bg-black/60 border border-white/20 rounded px-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-white"
+                  >
+                    <option value="all">All Slots & Dates</option>
+                    <option value="slot_given">🕒 Slot Given ({applications.filter((a) => Boolean(a.interviewSlot)).length})</option>
+                    <option value="slot_not_given">⚪ Slot Not Given ({applications.filter((a) => !a.interviewSlot).length})</option>
+                    <option value="date_given">📅 Date Given ({applications.filter((a) => Boolean(a.interviewDate)).length})</option>
+                    <option value="date_not_given">⚪ Date Not Given ({applications.filter((a) => !a.interviewDate).length})</option>
+                    <option value="both_given">✓ Both Slot & Date Given ({applications.filter((a) => Boolean(a.interviewSlot) && Boolean(a.interviewDate)).length})</option>
+                    <option value="neither_given">✕ Neither Slot Nor Date ({applications.filter((a) => !a.interviewSlot && !a.interviewDate).length})</option>
+                    <option value="slot_no_date">⚠️ Slot Given (No Date) ({applications.filter((a) => Boolean(a.interviewSlot) && !a.interviewDate).length})</option>
+                  </select>
+                </div>
+
                 {/* Sort By Filter */}
                 <div className="flex items-center gap-1 shrink-0">
                   <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Sort:</label>
@@ -1561,13 +1674,14 @@ export default function AddSecDashboard() {
                     Showing <strong className="text-white">{filteredApplications.length}</strong> of{" "}
                     <strong className="text-white">{applications.length}</strong>
                   </span>
-                  {(searchQuery || selectedYear !== "all" || evaluationFilter !== "all" || scoreFilter !== "all" || sortBy !== "newest") && (
+                  {(searchQuery || selectedYear !== "all" || evaluationFilter !== "all" || scoreFilter !== "all" || slotFilter !== "all" || sortBy !== "newest") && (
                     <button
                       onClick={() => {
                         setSearchQuery("");
                         setSelectedYear("all");
                         setEvaluationFilter("all");
                         setScoreFilter("all");
+                        setSlotFilter("all");
                         setSortBy("newest");
                       }}
                       className="text-blue-400 hover:underline cursor-pointer"
@@ -1717,56 +1831,99 @@ export default function AddSecDashboard() {
                           </div>
                         )}
 
-                        {/* Interview Time Slot on Mobile */}
+                        {/* Interview Date & Time Slot on Mobile */}
                         {(() => {
                           const currentSlot = edit.interviewSlot !== undefined ? edit.interviewSlot : (app.interviewSlot || "");
-                          const isSaving = slotSavingId === app._id;
-                          const isSaved = slotSavedId === app._id;
-                          const isDirty = edit.interviewSlot !== undefined && edit.interviewSlot !== (app.interviewSlot || "");
+                          const currentDate = edit.interviewDate !== undefined ? edit.interviewDate : (app.interviewDate || "");
+                          const isSlotSaving = slotSavingId === app._id;
+                          const isSlotSaved = slotSavedId === app._id;
+                          const isDateSaving = dateSavingId === app._id;
+                          const isDateSaved = dateSavedId === app._id;
 
                           return (
-                            <div className="py-2.5 space-y-1.5 border-b border-white/10">
+                            <div className="py-2.5 space-y-2 border-b border-white/10">
                               <div className="flex items-center justify-between text-[11px] font-mono text-gray-400 font-semibold uppercase tracking-wider">
                                 <div className="flex items-center gap-1.5">
-                                  <FaClock className="text-cyan-400 text-xs" />
-                                  <span>Interview Time Slot</span>
+                                  <FaCalendarAlt className="text-cyan-400 text-xs" />
+                                  <span>Interview Date & Slot</span>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-1.5">
-                                <input
-                                  type="time"
-                                  value={normalizeToTimeInputValue(currentSlot)}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    handleInlineChange(app._id, "interviewSlot", val);
-                                    saveInterviewSlot(app._id, val);
-                                  }}
-                                  style={{ colorScheme: "dark" }}
-                                  className={`flex-1 px-2.5 py-1.5 rounded text-xs font-mono transition-all border focus:outline-none cursor-pointer ${
-                                    currentSlot
-                                      ? "bg-cyan-950/40 border-cyan-500/50 text-cyan-200 focus:border-cyan-400"
-                                      : "bg-black/60 border-white/15 text-gray-400 focus:border-cyan-500/50"
-                                  }`}
-                                  title="Click to select interview time"
-                                />
-                                {currentSlot ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      handleInlineChange(app._id, "interviewSlot", "");
-                                      saveInterviewSlot(app._id, "");
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {/* Date Input */}
+                                <div className="flex items-center gap-1.5">
+                                  <input
+                                    type="date"
+                                    value={currentDate}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      handleInlineChange(app._id, "interviewDate", val);
+                                      saveInterviewDate(app._id, val);
                                     }}
-                                    className="text-gray-500 hover:text-rose-400 text-xs px-1.5 py-1 rounded transition-colors cursor-pointer shrink-0"
-                                    title="Clear time slot"
-                                  >
-                                    <FaTimes />
-                                  </button>
-                                ) : null}
-                                {isSaving ? (
-                                  <span className="text-[10px] font-mono text-cyan-400 animate-pulse px-1">...</span>
-                                ) : isSaved ? (
-                                  <FaCheckCircle className="text-emerald-400 text-xs shrink-0" title="Saved" />
-                                ) : null}
+                                    style={{ colorScheme: "dark" }}
+                                    className={`flex-1 px-2.5 py-1.5 rounded text-xs font-mono transition-all border focus:outline-none cursor-pointer ${
+                                      currentDate
+                                        ? "bg-cyan-950/40 border-cyan-500/50 text-cyan-200 focus:border-cyan-400"
+                                        : "bg-black/60 border-white/15 text-gray-400 focus:border-cyan-500/50"
+                                    }`}
+                                    title="Click to select interview date"
+                                  />
+                                  {currentDate ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        handleInlineChange(app._id, "interviewDate", "");
+                                        saveInterviewDate(app._id, "");
+                                      }}
+                                      className="text-gray-500 hover:text-rose-400 text-xs px-1.5 py-1 rounded transition-colors cursor-pointer shrink-0"
+                                      title="Clear date"
+                                    >
+                                      <FaTimes />
+                                    </button>
+                                  ) : null}
+                                  {isDateSaving ? (
+                                    <span className="text-[10px] font-mono text-cyan-400 animate-pulse px-1">...</span>
+                                  ) : isDateSaved ? (
+                                    <FaCheckCircle className="text-emerald-400 text-xs shrink-0" title="Date saved" />
+                                  ) : null}
+                                </div>
+
+                                {/* Time Slot Input */}
+                                <div className="flex items-center gap-1.5">
+                                  <input
+                                    type="time"
+                                    value={normalizeToTimeInputValue(currentSlot)}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      handleInlineChange(app._id, "interviewSlot", val);
+                                      saveInterviewSlot(app._id, val);
+                                    }}
+                                    style={{ colorScheme: "dark" }}
+                                    className={`flex-1 px-2.5 py-1.5 rounded text-xs font-mono transition-all border focus:outline-none cursor-pointer ${
+                                      currentSlot
+                                        ? "bg-cyan-950/40 border-cyan-500/50 text-cyan-200 focus:border-cyan-400"
+                                        : "bg-black/60 border-white/15 text-gray-400 focus:border-cyan-500/50"
+                                    }`}
+                                    title="Click to select interview time"
+                                  />
+                                  {currentSlot ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        handleInlineChange(app._id, "interviewSlot", "");
+                                        saveInterviewSlot(app._id, "");
+                                      }}
+                                      className="text-gray-500 hover:text-rose-400 text-xs px-1.5 py-1 rounded transition-colors cursor-pointer shrink-0"
+                                      title="Clear time slot"
+                                    >
+                                      <FaTimes />
+                                    </button>
+                                  ) : null}
+                                  {isSlotSaving ? (
+                                    <span className="text-[10px] font-mono text-cyan-400 animate-pulse px-1">...</span>
+                                  ) : isSlotSaved ? (
+                                    <FaCheckCircle className="text-emerald-400 text-xs shrink-0" title="Time slot saved" />
+                                  ) : null}
+                                </div>
                               </div>
                             </div>
                           );
@@ -1826,8 +1983,8 @@ export default function AddSecDashboard() {
                         </th>
                         <th className="py-2.5 px-2.5 w-[19%]">
                           <div className="flex items-center gap-1.5">
-                            <FaClock className="text-cyan-400 text-xs" />
-                            <span>Interview Slot</span>
+                            <FaCalendarAlt className="text-cyan-400 text-xs" />
+                            <span>Date & Slot</span>
                           </div>
                         </th>
                         <th className="py-2.5 px-2 w-[13%] text-center">Actions</th>
@@ -1927,54 +2084,99 @@ export default function AddSecDashboard() {
                               </div>
                             </td>
 
-                            {/* Interview Time Slot */}
+                            {/* Interview Slot & Date */}
                             <td className="py-2.5 px-2.5 overflow-hidden">
                               {(() => {
                                 const currentSlot = edit.interviewSlot !== undefined ? edit.interviewSlot : (app.interviewSlot || "");
-                                const isSaving = slotSavingId === app._id;
-                                const isSaved = slotSavedId === app._id;
-                                const isDirty = edit.interviewSlot !== undefined && edit.interviewSlot !== (app.interviewSlot || "");
+                                const currentDate = edit.interviewDate !== undefined ? edit.interviewDate : (app.interviewDate || "");
+                                const isSlotSaving = slotSavingId === app._id;
+                                const isSlotSaved = slotSavedId === app._id;
+                                const isDateSaving = dateSavingId === app._id;
+                                const isDateSaved = dateSavedId === app._id;
 
                                 return (
-                                  <div className="flex items-center gap-1">
-                                    <input
-                                      type="time"
-                                      value={normalizeToTimeInputValue(currentSlot)}
-                                      onChange={(e) => {
-                                        const val = e.target.value;
-                                        handleInlineChange(app._id, "interviewSlot", val);
-                                        saveInterviewSlot(app._id, val);
-                                      }}
-                                      style={{ colorScheme: "dark" }}
-                                      className={`w-full min-w-0 px-2 py-1 rounded text-[11px] font-mono transition-all border focus:outline-none cursor-pointer ${
-                                        currentSlot
-                                          ? "bg-cyan-950/40 border-cyan-500/50 text-cyan-200 focus:border-cyan-400"
-                                          : "bg-black/60 border-white/15 text-gray-400 focus:border-cyan-500/50"
-                                      }`}
-                                      title="Click to select interview time"
-                                    />
-
-                                    {currentSlot ? (
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          handleInlineChange(app._id, "interviewSlot", "");
-                                          saveInterviewSlot(app._id, "");
+                                  <div className="space-y-1">
+                                    {/* Date input */}
+                                    <div className="flex items-center gap-1">
+                                      <input
+                                        type="date"
+                                        value={currentDate}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          handleInlineChange(app._id, "interviewDate", val);
+                                          saveInterviewDate(app._id, val);
                                         }}
-                                        className="text-gray-500 hover:text-rose-400 text-[10px] px-1 py-0.5 rounded transition-colors cursor-pointer shrink-0"
-                                        title="Clear time slot"
-                                      >
-                                        <FaTimes />
-                                      </button>
-                                    ) : null}
+                                        style={{ colorScheme: "dark" }}
+                                        className={`w-full min-w-0 px-1.5 py-0.5 rounded text-[10px] font-mono transition-all border focus:outline-none cursor-pointer ${
+                                          currentDate
+                                            ? "bg-cyan-950/40 border-cyan-500/50 text-cyan-200 focus:border-cyan-400"
+                                            : "bg-black/60 border-white/15 text-gray-400 focus:border-cyan-500/50"
+                                        }`}
+                                        title="Click to select interview date"
+                                      />
+                                      {currentDate ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            handleInlineChange(app._id, "interviewDate", "");
+                                            saveInterviewDate(app._id, "");
+                                          }}
+                                          className="text-gray-500 hover:text-rose-400 text-[10px] px-1 py-0.5 rounded transition-colors cursor-pointer shrink-0"
+                                          title="Clear date"
+                                        >
+                                          <FaTimes />
+                                        </button>
+                                      ) : null}
+                                      {isDateSaving ? (
+                                        <span className="text-[9px] font-mono text-cyan-400 animate-pulse">...</span>
+                                      ) : isDateSaved ? (
+                                        <span className="text-[10px] text-emerald-400 shrink-0" title="Date saved!">
+                                          <FaCheckCircle />
+                                        </span>
+                                      ) : null}
+                                    </div>
 
-                                    {isSaving ? (
-                                      <span className="text-[9px] font-mono text-cyan-400 animate-pulse">...</span>
-                                    ) : isSaved ? (
-                                      <span className="text-[10px] text-emerald-400 shrink-0" title="Saved!">
-                                        <FaCheckCircle />
-                                      </span>
-                                    ) : null}
+                                    {/* Time input */}
+                                    <div className="flex items-center gap-1">
+                                      <input
+                                        type="time"
+                                        value={normalizeToTimeInputValue(currentSlot)}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          handleInlineChange(app._id, "interviewSlot", val);
+                                          saveInterviewSlot(app._id, val);
+                                        }}
+                                        style={{ colorScheme: "dark" }}
+                                        className={`w-full min-w-0 px-1.5 py-0.5 rounded text-[10px] font-mono transition-all border focus:outline-none cursor-pointer ${
+                                          currentSlot
+                                            ? "bg-cyan-950/40 border-cyan-500/50 text-cyan-200 focus:border-cyan-400"
+                                            : "bg-black/60 border-white/15 text-gray-400 focus:border-cyan-500/50"
+                                        }`}
+                                        title="Click to select interview time"
+                                      />
+
+                                      {currentSlot ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            handleInlineChange(app._id, "interviewSlot", "");
+                                            saveInterviewSlot(app._id, "");
+                                          }}
+                                          className="text-gray-500 hover:text-rose-400 text-[10px] px-1 py-0.5 rounded transition-colors cursor-pointer shrink-0"
+                                          title="Clear time slot"
+                                        >
+                                          <FaTimes />
+                                        </button>
+                                      ) : null}
+
+                                      {isSlotSaving ? (
+                                        <span className="text-[9px] font-mono text-cyan-400 animate-pulse">...</span>
+                                      ) : isSlotSaved ? (
+                                        <span className="text-[10px] text-emerald-400 shrink-0" title="Time slot saved!">
+                                          <FaCheckCircle />
+                                        </span>
+                                      ) : null}
+                                    </div>
                                   </div>
                                 );
                               })()}
@@ -2524,56 +2726,99 @@ export default function AddSecDashboard() {
                       </div>
                     </div>
 
-                    {/* Interview Time Slot */}
-                    <div className="p-3.5 rounded-lg bg-cyan-950/20 border border-cyan-500/30">
-                      <div className="flex items-center justify-between mb-2">
+                    {/* Interview Date & Slot */}
+                    <div className="p-3.5 rounded-lg bg-cyan-950/20 border border-cyan-500/30 space-y-2.5">
+                      <div className="flex items-center justify-between">
                         <label className="text-xs font-mono text-cyan-300 uppercase tracking-wider flex items-center gap-1.5 font-bold">
-                          <FaClock className="text-cyan-400 text-xs" />
-                          <span>Interview Time Slot</span>
+                          <FaCalendarAlt className="text-cyan-400 text-xs" />
+                          <span>Interview Date & Time</span>
                         </label>
-                        {slotSavedId === currentModalApp._id && (
-                          <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
-                            <FaCheckCircle /> Slot Saved
-                          </span>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {dateSavedId === currentModalApp._id && (
+                            <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
+                              <FaCheckCircle /> Date Saved
+                            </span>
+                          )}
+                          {slotSavedId === currentModalApp._id && (
+                            <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
+                              <FaCheckCircle /> Slot Saved
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="time"
-                          value={normalizeToTimeInputValue(modalEdit.interviewSlot !== undefined ? modalEdit.interviewSlot : (currentModalApp.interviewSlot || ""))}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            handleInlineChange(currentModalApp._id, "interviewSlot", val);
-                            saveInterviewSlot(currentModalApp._id, val);
-                          }}
-                          style={{ colorScheme: "dark" }}
-                          className="flex-1 px-3 py-2 bg-black/80 rounded text-xs font-mono text-cyan-200 border border-cyan-500/30 focus:border-cyan-400 focus:outline-none cursor-pointer"
-                          title="Click to select interview time"
-                        />
-                        {(modalEdit.interviewSlot !== undefined ? modalEdit.interviewSlot : currentModalApp.interviewSlot) ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              handleInlineChange(currentModalApp._id, "interviewSlot", "");
-                              saveInterviewSlot(currentModalApp._id, "");
-                            }}
-                            className="px-2.5 py-2 border border-rose-500/30 hover:border-rose-500 text-rose-400 font-mono text-xs rounded transition-colors cursor-pointer flex items-center gap-1 shrink-0"
-                            title="Clear time slot"
-                          >
-                            <FaTimes className="text-[10px]" />
-                            <span>Clear</span>
-                          </button>
-                        ) : null}
-                        {slotSavingId === currentModalApp._id ? (
-                          <span className="text-xs font-mono text-cyan-400 animate-pulse px-2">Saving...</span>
-                        ) : slotSavedId === currentModalApp._id ? (
-                          <span className="text-xs font-mono text-emerald-400 flex items-center gap-1 px-2">
-                            <FaCheckCircle /> Saved
-                          </span>
-                        ) : null}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {/* Date input */}
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider block">Date</span>
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="date"
+                              value={modalEdit.interviewDate !== undefined ? modalEdit.interviewDate : (currentModalApp.interviewDate || "")}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                handleInlineChange(currentModalApp._id, "interviewDate", val);
+                                saveInterviewDate(currentModalApp._id, val);
+                              }}
+                              style={{ colorScheme: "dark" }}
+                              className="flex-1 px-3 py-2 bg-black/80 rounded text-xs font-mono text-cyan-200 border border-cyan-500/30 focus:border-cyan-400 focus:outline-none cursor-pointer"
+                              title="Click to select interview date"
+                            />
+                            {(modalEdit.interviewDate !== undefined ? modalEdit.interviewDate : currentModalApp.interviewDate) ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleInlineChange(currentModalApp._id, "interviewDate", "");
+                                  saveInterviewDate(currentModalApp._id, "");
+                                }}
+                                className="px-2 py-2 border border-rose-500/30 hover:border-rose-500 text-rose-400 font-mono text-xs rounded transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                                title="Clear date"
+                              >
+                                <FaTimes className="text-[10px]" />
+                              </button>
+                            ) : null}
+                            {dateSavingId === currentModalApp._id ? (
+                              <span className="text-[10px] font-mono text-cyan-400 animate-pulse">...</span>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        {/* Time input */}
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider block">Time Slot</span>
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="time"
+                              value={normalizeToTimeInputValue(modalEdit.interviewSlot !== undefined ? modalEdit.interviewSlot : (currentModalApp.interviewSlot || ""))}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                handleInlineChange(currentModalApp._id, "interviewSlot", val);
+                                saveInterviewSlot(currentModalApp._id, val);
+                              }}
+                              style={{ colorScheme: "dark" }}
+                              className="flex-1 px-3 py-2 bg-black/80 rounded text-xs font-mono text-cyan-200 border border-cyan-500/30 focus:border-cyan-400 focus:outline-none cursor-pointer"
+                              title="Click to select interview time"
+                            />
+                            {(modalEdit.interviewSlot !== undefined ? modalEdit.interviewSlot : currentModalApp.interviewSlot) ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleInlineChange(currentModalApp._id, "interviewSlot", "");
+                                  saveInterviewSlot(currentModalApp._id, "");
+                                }}
+                                className="px-2 py-2 border border-rose-500/30 hover:border-rose-500 text-rose-400 font-mono text-xs rounded transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                                title="Clear time slot"
+                              >
+                                <FaTimes className="text-[10px]" />
+                              </button>
+                            ) : null}
+                            {slotSavingId === currentModalApp._id ? (
+                              <span className="text-[10px] font-mono text-cyan-400 animate-pulse">...</span>
+                            ) : null}
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-[10px] font-mono text-gray-400 mt-1.5">
-                        Set the interview time slot. Any changes automatically save and reflect in the admin recruitment portal.
+                      <p className="text-[10px] font-mono text-gray-400 mt-1">
+                        Set the interview date and time slot. Any changes automatically save and reflect across the admin recruitment portal.
                       </p>
                     </div>
 
@@ -2613,6 +2858,10 @@ export default function AddSecDashboard() {
                               modalEdit.interviewSlot !== undefined
                                 ? modalEdit.interviewSlot
                                 : currentModalApp.interviewSlot,
+                            interviewDate:
+                              modalEdit.interviewDate !== undefined
+                                ? modalEdit.interviewDate
+                                : currentModalApp.interviewDate,
                           })
                         }
                         disabled={modalEdit.isSaving}

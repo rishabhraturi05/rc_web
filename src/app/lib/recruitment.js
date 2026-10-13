@@ -382,3 +382,20 @@ export function formatTimeSlot(timeStr) {
   return `${String(hours).padStart(2, "0")}:${minutes} ${period}`;
 }
 
+export function formatInterviewDate(dateStr) {
+  if (!dateStr || typeof dateStr !== "string") return "";
+  const trimmed = dateStr.trim();
+  if (!trimmed) return "";
+  try {
+    const d = new Date(trimmed);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    }
+  } catch {}
+  return trimmed;
+}
+

@@ -202,6 +202,7 @@ export async function PUT(req, { params }) {
       positiveRemarks,
       negativeRemarks,
       interviewSlot,
+      interviewDate,
       interviewStatus,
       queueDepartment,
       queueAddedAt,
@@ -337,6 +338,7 @@ export async function PUT(req, { params }) {
             year: updatedYear,
             responses: updatedResponses,
             interviewSlot: application.interviewSlot || "",
+            interviewDate: application.interviewDate || "",
             interviewStatus: "pending",
           });
         }
@@ -384,6 +386,19 @@ export async function PUT(req, { params }) {
           await RecruitmentApplication.updateMany(
             { formId: id, $or: siblingFilter },
             { $set: { interviewSlot: cleanSlot } }
+          );
+        }
+      }
+
+      if (interviewDate !== undefined) {
+        const cleanDate = String(interviewDate || "").trim();
+        application.interviewDate = cleanDate;
+
+        // Synchronize interviewDate across all applications of this candidate in this recruitment drive
+        if (siblingFilter.length > 0) {
+          await RecruitmentApplication.updateMany(
+            { formId: id, $or: siblingFilter },
+            { $set: { interviewDate: cleanDate } }
           );
         }
       }

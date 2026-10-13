@@ -101,6 +101,7 @@ export async function PUT(req, { params }) {
       positiveRemarks,
       negativeRemarks,
       interviewSlot,
+      interviewDate,
     } = body || {};
 
     if (!applicationId) {
@@ -174,6 +175,37 @@ export async function PUT(req, { params }) {
       }
     }
 
+    if (interviewDate !== undefined) {
+      const cleanDate = String(interviewDate || "").trim();
+      application.interviewDate = cleanDate;
+
+      // Synchronize interviewDate across all applications of this candidate in this recruitment drive
+      const candidateEmail = String(application.responses?.email || "").trim();
+      const candidateRoll = String(
+        application.responses?.rollno ||
+        application.responses?.rollNumber ||
+        application.responses?.roll ||
+        ""
+      ).trim();
+
+      const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const siblingFilter = [];
+      if (candidateEmail) {
+        siblingFilter.push({ "responses.email": new RegExp(`^\\s*${escapeRegex(candidateEmail)}\\s*$`, "i") });
+      }
+      if (candidateRoll) {
+        siblingFilter.push({ "responses.rollno": new RegExp(`^\\s*${escapeRegex(candidateRoll)}\\s*$`, "i") });
+        siblingFilter.push({ "responses.rollNumber": new RegExp(`^\\s*${escapeRegex(candidateRoll)}\\s*$`, "i") });
+      }
+
+      if (siblingFilter.length > 0) {
+        await RecruitmentApplication.updateMany(
+          { formId: id, $or: siblingFilter },
+          { $set: { interviewDate: cleanDate } }
+        );
+      }
+    }
+
     const hasEvaluationChanges =
       points !== undefined ||
       comments !== undefined ||
@@ -200,6 +232,7 @@ export async function PUT(req, { params }) {
           positiveRemarks: application.positiveRemarks,
           negativeRemarks: application.negativeRemarks,
           interviewSlot: application.interviewSlot,
+          interviewDate: application.interviewDate,
           evaluatedBy: application.evaluatedBy,
           evaluatedAt: application.evaluatedAt,
         },
