@@ -193,6 +193,7 @@ export async function PUT(req, { params }) {
     const {
       applicationId,
       department,
+      departments,
       year,
       responses,
       points,
@@ -227,106 +228,206 @@ export async function PUT(req, { params }) {
       );
     }
 
+    // Locate candidate sibling applications to synchronize details and departments
+    const originalEmail = String(application.responses?.email || "").trim();
+    const originalRoll = String(
+      application.responses?.rollno ||
+      application.responses?.rollNumber ||
+      application.responses?.roll ||
+      ""
+    ).trim();
+
+    const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const siblingFilter = [{ _id: application._id }];
+    if (originalEmail) {
+      siblingFilter.push({ "responses.email": new RegExp(`^\\s*${escapeRegex(originalEmail)}\\s*$`, "i") });
+    }
+    if (originalRoll) {
+      siblingFilter.push({ "responses.rollno": new RegExp(`^\\s*${escapeRegex(originalRoll)}\\s*$`, "i") });
+      siblingFilter.push({ "responses.rollNumber": new RegExp(`^\\s*${escapeRegex(originalRoll)}\\s*$`, "i") });
+    }
+
+    const candidateApps = await RecruitmentApplication.find({
+      formId: id,
+      $or: siblingFilter,
+    });
+
+    let updatedResponses = application.responses || {};
     if (responses && typeof responses === "object") {
-      const updatedResponses = {
+      updatedResponses = {
         ...(application.responses || {}),
         ...responses,
       };
-      if (year) {
-        updatedResponses.year = year;
+      if (year !== undefined) {
+        updatedResponses.year = String(year).trim();
       }
       application.responses = updatedResponses;
       application.markModified("responses");
     }
 
-    if (department !== undefined) {
-      application.department = String(department).trim();
-    }
+    const updatedYear = year !== undefined ? String(year).trim() : (application.year || "");
     if (year !== undefined) {
-      application.year = String(year).trim();
+      application.year = updatedYear;
+    }
+
+    // Process Department(s) sync if departments or department was specified
+    let targetDepts = null;
+    if (Array.isArray(departments)) {
+      targetDepts = departments.map((d) => String(d).trim()).filter(Boolean);
+    } else if (department !== undefined && String(department).trim()) {
+      targetDepts = [String(department).trim()];
+    }
+
+    if (targetDepts !== null) {
+      targetDepts = Array.from(new Set(targetDepts));
+      if (targetDepts.length === 0) {
+        return NextResponse.json(
+          { success: false, message: "Please select at least one department." },
+          { status: 400 }
+        );
+      }
+
+      const existingByDept = new Map();
+      for (const app of candidateApps) {
+        if (app.department) {
+          existingByDept.set(app.department, app);
+        }
+      }
+
+      const deptsToKeep = targetDepts.filter((d) => existingByDept.has(d));
+      const deptsToAdd = targetDepts.filter((d) => !existingByDept.has(d));
+      const appsToRemove = candidateApps.filter((app) => !targetDepts.includes(app.department));
+
+      // 1. Update applications that are kept
+      for (const dept of deptsToKeep) {
+        const appDoc = existingByDept.get(dept);
+        if (responses && typeof responses === "object") {
+          appDoc.responses = updatedResponses;
+          appDoc.markModified("responses");
+        }
+        if (year !== undefined) {
+          appDoc.year = updatedYear;
+        }
+        await appDoc.save();
+      }
+
+      // 2. Handle apps to remove & depts to add
+      if (candidateApps.length === 1 && targetDepts.length === 1 && deptsToAdd.length === 1 && appsToRemove.length === 1) {
+        const singleDoc = appsToRemove[0];
+        singleDoc.department = deptsToAdd[0];
+        if (responses && typeof responses === "object") {
+          singleDoc.responses = updatedResponses;
+          singleDoc.markModified("responses");
+        }
+        if (year !== undefined) {
+          singleDoc.year = updatedYear;
+        }
+        await singleDoc.save();
+      } else {
+        // Delete removed application records from MongoDB
+        for (const appDoc of appsToRemove) {
+          await RecruitmentApplication.findByIdAndDelete(appDoc._id);
+        }
+
+        // Create new application records in MongoDB for added departments
+        for (const newDept of deptsToAdd) {
+          await RecruitmentApplication.create({
+            formId: id,
+            department: newDept,
+            year: updatedYear,
+            responses: updatedResponses,
+            interviewSlot: application.interviewSlot || "",
+            interviewStatus: "pending",
+          });
+        }
+      }
+    } else {
+      // Sync responses & year across all existing candidate records if only responses/year changed
+      if ((responses && typeof responses === "object") || year !== undefined) {
+        const syncUpdate = {};
+        if (responses && typeof responses === "object") syncUpdate.responses = updatedResponses;
+        if (year !== undefined) syncUpdate.year = updatedYear;
+        if (siblingFilter.length > 0) {
+          await RecruitmentApplication.updateMany(
+            { formId: id, $or: siblingFilter },
+            { $set: syncUpdate }
+          );
+        }
+      }
     }
 
     // Evaluation fields (points, comments, feedback, positiveRemarks, negativeRemarks)
-    if (points !== undefined) {
-      application.points = String(points).trim();
-    }
-    if (comments !== undefined) {
-      application.comments = String(comments).trim();
-    }
-    if (feedback !== undefined) {
-      application.feedback = String(feedback).trim().toLowerCase();
-    }
-    if (positiveRemarks !== undefined) {
-      application.positiveRemarks = Array.isArray(positiveRemarks) ? positiveRemarks : [];
-    }
-    if (negativeRemarks !== undefined) {
-      application.negativeRemarks = Array.isArray(negativeRemarks) ? negativeRemarks : [];
-    }
-    if (interviewSlot !== undefined) {
-      const cleanSlot = String(interviewSlot || "").trim();
-      application.interviewSlot = cleanSlot;
+    const isAppActive = !(targetDepts !== null && !targetDepts.includes(application.department) && candidateApps.length > 1);
 
-      // Synchronize interviewSlot across all applications of this candidate in this recruitment drive
-      const candidateEmail = String(application.responses?.email || "").trim();
-      const candidateRoll = String(
-        application.responses?.rollno ||
-        application.responses?.rollNumber ||
-        application.responses?.roll ||
-        ""
-      ).trim();
-
-      const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const siblingFilter = [];
-      if (candidateEmail) {
-        siblingFilter.push({ "responses.email": new RegExp(`^\\s*${escapeRegex(candidateEmail)}\\s*$`, "i") });
+    if (isAppActive) {
+      if (points !== undefined) {
+        application.points = String(points).trim();
       }
-      if (candidateRoll) {
-        siblingFilter.push({ "responses.rollno": new RegExp(`^\\s*${escapeRegex(candidateRoll)}\\s*$`, "i") });
-        siblingFilter.push({ "responses.rollNumber": new RegExp(`^\\s*${escapeRegex(candidateRoll)}\\s*$`, "i") });
+      if (comments !== undefined) {
+        application.comments = String(comments).trim();
+      }
+      if (feedback !== undefined) {
+        application.feedback = String(feedback).trim().toLowerCase();
+      }
+      if (positiveRemarks !== undefined) {
+        application.positiveRemarks = Array.isArray(positiveRemarks) ? positiveRemarks : [];
+      }
+      if (negativeRemarks !== undefined) {
+        application.negativeRemarks = Array.isArray(negativeRemarks) ? negativeRemarks : [];
+      }
+      if (interviewSlot !== undefined) {
+        const cleanSlot = String(interviewSlot || "").trim();
+        application.interviewSlot = cleanSlot;
+
+        // Synchronize interviewSlot across all applications of this candidate in this recruitment drive
+        if (siblingFilter.length > 0) {
+          await RecruitmentApplication.updateMany(
+            { formId: id, $or: siblingFilter },
+            { $set: { interviewSlot: cleanSlot } }
+          );
+        }
       }
 
-      if (siblingFilter.length > 0) {
-        await RecruitmentApplication.updateMany(
-          { formId: id, $or: siblingFilter },
-          { $set: { interviewSlot: cleanSlot } }
-        );
+      if (interviewStatus !== undefined) {
+        application.interviewStatus = String(interviewStatus).trim().toLowerCase();
       }
+      if (queueDepartment !== undefined) {
+        application.queueDepartment = String(queueDepartment).trim();
+      }
+      if (queueAddedAt !== undefined) {
+        application.queueAddedAt = queueAddedAt ? new Date(queueAddedAt) : null;
+      }
+      if (queueOrder !== undefined) {
+        application.queueOrder = Number(queueOrder) || 0;
+      }
+      if (interviewCompletedAt !== undefined) {
+        application.interviewCompletedAt = interviewCompletedAt ? new Date(interviewCompletedAt) : null;
+      }
+
+      if (
+        points !== undefined ||
+        comments !== undefined ||
+        feedback !== undefined ||
+        positiveRemarks !== undefined ||
+        negativeRemarks !== undefined
+      ) {
+        application.evaluatedBy = authResult.session?.user?.username || "admin";
+        application.evaluatedAt = new Date();
+      }
+
+      await application.save();
     }
 
-    if (interviewStatus !== undefined) {
-      application.interviewStatus = String(interviewStatus).trim().toLowerCase();
-    }
-    if (queueDepartment !== undefined) {
-      application.queueDepartment = String(queueDepartment).trim();
-    }
-    if (queueAddedAt !== undefined) {
-      application.queueAddedAt = queueAddedAt ? new Date(queueAddedAt) : null;
-    }
-    if (queueOrder !== undefined) {
-      application.queueOrder = Number(queueOrder) || 0;
-    }
-    if (interviewCompletedAt !== undefined) {
-      application.interviewCompletedAt = interviewCompletedAt ? new Date(interviewCompletedAt) : null;
-    }
-
-    if (
-      points !== undefined ||
-      comments !== undefined ||
-      feedback !== undefined ||
-      positiveRemarks !== undefined ||
-      negativeRemarks !== undefined
-    ) {
-      application.evaluatedBy = authResult.session?.user?.username || "admin";
-      application.evaluatedAt = new Date();
-    }
-
-    await application.save();
+    const returnApp = await RecruitmentApplication.findOne({
+      formId: id,
+      $or: siblingFilter,
+    }).lean();
 
     return NextResponse.json(
       {
         success: true,
         message: "Application updated successfully.",
-        data: application,
+        data: returnApp || application,
       },
       {
         headers: {

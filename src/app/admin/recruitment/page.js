@@ -245,6 +245,7 @@ export default function RecruitmentAdminPage() {
   const [editingApplication, setEditingApplication] = useState(null);
   const [savingApplication, setSavingApplication] = useState(false);
   const [applicationFormValues, setApplicationFormValues] = useState({
+    departments: [],
     department: "",
     year: "",
     responses: {},
@@ -1218,10 +1219,23 @@ export default function RecruitmentAdminPage() {
     }
   };
 
-  const openApplicationEditor = (application) => {
+  const openApplicationEditor = (application, group = null) => {
+    const targetGroup =
+      group ||
+      groupedApplications.find((g) =>
+        g.deptApplications?.some((d) => String(d._id) === String(application?._id))
+      );
+
+    const initialDepartments = targetGroup
+      ? targetGroup.deptApplications.map((d) => d.department).filter(Boolean)
+      : application?.department
+      ? [application.department]
+      : [];
+
     setEditingApplication(application);
     setApplicationFormValues({
-      department: application.department || selectedForm?.departments?.[0] || "",
+      departments: initialDepartments.length > 0 ? initialDepartments : [selectedForm?.departments?.[0] || "Software"],
+      department: initialDepartments[0] || selectedForm?.departments?.[0] || "",
       year: application.year || application.responses?.year || selectedForm?.years?.[0] || "",
       responses: { ...(application.responses || {}) },
     });
@@ -1229,7 +1243,7 @@ export default function RecruitmentAdminPage() {
 
   const closeApplicationEditor = () => {
     setEditingApplication(null);
-    setApplicationFormValues({ department: "", year: "", responses: {} });
+    setApplicationFormValues({ departments: [], department: "", year: "", responses: {} });
   };
 
   const handleApplicationResponseChange = (fieldKey, value) => {
@@ -1245,8 +1259,9 @@ export default function RecruitmentAdminPage() {
   const saveApplication = async () => {
     if (!editingApplication || !selectedForm) return;
 
-    if (!applicationFormValues.department) {
-      setMessage("Department is required.");
+    const chosenDepartments = (applicationFormValues.departments || []).filter(Boolean);
+    if (chosenDepartments.length === 0) {
+      setMessage("Please select at least one department.");
       return;
     }
 
@@ -1264,7 +1279,8 @@ export default function RecruitmentAdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           applicationId: editingApplication._id,
-          department: applicationFormValues.department,
+          departments: chosenDepartments,
+          department: chosenDepartments[0] || "",
           year: applicationFormValues.year,
           responses: {
             ...applicationFormValues.responses,
@@ -2912,7 +2928,7 @@ export default function RecruitmentAdminPage() {
 
                             <button
                               type="button"
-                              onClick={() => openApplicationEditor(group.primaryApp)}
+                              onClick={() => openApplicationEditor(group.primaryApp, group)}
                               className="px-2 py-1.5 bg-white/5 hover:bg-white/15 text-gray-300 border border-white/20 rounded text-xs font-mono uppercase tracking-wider cursor-pointer"
                             >
                               Edit
@@ -3274,7 +3290,7 @@ export default function RecruitmentAdminPage() {
 
                                 <button
                                   type="button"
-                                  onClick={() => openApplicationEditor(group.primaryApp)}
+                                  onClick={() => openApplicationEditor(group.primaryApp, group)}
                                   className="cursor-pointer text-gray-400 hover:text-white border border-white/20 hover:border-white rounded p-1 transition-colors"
                                   title="Edit raw response"
                                 >
@@ -3353,22 +3369,55 @@ export default function RecruitmentAdminPage() {
               </div>
 
               <div className="space-y-4">
-                {/* Department select */}
+                {/* Department / Domain multi-select */}
                 <div>
-                  <label className="mb-1 block font-mono text-xs font-semibold text-gray-300 uppercase tracking-wider">
-                    Department *
+                  <label className="mb-1.5 block font-mono text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                    Applied Department(s) / Domain(s) *{" "}
+                    <span className="text-gray-400 font-normal normal-case">(Select 1 or more domains)</span>
                   </label>
-                  <select
-                    value={applicationFormValues.department}
-                    onChange={(e) => setApplicationFormValues((prev) => ({ ...prev, department: e.target.value }))}
-                    className="w-full rounded border border-white/20 bg-black/50 px-3 py-2 font-mono text-sm text-white focus:border-white focus:outline-none"
-                  >
-                    {(selectedForm?.departments || DEFAULT_DEPARTMENT_OPTIONS).map((dept) => (
-                      <option key={dept} value={dept} className="bg-black text-white">
-                        {dept}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 rounded border border-white/20 bg-black/40 p-3">
+                    {(selectedForm?.departments || DEFAULT_DEPARTMENT_OPTIONS).map((dept) => {
+                      const isChecked = applicationFormValues.departments?.includes(dept);
+                      return (
+                        <label
+                          key={dept}
+                          className={`flex items-center gap-2.5 px-3 py-2 rounded border cursor-pointer select-none transition-all ${
+                            isChecked
+                              ? "bg-white/15 border-white text-white font-medium shadow-sm"
+                              : "bg-black/25 border-white/10 text-gray-400 hover:border-white/30 hover:text-gray-200"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={Boolean(isChecked)}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setApplicationFormValues((prev) => {
+                                const cur = prev.departments || [];
+                                const next = checked
+                                  ? [...cur, dept]
+                                  : cur.filter((d) => d !== dept);
+                                return {
+                                  ...prev,
+                                  departments: next,
+                                  department: next[0] || "",
+                                };
+                              });
+                            }}
+                            className="h-4 w-4 accent-white rounded cursor-pointer"
+                          />
+                          <span className="font-mono text-xs truncate" title={dept}>
+                            {dept}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {(!applicationFormValues.departments || applicationFormValues.departments.length === 0) && (
+                    <p className="mt-1 font-mono text-xs text-red-400">
+                      Please select at least one department.
+                    </p>
+                  )}
                 </div>
 
                 {/* Year select */}
@@ -3844,6 +3893,16 @@ export default function RecruitmentAdminPage() {
                         <FaExternalLinkAlt className="text-xs" />
                       </a>
                     )}
+
+                    <button
+                      type="button"
+                      onClick={() => openApplicationEditor(currentModalApp, currentModalGroup)}
+                      className="px-2.5 py-1.5 glass-panel border border-white/20 text-gray-300 hover:text-white rounded transition-colors cursor-pointer flex items-center gap-1.5 font-mono text-xs"
+                      title="Edit Applicant Details & Domains"
+                    >
+                      <FaEdit className="text-xs" />
+                      <span className="hidden sm:inline">Edit Details</span>
+                    </button>
 
                     <button
                       type="button"
