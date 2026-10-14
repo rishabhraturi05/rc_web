@@ -117,7 +117,9 @@ export default function AddSecDashboard() {
   const [selectedYear, setSelectedYear] = useState("all");
   const [evaluationFilter, setEvaluationFilter] = useState("all"); // 'all', 'evaluated', 'pending'
   const [scoreFilter, setScoreFilter] = useState("all"); // 'all', 'positive', 'zero', 'negative', 'pending'
-  const [sortBy, setSortBy] = useState("newest"); // 'newest', 'oldest', 'points_desc', 'points_asc', 'name_asc'
+  const [selectedDate, setSelectedDate] = useState("all"); // 'all', 'pending', 'has_date', or 'YYYY-MM-DD'
+  const [interviewFilter, setInterviewFilter] = useState("all"); // 'all', 'pending', 'completed', 'in_queue', 'scheduled', 'unscheduled'
+  const [sortBy, setSortBy] = useState("newest"); // 'newest', 'oldest', 'points_desc', 'points_asc', 'name_asc', 'slot_asc', 'slot_desc'
 
   // Inline edits state: { [appId]: { points, comments, feedback, positiveRemarks, negativeRemarks, isDirty, isSaving, savedRecently } }
   const [inlineEdits, setInlineEdits] = useState({});
@@ -126,6 +128,7 @@ export default function AddSecDashboard() {
   const [slotSavedId, setSlotSavedId] = useState(null);
   const [dateSavingId, setDateSavingId] = useState(null);
   const [dateSavedId, setDateSavedId] = useState(null);
+  const [statusSavingId, setStatusSavingId] = useState(null);
 
   // Review Modal state
   const [modalAppIndex, setModalAppIndex] = useState(null); // index in filteredApplications
@@ -343,6 +346,19 @@ export default function AddSecDashboard() {
     [forms, activeFormId]
   );
 
+  // Available distinct interview dates in current application list
+  const availableDates = useMemo(() => {
+    const dates = new Set();
+    applications.forEach((app) => {
+      const editDate = inlineEdits[app._id]?.interviewDate;
+      const d = editDate !== undefined ? editDate : app.interviewDate;
+      if (d && String(d).trim()) {
+        dates.add(String(d).trim());
+      }
+    });
+    return Array.from(dates).sort();
+  }, [applications, inlineEdits]);
+
   // Helper to extract net score, formatting, and classification status
   const getCandidateScoreInfo = useCallback((app, edit) => {
     const currentPos =
@@ -368,14 +384,26 @@ export default function AddSecDashboard() {
       edit?.comments !== undefined ? edit.comments : app?.comments;
     const hasComments = Boolean(currentComments && String(currentComments).trim() !== "");
 
+    const currentFeedback = edit?.feedback !== undefined ? edit.feedback : app?.feedback;
+    const hasFeedback = Boolean(
+      currentFeedback &&
+      String(currentFeedback).trim() !== "" &&
+      !["pending", "none", "null", "undefined"].includes(String(currentFeedback).trim().toLowerCase())
+    );
+
+    const hasEvaluator = Boolean(
+      app?.evaluatedBy &&
+      String(app.evaluatedBy).trim() !== "" &&
+      !["pending", "none", "null", "undefined"].includes(String(app.evaluatedBy).trim().toLowerCase())
+    );
+
     let scoreNum = null;
     let scoreFormatted = "—";
-    let isEvaluated = false;
+    const isEvaluated = Boolean(hasRemarks || hasPoints || hasComments || hasFeedback || hasEvaluator);
 
     if (hasRemarks) {
       scoreNum = currentPos.length - currentNeg.length;
       scoreFormatted = scoreNum > 0 ? `+${scoreNum}` : `${scoreNum}`;
-      isEvaluated = true;
     } else if (hasPoints) {
       const parsed = parseFloat(currentPoints);
       if (!Number.isNaN(parsed)) {
@@ -384,9 +412,6 @@ export default function AddSecDashboard() {
       } else {
         scoreFormatted = String(currentPoints);
       }
-      isEvaluated = true;
-    } else if (hasComments) {
-      isEvaluated = true;
     }
 
     let status = "pending";
@@ -420,9 +445,10 @@ export default function AddSecDashboard() {
         return false;
       }
 
-      const scoreInfo = getCandidateScoreInfo(app, inlineEdits[app._id]);
+      const edit = inlineEdits[app._id];
+      const scoreInfo = getCandidateScoreInfo(app, edit);
 
-      // 2. Evaluation status filter
+      // 2. Evaluation status filter (Evaluated vs Pending)
       if (evaluationFilter === "evaluated" && !scoreInfo.isEvaluated) return false;
       if (evaluationFilter === "pending" && scoreInfo.isEvaluated) return false;
 
@@ -432,14 +458,34 @@ export default function AddSecDashboard() {
       if (scoreFilter === "negative" && scoreInfo.status !== "negative") return false;
       if (scoreFilter === "pending" && scoreInfo.isEvaluated) return false;
 
-      // 4. Interview Slot & Date filter
-      const appSlot = inlineEdits[app._id]?.interviewSlot !== undefined
-        ? inlineEdits[app._id].interviewSlot
-        : app.interviewSlot || "";
-      const appDate = inlineEdits[app._id]?.interviewDate !== undefined
-        ? inlineEdits[app._id].interviewDate
-        : app.interviewDate || "";
+      const appSlot = edit?.interviewSlot !== undefined ? edit.interviewSlot : app.interviewSlot || "";
+      const appDate = edit?.interviewDate !== undefined ? edit.interviewDate : app.interviewDate || "";
+      const appInterviewStatus = edit?.interviewStatus !== undefined ? edit.interviewStatus : app.interviewStatus || "pending";
 
+      // 4. Date filter (filter according to date)
+      if (selectedDate === "pending" || selectedDate === "no_date") {
+        if (Boolean(appDate)) return false;
+      } else if (selectedDate === "has_date") {
+        if (!appDate) return false;
+      } else if (selectedDate !== "all") {
+        if (appDate !== selectedDate) return false;
+      }
+
+      // 5. Interview status filter (pending, completed, in_queue, scheduled, unscheduled)
+      if (interviewFilter === "pending") {
+        // Pending interview: not completed yet
+        if (appInterviewStatus === "completed") return false;
+      } else if (interviewFilter === "completed") {
+        if (appInterviewStatus !== "completed") return false;
+      } else if (interviewFilter === "in_queue") {
+        if (appInterviewStatus !== "in_queue") return false;
+      } else if (interviewFilter === "scheduled") {
+        if (!appSlot || !appDate) return false;
+      } else if (interviewFilter === "unscheduled") {
+        if (Boolean(appSlot)) return false;
+      }
+
+      // Legacy slotFilter compatibility
       if (slotFilter === "slot_given" && !appSlot) return false;
       if (slotFilter === "slot_not_given" && Boolean(appSlot)) return false;
       if (slotFilter === "date_given" && !appDate) return false;
@@ -448,7 +494,7 @@ export default function AddSecDashboard() {
       if (slotFilter === "neither_given" && (Boolean(appSlot) || Boolean(appDate))) return false;
       if (slotFilter === "slot_no_date" && (!appSlot || Boolean(appDate))) return false;
 
-      // 5. Search query
+      // 6. Search query
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim();
         const candidateName = String(app.responses?.name || app.responses?.fullName || "").toLowerCase();
@@ -524,7 +570,19 @@ export default function AddSecDashboard() {
     });
 
     return list;
-  }, [applications, selectedYear, evaluationFilter, scoreFilter, slotFilter, searchQuery, sortBy, inlineEdits, getCandidateScoreInfo]);
+  }, [
+    applications,
+    selectedYear,
+    evaluationFilter,
+    scoreFilter,
+    selectedDate,
+    interviewFilter,
+    slotFilter,
+    searchQuery,
+    sortBy,
+    inlineEdits,
+    getCandidateScoreInfo,
+  ]);
 
   // Overall Statistics for this Form & Department (Score-driven)
   const stats = useMemo(() => {
@@ -829,6 +887,64 @@ export default function AddSecDashboard() {
       showToast("Error updating interview date.", "error");
     } finally {
       setDateSavingId(null);
+    }
+  };
+
+  // Dedicated interview status updater
+  const saveInterviewStatus = async (appId, newStatus) => {
+    if (!activeForm || !appId) return;
+    setStatusSavingId(appId);
+    const cleanStatus = String(newStatus || "pending").trim().toLowerCase();
+    const completedAt = cleanStatus === "completed" ? new Date().toISOString() : null;
+
+    try {
+      const response = await fetch(`/api/addsecs/forms/${activeForm._id}/applications`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId: appId,
+          interviewStatus: cleanStatus,
+          department: departmentName,
+        }),
+      });
+
+      const result = await response.json();
+      if (!result.success) {
+        showToast(result.message || "Failed to update interview status.", "error");
+        return;
+      }
+
+      setApplications((prev) =>
+        prev.map((app) =>
+          app._id === appId
+            ? {
+                ...app,
+                interviewStatus: cleanStatus,
+                interviewCompletedAt: completedAt,
+              }
+            : app
+        )
+      );
+
+      setInlineEdits((prev) => ({
+        ...prev,
+        [appId]: {
+          ...(prev[appId] || {}),
+          interviewStatus: cleanStatus,
+        },
+      }));
+
+      showToast(
+        cleanStatus === "completed"
+          ? "Interview marked as completed!"
+          : "Interview marked as pending.",
+        "success"
+      );
+    } catch (err) {
+      console.error("Save interview status error:", err);
+      showToast("Error updating interview status.", "error");
+    } finally {
+      setStatusSavingId(null);
     }
   };
 
@@ -1749,8 +1865,12 @@ export default function AddSecDashboard() {
                     className="bg-black/60 border border-white/20 rounded px-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-white"
                   >
                     <option value="all">All Status</option>
-                    <option value="evaluated">Evaluated Only</option>
-                    <option value="pending">Pending Only</option>
+                    <option value="evaluated">
+                      ✓ Evaluated ({applications.filter((a) => getCandidateScoreInfo(a, inlineEdits[a._id]).isEvaluated).length})
+                    </option>
+                    <option value="pending">
+                      ⚪ Pending ({applications.filter((a) => !getCandidateScoreInfo(a, inlineEdits[a._id]).isEvaluated).length})
+                    </option>
                   </select>
                 </div>
 
@@ -1770,22 +1890,81 @@ export default function AddSecDashboard() {
                   </select>
                 </div>
 
-                {/* Slot & Date Filter */}
+                {/* Filter According to Date */}
                 <div className="flex items-center gap-1 shrink-0">
-                  <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Slot / Date:</label>
+                  <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap flex items-center gap-1">
+                    <FaCalendarAlt className="text-cyan-400 text-xs" />
+                    <span>Date:</span>
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <select
+                      value={selectedDate}
+                      onChange={(e) => setSelectedDate(e.target.value)}
+                      className="bg-black/60 border border-white/20 rounded px-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-cyan-400"
+                    >
+                      <option value="all">All Dates</option>
+                      <option value="pending">
+                        ⚪ Date Pending ({applications.filter((a) => !(inlineEdits[a._id]?.interviewDate !== undefined ? inlineEdits[a._id].interviewDate : a.interviewDate)).length})
+                      </option>
+                      <option value="has_date">
+                        📅 Date Assigned ({applications.filter((a) => Boolean(inlineEdits[a._id]?.interviewDate !== undefined ? inlineEdits[a._id].interviewDate : a.interviewDate)).length})
+                      </option>
+                      {availableDates.map((dateStr) => {
+                        const count = applications.filter(
+                          (a) => (inlineEdits[a._id]?.interviewDate !== undefined ? inlineEdits[a._id].interviewDate : a.interviewDate) === dateStr
+                        ).length;
+                        return (
+                          <option key={dateStr} value={dateStr}>
+                            📅 {formatInterviewDate(dateStr)} ({count})
+                          </option>
+                        );
+                      })}
+                    </select>
+                    <input
+                      type="date"
+                      value={selectedDate !== "all" && selectedDate !== "pending" && selectedDate !== "has_date" ? selectedDate : ""}
+                      onChange={(e) => setSelectedDate(e.target.value || "all")}
+                      style={{ colorScheme: "dark" }}
+                      className="bg-black/60 border border-white/20 rounded px-1.5 py-1 text-xs font-mono text-cyan-200 focus:outline-none focus:border-cyan-400 cursor-pointer w-28"
+                      title="Select or pick specific date"
+                    />
+                    {selectedDate !== "all" && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDate("all")}
+                        className="text-gray-400 hover:text-rose-400 text-xs px-1 cursor-pointer"
+                        title="Clear date filter"
+                      >
+                        <FaTimes />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Interview Status Filter */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Interview:</label>
                   <select
-                    value={slotFilter}
-                    onChange={(e) => setSlotFilter(e.target.value)}
+                    value={interviewFilter}
+                    onChange={(e) => setInterviewFilter(e.target.value)}
                     className="bg-black/60 border border-white/20 rounded px-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-white"
                   >
-                    <option value="all">All Slots & Dates</option>
-                    <option value="slot_given">🕒 Slot Given ({applications.filter((a) => Boolean(a.interviewSlot)).length})</option>
-                    <option value="slot_not_given">⚪ Slot Not Given ({applications.filter((a) => !a.interviewSlot).length})</option>
-                    <option value="date_given">📅 Date Given ({applications.filter((a) => Boolean(a.interviewDate)).length})</option>
-                    <option value="date_not_given">⚪ Date Not Given ({applications.filter((a) => !a.interviewDate).length})</option>
-                    <option value="both_given">✓ Both Slot & Date Given ({applications.filter((a) => Boolean(a.interviewSlot) && Boolean(a.interviewDate)).length})</option>
-                    <option value="neither_given">✕ Neither Slot Nor Date ({applications.filter((a) => !a.interviewSlot && !a.interviewDate).length})</option>
-                    <option value="slot_no_date">⚠️ Slot Given (No Date) ({applications.filter((a) => Boolean(a.interviewSlot) && !a.interviewDate).length})</option>
+                    <option value="all">All Interviews</option>
+                    <option value="pending">
+                      ⚪ Pending ({applications.filter((a) => a.interviewStatus !== "completed").length})
+                    </option>
+                    <option value="completed">
+                      ✓ Completed ({applications.filter((a) => a.interviewStatus === "completed").length})
+                    </option>
+                    <option value="in_queue">
+                      🟢 In Queue ({applications.filter((a) => a.interviewStatus === "in_queue").length})
+                    </option>
+                    <option value="scheduled">
+                      🕒 Scheduled ({applications.filter((a) => Boolean(a.interviewSlot) && Boolean(a.interviewDate)).length})
+                    </option>
+                    <option value="unscheduled">
+                      ⚠️ Unscheduled ({applications.filter((a) => !a.interviewSlot).length})
+                    </option>
                   </select>
                 </div>
 
@@ -1813,13 +1992,15 @@ export default function AddSecDashboard() {
                     Showing <strong className="text-white">{filteredApplications.length}</strong> of{" "}
                     <strong className="text-white">{applications.length}</strong>
                   </span>
-                  {(searchQuery || selectedYear !== "all" || evaluationFilter !== "all" || scoreFilter !== "all" || slotFilter !== "all" || sortBy !== "newest") && (
+                  {(searchQuery || selectedYear !== "all" || evaluationFilter !== "all" || scoreFilter !== "all" || selectedDate !== "all" || interviewFilter !== "all" || slotFilter !== "all" || sortBy !== "newest") && (
                     <button
                       onClick={() => {
                         setSearchQuery("");
                         setSelectedYear("all");
                         setEvaluationFilter("all");
                         setScoreFilter("all");
+                        setSelectedDate("all");
+                        setInterviewFilter("all");
                         setSlotFilter("all");
                         setSortBy("newest");
                       }}
@@ -1984,8 +2165,37 @@ export default function AddSecDashboard() {
                               <div className="flex items-center justify-between text-[11px] font-mono text-gray-400 font-semibold uppercase tracking-wider">
                                 <div className="flex items-center gap-1.5">
                                   <FaCalendarAlt className="text-cyan-400 text-xs" />
-                                  <span>Interview Date & Slot</span>
+                                  <span>Interview Schedule</span>
                                 </div>
+                                <button
+                                  type="button"
+                                  onClick={() => saveInterviewStatus(app._id, app.interviewStatus === "completed" ? "pending" : "completed")}
+                                  disabled={statusSavingId === app._id}
+                                  className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase transition-all cursor-pointer flex items-center gap-1 ${
+                                    app.interviewStatus === "completed"
+                                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 hover:bg-emerald-500/30"
+                                      : app.interviewStatus === "in_queue"
+                                      ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/50"
+                                      : "bg-white/10 text-gray-300 border border-white/20 hover:bg-white/20 hover:text-white"
+                                  }`}
+                                  title={app.interviewStatus === "completed" ? "Interview marked completed. Click to mark pending." : "Click to mark interview as completed."}
+                                >
+                                  {statusSavingId === app._id ? (
+                                    <span className="animate-pulse">Saving...</span>
+                                  ) : app.interviewStatus === "completed" ? (
+                                    <>
+                                      <FaCheckCircle className="text-emerald-400 text-[10px]" />
+                                      <span>Done</span>
+                                    </>
+                                  ) : app.interviewStatus === "in_queue" ? (
+                                    <span>In Queue</span>
+                                  ) : (
+                                    <>
+                                      <span className="text-gray-500">⚪</span>
+                                      <span>Pending</span>
+                                    </>
+                                  )}
+                                </button>
                               </div>
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {/* Date Input */}
@@ -2106,27 +2316,28 @@ export default function AddSecDashboard() {
                     <thead className="bg-white/5 border-b border-white/15 text-gray-400 uppercase tracking-wider text-[11px]">
                       <tr>
                         <th className="py-2.5 px-2 w-[4%] text-center">#</th>
-                        <th className="py-2.5 px-3 w-[24%]">Applicant Info</th>
-                        <th className="py-2.5 px-2 w-[8%] text-center">Year</th>
-                        <th className="py-2.5 px-2 w-[9%] text-center">
+                        <th className="py-2.5 px-3 w-[23%]">Applicant Info</th>
+                        <th className="py-2.5 px-2 w-[7%] text-center">Year</th>
+                        <th className="py-2.5 px-2 w-[8%] text-center">
                           <div className="flex items-center justify-center gap-1">
                             <FaStar className="text-amber-400 text-xs" />
                             <span>Score</span>
                           </div>
                         </th>
-                        <th className="py-2.5 px-2.5 w-[23%]">
+                        <th className="py-2.5 px-2.5 w-[21%]">
                           <div className="flex items-center gap-1">
                             <FaRegCommentDots className="text-blue-400 text-xs" />
                             <span>Remarks</span>
                           </div>
                         </th>
-                        <th className="py-2.5 px-2.5 w-[19%]">
+                        <th className="py-2.5 px-2.5 w-[16%]">
                           <div className="flex items-center gap-1.5">
                             <FaCalendarAlt className="text-cyan-400 text-xs" />
                             <span>Date & Slot</span>
                           </div>
                         </th>
-                        <th className="py-2.5 px-2 w-[13%] text-center">Actions</th>
+                        <th className="py-2.5 px-2 w-[10%] text-center">Interview</th>
+                        <th className="py-2.5 px-2 w-[11%] text-center">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/10">
@@ -2319,6 +2530,39 @@ export default function AddSecDashboard() {
                                   </div>
                                 );
                               })()}
+                            </td>
+
+                            {/* Interview Status Toggle Column */}
+                            <td className="py-2.5 px-2 text-center overflow-hidden">
+                              <button
+                                type="button"
+                                onClick={() => saveInterviewStatus(app._id, app.interviewStatus === "completed" ? "pending" : "completed")}
+                                disabled={statusSavingId === app._id}
+                                className={`px-2 py-1 rounded text-[10px] font-mono font-bold uppercase transition-all cursor-pointer inline-flex items-center gap-1 ${
+                                  app.interviewStatus === "completed"
+                                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 hover:bg-emerald-500/30"
+                                    : app.interviewStatus === "in_queue"
+                                    ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/50"
+                                    : "bg-white/5 text-gray-400 border border-white/15 hover:bg-white/15 hover:text-white"
+                                }`}
+                                title={app.interviewStatus === "completed" ? "Interview done. Click to mark pending." : "Click to mark interview as completed"}
+                              >
+                                {statusSavingId === app._id ? (
+                                  <span className="animate-pulse">...</span>
+                                ) : app.interviewStatus === "completed" ? (
+                                  <>
+                                    <FaCheckCircle className="text-emerald-400 text-[10px]" />
+                                    <span>Done</span>
+                                  </>
+                                ) : app.interviewStatus === "in_queue" ? (
+                                  <span>In Queue</span>
+                                ) : (
+                                  <>
+                                    <span className="text-gray-500">⚪</span>
+                                    <span>Pending</span>
+                                  </>
+                                )}
+                              </button>
                             </td>
 
                             {/* Review Actions */}
@@ -2873,6 +3117,42 @@ export default function AddSecDashboard() {
                           <span>Interview Date & Time</span>
                         </label>
                         <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              saveInterviewStatus(
+                                currentModalApp._id,
+                                currentModalApp.interviewStatus === "completed" ? "pending" : "completed"
+                              )
+                            }
+                            disabled={statusSavingId === currentModalApp._id}
+                            className={`px-2.5 py-1 rounded text-xs font-mono font-bold uppercase transition-all cursor-pointer flex items-center gap-1.5 ${
+                              currentModalApp.interviewStatus === "completed"
+                                ? "bg-emerald-500/25 text-emerald-300 border border-emerald-500/60 hover:bg-emerald-500/40"
+                                : "bg-white/10 text-gray-300 border border-white/20 hover:bg-white/20 hover:text-white"
+                            }`}
+                            title={
+                              currentModalApp.interviewStatus === "completed"
+                                ? "Interview marked completed. Click to mark pending."
+                                : "Click to mark interview as completed."
+                            }
+                          >
+                            {statusSavingId === currentModalApp._id ? (
+                              <span className="animate-pulse">Saving...</span>
+                            ) : currentModalApp.interviewStatus === "completed" ? (
+                              <>
+                                <FaCheckCircle className="text-emerald-400 text-xs" />
+                                <span>Interview Completed</span>
+                              </>
+                            ) : currentModalApp.interviewStatus === "in_queue" ? (
+                              <span>In Queue</span>
+                            ) : (
+                              <>
+                                <span className="text-gray-500">⚪</span>
+                                <span>Interview Pending</span>
+                              </>
+                            )}
+                          </button>
                           {dateSavedId === currentModalApp._id && (
                             <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
                               <FaCheckCircle /> Date Saved

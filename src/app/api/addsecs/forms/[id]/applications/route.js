@@ -115,6 +115,7 @@ export async function PUT(req, { params }) {
       negativeRemarks,
       interviewSlot,
       interviewDate,
+      interviewStatus,
     } = body || {};
 
     if (!applicationId) {
@@ -157,6 +158,15 @@ export async function PUT(req, { params }) {
     }
     if (negativeRemarks !== undefined) {
       application.negativeRemarks = Array.isArray(negativeRemarks) ? negativeRemarks : [];
+    }
+    if (interviewStatus !== undefined) {
+      const cleanStatus = String(interviewStatus).trim().toLowerCase();
+      application.interviewStatus = cleanStatus;
+      if (cleanStatus === "completed") {
+        application.interviewCompletedAt = new Date();
+      } else if (cleanStatus === "pending") {
+        application.interviewCompletedAt = null;
+      }
     }
     if (interviewSlot !== undefined) {
       const cleanSlot = String(interviewSlot || "").trim();
@@ -247,6 +257,8 @@ export async function PUT(req, { params }) {
           negativeRemarks: application.negativeRemarks,
           interviewSlot: application.interviewSlot,
           interviewDate: application.interviewDate,
+          interviewStatus: application.interviewStatus,
+          interviewCompletedAt: application.interviewCompletedAt,
           evaluatedBy: application.evaluatedBy,
           evaluatedAt: application.evaluatedAt,
         },

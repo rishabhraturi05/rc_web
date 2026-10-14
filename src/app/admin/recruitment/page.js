@@ -129,14 +129,26 @@ function getCandidateScoreInfo(app, edit) {
     edit?.comments !== undefined ? edit.comments : app?.comments;
   const hasComments = Boolean(currentComments && String(currentComments).trim() !== "");
 
+  const currentFeedback = edit?.feedback !== undefined ? edit.feedback : app?.feedback;
+  const hasFeedback = Boolean(
+    currentFeedback &&
+    String(currentFeedback).trim() !== "" &&
+    !["pending", "none", "null", "undefined"].includes(String(currentFeedback).trim().toLowerCase())
+  );
+
+  const hasEvaluator = Boolean(
+    app?.evaluatedBy &&
+    String(app.evaluatedBy).trim() !== "" &&
+    !["pending", "none", "null", "undefined"].includes(String(app.evaluatedBy).trim().toLowerCase())
+  );
+
   let scoreNum = null;
   let scoreFormatted = "—";
-  let isEvaluated = false;
+  const isEvaluated = Boolean(hasRemarks || hasPoints || hasComments || hasFeedback || hasEvaluator);
 
   if (hasRemarks) {
     scoreNum = currentPos.length - currentNeg.length;
     scoreFormatted = scoreNum > 0 ? `+${scoreNum}` : `${scoreNum}`;
-    isEvaluated = true;
   } else if (hasPoints) {
     const parsed = parseFloat(currentPoints);
     if (!Number.isNaN(parsed)) {
@@ -145,9 +157,6 @@ function getCandidateScoreInfo(app, edit) {
     } else {
       scoreFormatted = String(currentPoints);
     }
-    isEvaluated = true;
-  } else if (hasComments) {
-    isEvaluated = true;
   }
 
   let status = "pending";
@@ -261,6 +270,7 @@ export default function RecruitmentAdminPage() {
   const [scoreFilter, setScoreFilter] = useState("all"); // 'all', 'positive', 'zero', 'negative', 'pending'
   const [sortBy, setSortBy] = useState("newest"); // 'newest', 'oldest', 'points_desc', 'points_asc', 'name_asc'
   const [interviewStatusFilter, setInterviewStatusFilter] = useState("all"); // 'all', 'in_queue', 'completed', 'pending'
+  const [selectedDate, setSelectedDate] = useState("all"); // 'all', 'pending', 'has_date', or 'YYYY-MM-DD'
   const [slotFilter, setSlotFilter] = useState("all"); // 'all', 'slot_given', 'slot_not_given', 'date_given', 'date_not_given', 'both_given', 'neither_given', 'slot_no_date'
 
   // Interview Queue state
@@ -352,6 +362,19 @@ export default function RecruitmentAdminPage() {
     return `id:${app._id}`;
   };
 
+  // Available distinct interview dates in current application list
+  const availableDates = useMemo(() => {
+    const dates = new Set();
+    applications.forEach((app) => {
+      const editDate = inlineEdits[app._id]?.interviewDate;
+      const d = editDate !== undefined ? editDate : app.interviewDate;
+      if (d && String(d).trim()) {
+        dates.add(String(d).trim());
+      }
+    });
+    return Array.from(dates).sort();
+  }, [applications, inlineEdits]);
+
   const groupedApplications = useMemo(() => {
     if (!applications.length) return [];
 
@@ -394,7 +417,12 @@ export default function RecruitmentAdminPage() {
         if (!matchYear) return false;
       }
 
-      const deptScoreInfos = group.deptApplications.map((d) =>
+      // Relevant department applications (scoped to selectedDepartment when filtered)
+      const relevantDeptApps = selectedDepartment !== "all"
+        ? group.deptApplications.filter((d) => d.department === selectedDepartment)
+        : group.deptApplications;
+
+      const deptScoreInfos = relevantDeptApps.map((d) =>
         getCandidateScoreInfo(d, inlineEdits[d._id])
       );
 
@@ -424,28 +452,47 @@ export default function RecruitmentAdminPage() {
 
       // 5. Interview status filter
       if (interviewStatusFilter === "in_queue") {
-        const anyInQueue = group.deptApplications.some((d) => d.interviewStatus === "in_queue");
+        const anyInQueue = relevantDeptApps.some((d) => d.interviewStatus === "in_queue");
         if (!anyInQueue) return false;
       } else if (interviewStatusFilter === "completed") {
-        const anyCompleted = group.deptApplications.some((d) => d.interviewStatus === "completed");
+        const anyCompleted = relevantDeptApps.some((d) => d.interviewStatus === "completed");
         if (!anyCompleted) return false;
       } else if (interviewStatusFilter === "pending") {
-        const anyPendingOrUnmarked = group.deptApplications.some(
+        const anyPendingOrUnmarked = relevantDeptApps.some(
           (d) => !d.interviewStatus || d.interviewStatus === "pending"
         );
         if (!anyPendingOrUnmarked) return false;
       }
 
-      // 6. Slot & Date Filter
+      // 6. Filter According to Date
+      if (selectedDate !== "all") {
+        const candidateDates = relevantDeptApps.map((d) => {
+          const editDate = inlineEdits[d._id]?.interviewDate;
+          return editDate !== undefined ? editDate : d.interviewDate || "";
+        });
+
+        if (selectedDate === "pending" || selectedDate === "no_date") {
+          const allNoDate = candidateDates.every((d) => !d);
+          if (!allNoDate) return false;
+        } else if (selectedDate === "has_date") {
+          const anyHasDate = candidateDates.some((d) => Boolean(d));
+          if (!anyHasDate) return false;
+        } else {
+          const matchDate = candidateDates.some((d) => d === selectedDate);
+          if (!matchDate) return false;
+        }
+      }
+
+      // 7. Slot & Date Filter
       if (slotFilter !== "all") {
-        const cSlot = group.deptApplications.find(
+        const cSlot = relevantDeptApps.find(
           (d) => (inlineEdits[d._id]?.interviewSlot !== undefined ? inlineEdits[d._id].interviewSlot : d.interviewSlot)
         );
         const currentSlotVal = cSlot
           ? (inlineEdits[cSlot._id]?.interviewSlot !== undefined ? inlineEdits[cSlot._id].interviewSlot : cSlot.interviewSlot)
           : (inlineEdits[group.primaryApp._id]?.interviewSlot !== undefined ? inlineEdits[group.primaryApp._id].interviewSlot : group.primaryApp.interviewSlot) || "";
 
-        const cDate = group.deptApplications.find(
+        const cDate = relevantDeptApps.find(
           (d) => (inlineEdits[d._id]?.interviewDate !== undefined ? inlineEdits[d._id].interviewDate : d.interviewDate)
         );
         const currentDateVal = cDate
@@ -464,7 +511,7 @@ export default function RecruitmentAdminPage() {
         if (slotFilter === "slot_no_date" && (!hasSlot || hasDate)) return false;
       }
 
-      // 7. Search query
+      // 8. Search query
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim();
         const cName = group.candidateName.toLowerCase();
@@ -581,6 +628,7 @@ export default function RecruitmentAdminPage() {
     evaluationFilter,
     scoreFilter,
     interviewStatusFilter,
+    selectedDate,
     slotFilter,
     searchQuery,
     sortBy,
@@ -2710,8 +2758,18 @@ export default function RecruitmentAdminPage() {
                       className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-white w-full"
                     >
                       <option value="all">All Status</option>
-                      <option value="evaluated">Evaluated Only</option>
-                      <option value="pending">Pending Only</option>
+                      <option value="evaluated">
+                        ✓ Evaluated ({(() => {
+                          const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
+                          return base.filter((a) => getCandidateScoreInfo(a, inlineEdits[a._id]).isEvaluated).length;
+                        })()})
+                      </option>
+                      <option value="pending">
+                        ⚪ Pending ({(() => {
+                          const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
+                          return base.filter((a) => !getCandidateScoreInfo(a, inlineEdits[a._id]).isEvaluated).length;
+                        })()})
+                      </option>
                     </select>
                   </div>
 
@@ -2731,6 +2789,62 @@ export default function RecruitmentAdminPage() {
                     </select>
                   </div>
 
+                  {/* Filter According to Date */}
+                  <div className="flex flex-col xs:flex-row xs:items-center gap-1">
+                    <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap flex items-center gap-1">
+                      <FaCalendarAlt className="text-cyan-400 text-xs" />
+                      <span>Date:</span>
+                    </label>
+                    <div className="flex items-center gap-1 w-full">
+                      <select
+                        value={selectedDate}
+                        onChange={(e) => setSelectedDate(e.target.value)}
+                        className="bg-black/60 border border-white/20 rounded px-2 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-cyan-400 w-full"
+                      >
+                        <option value="all">All Dates</option>
+                        <option value="pending">
+                          ⚪ Date Pending ({(() => {
+                            const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
+                            return base.filter((a) => !(inlineEdits[a._id]?.interviewDate !== undefined ? inlineEdits[a._id].interviewDate : a.interviewDate)).length;
+                          })()})
+                        </option>
+                        <option value="has_date">
+                          📅 Date Assigned ({(() => {
+                            const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
+                            return base.filter((a) => Boolean(inlineEdits[a._id]?.interviewDate !== undefined ? inlineEdits[a._id].interviewDate : a.interviewDate)).length;
+                          })()})
+                        </option>
+                        {availableDates.map((dateStr) => {
+                          const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
+                          const count = base.filter((a) => (inlineEdits[a._id]?.interviewDate !== undefined ? inlineEdits[a._id].interviewDate : a.interviewDate) === dateStr).length;
+                          return (
+                            <option key={dateStr} value={dateStr}>
+                              📅 {formatInterviewDate(dateStr)} ({count})
+                            </option>
+                          );
+                        })}
+                      </select>
+                      <input
+                        type="date"
+                        value={selectedDate !== "all" && selectedDate !== "pending" && selectedDate !== "has_date" ? selectedDate : ""}
+                        onChange={(e) => setSelectedDate(e.target.value || "all")}
+                        style={{ colorScheme: "dark" }}
+                        className="bg-black/60 border border-white/20 rounded px-1.5 py-1 text-xs font-mono text-cyan-200 focus:outline-none focus:border-cyan-400 cursor-pointer w-28 shrink-0"
+                        title="Pick specific interview date"
+                      />
+                      {selectedDate !== "all" && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedDate("all")}
+                          className="text-gray-400 hover:text-rose-400 text-xs px-1 cursor-pointer shrink-0"
+                          title="Clear date filter"
+                        >
+                          <FaTimes />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
                   {/* Interview Status Filter */}
                   <div className="flex flex-col xs:flex-row xs:items-center gap-1">
                     <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Interview:</label>
@@ -2740,9 +2854,24 @@ export default function RecruitmentAdminPage() {
                       className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-white w-full"
                     >
                       <option value="all">All Status</option>
-                      <option value="in_queue">🟢 In Queue ({applications.filter((a) => a.interviewStatus === "in_queue").length})</option>
-                      <option value="completed">✓ Completed ({applications.filter((a) => a.interviewStatus === "completed").length})</option>
-                      <option value="pending">⚪ Pending ({applications.filter((a) => !a.interviewStatus || a.interviewStatus === "pending").length})</option>
+                      <option value="pending">
+                        ⚪ Pending ({(() => {
+                          const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
+                          return base.filter((a) => !a.interviewStatus || a.interviewStatus === "pending").length;
+                        })()})
+                      </option>
+                      <option value="completed">
+                        ✓ Completed ({(() => {
+                          const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
+                          return base.filter((a) => a.interviewStatus === "completed").length;
+                        })()})
+                      </option>
+                      <option value="in_queue">
+                        🟢 In Queue ({(() => {
+                          const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
+                          return base.filter((a) => a.interviewStatus === "in_queue").length;
+                        })()})
+                      </option>
                     </select>
                   </div>
 
@@ -2786,7 +2915,7 @@ export default function RecruitmentAdminPage() {
               </div>
 
               {/* Active Filter Clear Bar */}
-              {(searchQuery || selectedDepartment !== "all" || selectedYear !== "all" || evaluationFilter !== "all" || scoreFilter !== "all" || interviewStatusFilter !== "all" || slotFilter !== "all" || sortBy !== "newest") && (
+              {(searchQuery || selectedDepartment !== "all" || selectedYear !== "all" || evaluationFilter !== "all" || scoreFilter !== "all" || interviewStatusFilter !== "all" || selectedDate !== "all" || slotFilter !== "all" || sortBy !== "newest") && (
                 <div className="flex items-center justify-between text-xs font-mono text-gray-400 pt-2 border-t border-white/10">
                   <span>
                     Filtered: Showing <strong className="text-white">{groupedApplications.length}</strong> of <strong className="text-white">{new Set(applications.map(getCandidateKey)).size}</strong> candidates
@@ -2800,6 +2929,7 @@ export default function RecruitmentAdminPage() {
                       setEvaluationFilter("all");
                       setScoreFilter("all");
                       setInterviewStatusFilter("all");
+                      setSelectedDate("all");
                       setSlotFilter("all");
                       setSortBy("newest");
                     }}
