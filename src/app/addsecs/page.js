@@ -37,6 +37,7 @@ import {
   FaExternalLinkAlt,
   FaKey,
   FaCalendarAlt,
+  FaSyncAlt,
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import { getRecruitmentFormTitle, getApplicantResumeInfo, normalizeToTimeInputValue, formatTimeSlot, formatInterviewDate, parseTimeSlotToMinutes } from "@/app/lib/recruitment";
@@ -155,6 +156,14 @@ export default function AddSecDashboard() {
   const isAdmin = session?.user?.role === "admin";
   const [adminSelectedDept, setAdminSelectedDept] = useState("Software");
 
+  // Helper to ensure clean department name without "Department Department"
+  const cleanDepartmentName = useCallback((raw) => {
+    if (!raw) return "Software";
+    const cleaned = String(raw).replace(/\s*department\s*$/i, "").trim();
+    if (!cleaned || cleaned.toLowerCase() === "department") return "Software";
+    return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+  }, []);
+
   // Load saved admin department preference if admin
   useEffect(() => {
     if (isAdmin && typeof window !== "undefined") {
@@ -166,20 +175,32 @@ export default function AddSecDashboard() {
   }, [isAdmin]);
 
   const handleAdminDeptChange = (dept) => {
-    setAdminSelectedDept(dept);
+    const cleaned = cleanDepartmentName(dept);
+    setAdminSelectedDept(cleaned);
     if (typeof window !== "undefined") {
-      localStorage.setItem("rc_admin_addsec_dept", dept);
+      localStorage.setItem("rc_admin_addsec_dept", cleaned);
     }
-    setActiveFormId(null);
+    handleSelectForm(null);
   };
 
-  // Department name:
-  // If AddSec: strictly from session (Software, Mechanical, Embedded, PR).
-  // If Admin: from adminSelectedDept (Software, Mechanical, Embedded, PR).
-  // Guaranteed never to be generic "Department".
-  const departmentName = isAdmin
-    ? adminSelectedDept
-    : (session?.user?.department || "Software");
+  // Department name strictly formatted without duplicates:
+  const departmentName = cleanDepartmentName(
+    isAdmin ? adminSelectedDept : session?.user?.department
+  );
+
+  // Restore active recruitment form from URL or sessionStorage on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const queryForm = params.get("form");
+      const savedForm = sessionStorage.getItem("rc_addsec_active_form");
+      if (queryForm) {
+        setActiveFormId(queryForm);
+      } else if (savedForm) {
+        setActiveFormId(savedForm);
+      }
+    }
+  }, []);
 
   // Auth protection check: load department forms when authenticated
   useEffect(() => {
@@ -236,8 +257,18 @@ export default function AddSecDashboard() {
       const formList = result.data || [];
       setForms(formList);
 
-      if (activeFormId && formList.some((f) => f._id === activeFormId)) {
-        await fetchApplications(activeFormId, activeDept);
+      const targetFormId =
+        activeFormId ||
+        (typeof window !== "undefined"
+          ? sessionStorage.getItem("rc_addsec_active_form") ||
+            new URLSearchParams(window.location.search).get("form")
+          : "");
+
+      if (targetFormId && formList.some((f) => f._id === targetFormId)) {
+        if (activeFormId !== targetFormId) {
+          setActiveFormId(targetFormId);
+        }
+        await fetchApplications(targetFormId, activeDept);
       }
     } catch (error) {
       console.error("Error fetching forms:", error);
@@ -292,9 +323,19 @@ export default function AddSecDashboard() {
   };
 
   const handleSelectForm = (formId) => {
-    if (formId === activeFormId) return;
-    setActiveFormId(formId);
-    fetchApplications(formId, departmentName);
+    setActiveFormId(formId || null);
+    if (typeof window !== "undefined") {
+      if (formId) {
+        sessionStorage.setItem("rc_addsec_active_form", formId);
+        window.history.replaceState(null, "", `/addsecs?form=${encodeURIComponent(formId)}`);
+      } else {
+        sessionStorage.removeItem("rc_addsec_active_form");
+        window.history.replaceState(null, "", `/addsecs`);
+      }
+    }
+    if (formId) {
+      fetchApplications(formId, departmentName);
+    }
   };
 
   const activeForm = useMemo(
@@ -1307,26 +1348,16 @@ export default function AddSecDashboard() {
               <div>
                 <div className="flex flex-wrap items-center gap-2 mb-1">
                   <span className="px-2.5 py-0.5 rounded text-xs font-mono font-bold uppercase tracking-wider bg-white/10 text-white border border-white/30">
-                    {departmentName} Department {isAdmin && "(Admin View)"}
+                    {departmentName} Department
                   </span>
                   <span className="text-xs font-mono text-gray-400">
                     Logged in as <strong className="text-white">{session?.user?.username}</strong>
                   </span>
-                  {isAdmin && (
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      className="text-[11px] font-mono text-amber-400 hover:text-amber-300 underline underline-offset-2 ml-1 cursor-pointer"
-                      title="Sign out Admin to log into a specific Department AddSec account"
-                    >
-                      [ Switch to AddSec Account ]
-                    </button>
-                  )}
                 </div>
                 {isAdmin && (
                   <div className="flex flex-wrap items-center gap-1.5 my-2 p-1.5 bg-black/40 border border-white/20 rounded-lg">
                     <span className="text-[10px] font-mono text-gray-400 px-1 uppercase font-semibold">
-                      Department View:
+                      Department:
                     </span>
                     {DEPARTMENTS.map((dept) => (
                       <button
@@ -1488,7 +1519,7 @@ export default function AddSecDashboard() {
               <div>
                 <button
                   type="button"
-                  onClick={() => setActiveFormId(null)}
+                  onClick={() => handleSelectForm(null)}
                   className="inline-flex items-center gap-2 text-gray-400 hover:text-white font-mono text-xs mb-2.5 transition-colors cursor-pointer"
                   title="Return to AddSec Portal Home"
                 >
@@ -1496,43 +1527,12 @@ export default function AddSecDashboard() {
                 </button>
                 <div className="flex flex-wrap items-center gap-2 mb-1">
                   <span className="px-2.5 py-0.5 rounded text-xs font-mono font-bold uppercase tracking-wider bg-white/10 text-white border border-white/30">
-                    {departmentName} Department {isAdmin && "(Admin View)"}
+                    {departmentName} Department
                   </span>
                   <span className="text-xs font-mono text-gray-400">
                     Logged in as <strong className="text-white">{session?.user?.username}</strong>
                   </span>
-                  {isAdmin && (
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      className="text-[11px] font-mono text-amber-400 hover:text-amber-300 underline underline-offset-2 ml-1 cursor-pointer"
-                      title="Sign out Admin to log into a specific Department AddSec account"
-                    >
-                      [ Switch to AddSec Account ]
-                    </button>
-                  )}
                 </div>
-                {isAdmin && (
-                  <div className="flex flex-wrap items-center gap-1.5 my-2 p-1.5 bg-black/40 border border-white/20 rounded-lg">
-                    <span className="text-[10px] font-mono text-gray-400 px-1 uppercase font-semibold">
-                      Department View:
-                    </span>
-                    {DEPARTMENTS.map((dept) => (
-                      <button
-                        key={dept.name}
-                        type="button"
-                        onClick={() => handleAdminDeptChange(dept.name)}
-                        className={`px-2.5 py-1 rounded text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                          departmentName === dept.name
-                            ? "bg-white text-black shadow"
-                            : "text-gray-300 hover:text-white hover:bg-white/10"
-                        }`}
-                      >
-                        {dept.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
                 <h1 className="font-mono text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-2">
                   {">_"} RECRUITMENT_DETAILS
                 </h1>
@@ -1543,7 +1543,20 @@ export default function AddSecDashboard() {
 
               <div className="flex flex-wrap items-center gap-2">
                 <button
-                  onClick={() => setActiveFormId(null)}
+                  type="button"
+                  onClick={() => {
+                    fetchApplications(activeFormId, departmentName);
+                    showToast("Synchronized latest updates.", "info");
+                  }}
+                  disabled={loadingApps}
+                  className="px-3.5 py-2 bg-emerald-950/60 hover:bg-emerald-900/70 text-emerald-300 border border-emerald-500/40 rounded font-mono text-xs uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="Sync and view latest progress from other team evaluators"
+                >
+                  <FaSyncAlt className={`text-xs ${loadingApps ? "animate-spin" : ""}`} />
+                  <span>[ Sync / Refresh ]</span>
+                </button>
+                <button
+                  onClick={() => handleSelectForm(null)}
                   className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/30 rounded font-mono text-xs uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer"
                   title="Return to AddSec Home"
                 >

@@ -25,14 +25,16 @@ export async function GET(req, { params }) {
     const requestedDept = searchParams.get("department");
 
     // AddSec is locked to their assigned department. Admin can specify a department (defaults to "Software").
-    let userDepartment =
+    const rawDept =
       session.user?.role === "addsec"
         ? session.user?.department
         : (requestedDept || "Software");
 
-    if (!userDepartment) {
+    let userDepartment = String(rawDept || "Software").replace(/\s*department\s*$/i, "").trim() || "Software";
+    if (userDepartment.toLowerCase() === "department") {
       userDepartment = "Software";
     }
+    userDepartment = userDepartment.charAt(0).toUpperCase() + userDepartment.slice(1);
 
     await connectDB();
 
@@ -44,16 +46,19 @@ export async function GET(req, { params }) {
       );
     }
 
+    const deptRegex = new RegExp(`^${userDepartment}$`, "i");
+
     // Security check: If AddSec, ensure form includes their department
-    if (session.user?.role === "addsec" && userDepartment && !form.departments?.includes(userDepartment)) {
+    const formHasDept = Array.isArray(form.departments) && form.departments.some((d) => deptRegex.test(d));
+    if (session.user?.role === "addsec" && !formHasDept) {
       return NextResponse.json(
         { success: false, message: `Access denied. This form is not assigned to ${userDepartment} department.` },
         { status: 403 }
       );
     }
 
-    // Filter applications strictly for this department
-    const query = { formId: form._id, department: userDepartment };
+    // Filter applications strictly for this department (case-insensitive regex)
+    const query = { formId: form._id, department: deptRegex };
 
     const applications = await RecruitmentApplication.find(query)
       .sort({ createdAt: -1 })
@@ -124,7 +129,8 @@ export async function PUT(req, { params }) {
     // Query application ensuring it matches the form and department
     const query = { _id: applicationId, formId: id };
     if (userDepartment) {
-      query.department = userDepartment;
+      const cleanDept = String(userDepartment).replace(/\s*department\s*$/i, "").trim();
+      query.department = new RegExp(`^${cleanDept}$`, "i");
     }
 
     const application = await RecruitmentApplication.findOne(query);

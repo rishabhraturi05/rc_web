@@ -136,19 +136,19 @@ export default function AddSecLogin() {
 
       {/* If already logged in as Admin, show notice with quick action */}
       {status === "authenticated" && session?.user?.role === "admin" && (
-        <div className="max-w-md mx-auto w-full mb-6 p-4 rounded-xl bg-amber-950/40 border border-amber-500/40 text-center font-mono">
-          <p className="text-xs text-amber-300 font-semibold mb-1">
-            Currently authenticated as Admin ({session.user.username})
+        <div className="max-w-md mx-auto w-full mb-6 p-4 rounded-xl bg-black/40 border border-white/20 text-center font-mono">
+          <p className="text-xs text-gray-200 font-semibold mb-1">
+            Logged in as <strong className="text-white">{session.user.username}</strong>
           </p>
           <p className="text-[11px] text-gray-400 mb-3">
-            Enter AddSec portal directly in Admin Mode, or sign in below with a Department AddSec ID to switch.
+            You can proceed to the AddSec portal, or sign in below with a specific Department AddSec ID.
           </p>
           <div className="flex items-center justify-center gap-2">
             <Link
               href="/addsecs"
               className="px-3 py-1.5 rounded bg-white text-black hover:bg-gray-200 text-xs font-bold transition-colors"
             >
-              [ Enter AddSec Portal ]
+              [ Proceed to AddSec Portal ]
             </Link>
             <button
               type="button"
@@ -158,7 +158,7 @@ export default function AddSecLogin() {
               }}
               className="px-3 py-1.5 rounded bg-white/10 hover:bg-white/20 text-gray-300 text-xs border border-white/20 transition-colors cursor-pointer"
             >
-              [ Sign Out Admin ]
+              [ Sign Out / Switch User ]
             </button>
           </div>
         </div>

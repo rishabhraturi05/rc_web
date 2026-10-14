@@ -24,22 +24,25 @@ export async function GET(req) {
     const requestedDept = searchParams.get("department");
 
     // AddSec is locked to their assigned department. Admin can specify a department (defaults to "Software").
-    let userDepartment =
+    const rawDept =
       session.user?.role === "addsec"
         ? session.user?.department
         : (requestedDept || "Software");
 
-    if (!userDepartment) {
+    let userDepartment = String(rawDept || "Software").replace(/\s*department\s*$/i, "").trim() || "Software";
+    if (userDepartment.toLowerCase() === "department") {
       userDepartment = "Software";
     }
+    userDepartment = userDepartment.charAt(0).toUpperCase() + userDepartment.slice(1);
 
     await connectDB();
 
-    const formQuery = { departments: userDepartment };
+    const deptRegex = new RegExp(`^${userDepartment}$`, "i");
+    const formQuery = { departments: deptRegex };
     const forms = await RecruitmentConfig.find(formQuery).lean();
 
     const formIds = forms.map((f) => f._id);
-    const appQuery = { formId: { $in: formIds }, department: userDepartment };
+    const appQuery = { formId: { $in: formIds }, department: deptRegex };
 
     const applications = await RecruitmentApplication.find(appQuery)
       .sort({ createdAt: -1 })
@@ -48,7 +51,7 @@ export async function GET(req) {
     const formsMap = {};
     for (const f of forms) {
       const years = Array.isArray(f.years) && f.years.length ? f.years : DEFAULT_YEAR_OPTIONS;
-      const title = f.title?.trim() || getRecruitmentFormTitle({ ...form, years });
+      const title = f.title?.trim() || getRecruitmentFormTitle({ ...f, years });
       formsMap[f._id.toString()] = { ...f, title, years };
     }
 

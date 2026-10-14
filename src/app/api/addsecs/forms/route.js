@@ -24,25 +24,28 @@ export async function GET(req) {
     const requestedDept = searchParams.get("department");
 
     // AddSec is locked to their assigned department. Admin can specify a department (defaults to "Software").
-    let userDepartment =
+    const rawDept =
       session.user?.role === "addsec"
         ? session.user?.department
         : (requestedDept || "Software");
 
-    if (!userDepartment) {
+    let userDepartment = String(rawDept || "Software").replace(/\s*department\s*$/i, "").trim() || "Software";
+    if (userDepartment.toLowerCase() === "department") {
       userDepartment = "Software";
     }
+    userDepartment = userDepartment.charAt(0).toUpperCase() + userDepartment.slice(1);
 
     await connectDB();
 
-    // Query for forms that contain this specific department
-    const formQuery = { departments: userDepartment };
+    // Query for forms that contain this specific department (case-insensitive regex)
+    const deptRegex = new RegExp(`^${userDepartment}$`, "i");
+    const formQuery = { departments: deptRegex };
     const forms = await RecruitmentConfig.find(formQuery).sort({ createdAt: -1 }).lean();
 
     // For each form, get application statistics strictly for this department
     const formsWithStats = await Promise.all(
       forms.map(async (form) => {
-        const appQuery = { formId: form._id, department: userDepartment };
+        const appQuery = { formId: form._id, department: deptRegex };
 
         const totalApplications = await RecruitmentApplication.countDocuments(appQuery);
         const evaluatedApplications = await RecruitmentApplication.countDocuments({
@@ -50,6 +53,9 @@ export async function GET(req) {
           $or: [
             { points: { $exists: true, $ne: "" } },
             { comments: { $exists: true, $ne: "" } },
+            { feedback: { $exists: true, $ne: "" } },
+            { "positiveRemarks.0": { $exists: true } },
+            { "negativeRemarks.0": { $exists: true } },
           ],
         });
 
