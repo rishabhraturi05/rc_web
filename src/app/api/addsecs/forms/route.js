@@ -9,7 +9,7 @@ import { DEFAULT_YEAR_OPTIONS, getRecruitmentFormTitle } from "@/app/lib/recruit
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export async function GET() {
+export async function GET(req) {
   try {
     const session = await getServerSession(authOptions);
 
@@ -20,27 +20,29 @@ export async function GET() {
       );
     }
 
-    const userDepartment = session.user?.department;
-    if (!userDepartment && session.user?.role !== "admin") {
-      return NextResponse.json(
-        { success: false, message: "No department assigned to this account." },
-        { status: 403 }
-      );
+    const { searchParams } = new URL(req.url);
+    const requestedDept = searchParams.get("department");
+
+    // AddSec is locked to their assigned department. Admin can specify a department (defaults to "Software").
+    let userDepartment =
+      session.user?.role === "addsec"
+        ? session.user?.department
+        : (requestedDept || "Software");
+
+    if (!userDepartment) {
+      userDepartment = "Software";
     }
 
     await connectDB();
 
-    // Query for forms that contain this department (or all forms if admin)
-    const formQuery = userDepartment ? { departments: userDepartment } : {};
+    // Query for forms that contain this specific department
+    const formQuery = { departments: userDepartment };
     const forms = await RecruitmentConfig.find(formQuery).sort({ createdAt: -1 }).lean();
 
-    // For each form, get application statistics for this department
+    // For each form, get application statistics strictly for this department
     const formsWithStats = await Promise.all(
       forms.map(async (form) => {
-        const appQuery = { formId: form._id };
-        if (userDepartment) {
-          appQuery.department = userDepartment;
-        }
+        const appQuery = { formId: form._id, department: userDepartment };
 
         const totalApplications = await RecruitmentApplication.countDocuments(appQuery);
         const evaluatedApplications = await RecruitmentApplication.countDocuments({
@@ -69,7 +71,7 @@ export async function GET() {
     return NextResponse.json(
       {
         success: true,
-        department: userDepartment || "All",
+        department: userDepartment,
         data: formsWithStats,
       },
       { headers: { "Cache-Control": "no-store, max-age=0" } }

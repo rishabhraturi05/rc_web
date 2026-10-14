@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { signIn, useSession } from "next-auth/react";
+import { signIn, signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { FaLaptopCode, FaCogs, FaMicrochip, FaBullhorn, FaLock, FaUser, FaArrowLeft } from "react-icons/fa";
+import { FaLaptopCode, FaCogs, FaMicrochip, FaBullhorn, FaLock, FaUser, FaArrowLeft, FaShieldAlt } from "react-icons/fa";
 
 const DEPARTMENTS = [
   {
@@ -44,7 +44,8 @@ export default function AddSecLogin() {
   const [loginMessage, setLoginMessage] = useState("");
 
   useEffect(() => {
-    if (status === "authenticated" && (session?.user?.role === "addsec" || session?.user?.role === "admin")) {
+    // Only auto-redirect if already authenticated as an AddSec
+    if (status === "authenticated" && session?.user?.role === "addsec") {
       router.push("/addsecs");
     }
   }, [status, session, router]);
@@ -132,6 +133,36 @@ export default function AddSecLogin() {
           })}
         </div>
       </div>
+
+      {/* If already logged in as Admin, show notice with quick action */}
+      {status === "authenticated" && session?.user?.role === "admin" && (
+        <div className="max-w-md mx-auto w-full mb-6 p-4 rounded-xl bg-amber-950/40 border border-amber-500/40 text-center font-mono">
+          <p className="text-xs text-amber-300 font-semibold mb-1">
+            Currently authenticated as Admin ({session.user.username})
+          </p>
+          <p className="text-[11px] text-gray-400 mb-3">
+            Enter AddSec portal directly in Admin Mode, or sign in below with a Department AddSec ID to switch.
+          </p>
+          <div className="flex items-center justify-center gap-2">
+            <Link
+              href="/addsecs"
+              className="px-3 py-1.5 rounded bg-white text-black hover:bg-gray-200 text-xs font-bold transition-colors"
+            >
+              [ Enter AddSec Portal ]
+            </Link>
+            <button
+              type="button"
+              onClick={async () => {
+                await signOut({ redirect: false });
+                router.refresh();
+              }}
+              className="px-3 py-1.5 rounded bg-white/10 hover:bg-white/20 text-gray-300 text-xs border border-white/20 transition-colors cursor-pointer"
+            >
+              [ Sign Out Admin ]
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Login Form Container */}
       <div className="relative z-10 max-w-md mx-auto w-full">

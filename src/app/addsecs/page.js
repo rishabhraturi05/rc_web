@@ -152,17 +152,43 @@ export default function AddSecDashboard() {
     };
   }, [modalOpen]);
 
-  // Department name from session
-  const departmentName = session?.user?.department || "Department";
+  const isAdmin = session?.user?.role === "admin";
+  const [adminSelectedDept, setAdminSelectedDept] = useState("Software");
+
+  // Load saved admin department preference if admin
+  useEffect(() => {
+    if (isAdmin && typeof window !== "undefined") {
+      const saved = localStorage.getItem("rc_admin_addsec_dept");
+      if (saved && ["Software", "Mechanical", "Embedded", "PR"].includes(saved)) {
+        setAdminSelectedDept(saved);
+      }
+    }
+  }, [isAdmin]);
+
+  const handleAdminDeptChange = (dept) => {
+    setAdminSelectedDept(dept);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("rc_admin_addsec_dept", dept);
+    }
+    setActiveFormId(null);
+  };
+
+  // Department name:
+  // If AddSec: strictly from session (Software, Mechanical, Embedded, PR).
+  // If Admin: from adminSelectedDept (Software, Mechanical, Embedded, PR).
+  // Guaranteed never to be generic "Department".
+  const departmentName = isAdmin
+    ? adminSelectedDept
+    : (session?.user?.department || "Software");
 
   // Auth protection check: load department forms when authenticated
   useEffect(() => {
     if (status === "authenticated" && (session?.user?.role === "addsec" || session?.user?.role === "admin")) {
-      fetchDepartmentForms();
+      fetchDepartmentForms(departmentName);
     } else if (status !== "loading") {
       setLoading(false);
     }
-  }, [status, session]);
+  }, [status, session, departmentName]);
 
   // Auto-dismiss feedback message after 4s
   useEffect(() => {
@@ -188,10 +214,17 @@ export default function AddSecDashboard() {
     }
   };
 
-  const fetchDepartmentForms = async () => {
+  const fetchDepartmentForms = async (overrideDept) => {
     setLoading(true);
     try {
-      const response = await fetch("/api/addsecs/forms");
+      const activeDept = overrideDept || departmentName;
+      const url = isAdmin
+        ? `/api/addsecs/forms?department=${encodeURIComponent(activeDept)}`
+        : "/api/addsecs/forms";
+      const response = await fetch(url, {
+        cache: "no-store",
+        headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
+      });
       const result = await response.json();
 
       if (!result.success) {
@@ -204,7 +237,7 @@ export default function AddSecDashboard() {
       setForms(formList);
 
       if (activeFormId && formList.some((f) => f._id === activeFormId)) {
-        await fetchApplications(activeFormId);
+        await fetchApplications(activeFormId, activeDept);
       }
     } catch (error) {
       console.error("Error fetching forms:", error);
@@ -214,11 +247,15 @@ export default function AddSecDashboard() {
     }
   };
 
-  const fetchApplications = async (formId) => {
+  const fetchApplications = async (formId, overrideDept) => {
     if (!formId) return;
     setLoadingApps(true);
     try {
-      const response = await fetch(`/api/addsecs/forms/${formId}/applications`, {
+      const activeDept = overrideDept || departmentName;
+      const url = isAdmin
+        ? `/api/addsecs/forms/${formId}/applications?department=${encodeURIComponent(activeDept)}`
+        : `/api/addsecs/forms/${formId}/applications`;
+      const response = await fetch(url, {
         cache: "no-store",
         headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
       });
@@ -257,7 +294,7 @@ export default function AddSecDashboard() {
   const handleSelectForm = (formId) => {
     if (formId === activeFormId) return;
     setActiveFormId(formId);
-    fetchApplications(formId);
+    fetchApplications(formId, departmentName);
   };
 
   const activeForm = useMemo(
@@ -513,6 +550,7 @@ export default function AddSecDashboard() {
           negativeRemarks: edit.negativeRemarks || [],
           interviewSlot: edit.interviewSlot,
           interviewDate: edit.interviewDate,
+          department: departmentName,
         }),
       });
 
@@ -621,6 +659,7 @@ export default function AddSecDashboard() {
         body: JSON.stringify({
           applicationId: appId,
           interviewSlot: trimmed,
+          department: departmentName,
         }),
       });
 
@@ -692,6 +731,7 @@ export default function AddSecDashboard() {
         body: JSON.stringify({
           applicationId: appId,
           interviewDate: trimmed,
+          department: departmentName,
         }),
       });
 
@@ -970,7 +1010,13 @@ export default function AddSecDashboard() {
   const exportAllForms = async () => {
     try {
       showToast("Preparing department full export...", "info");
-      const response = await fetch("/api/addsecs/applications/all");
+      const url = isAdmin
+        ? `/api/addsecs/applications/all?department=${encodeURIComponent(departmentName)}`
+        : "/api/addsecs/applications/all";
+      const response = await fetch(url, {
+        cache: "no-store",
+        headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
+      });
       const result = await response.json();
 
       if (!result.success || !result.data?.applications?.length) {
@@ -1261,12 +1307,43 @@ export default function AddSecDashboard() {
               <div>
                 <div className="flex flex-wrap items-center gap-2 mb-1">
                   <span className="px-2.5 py-0.5 rounded text-xs font-mono font-bold uppercase tracking-wider bg-white/10 text-white border border-white/30">
-                    {departmentName} Department
+                    {departmentName} Department {isAdmin && "(Admin View)"}
                   </span>
                   <span className="text-xs font-mono text-gray-400">
                     Logged in as <strong className="text-white">{session?.user?.username}</strong>
                   </span>
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="text-[11px] font-mono text-amber-400 hover:text-amber-300 underline underline-offset-2 ml-1 cursor-pointer"
+                      title="Sign out Admin to log into a specific Department AddSec account"
+                    >
+                      [ Switch to AddSec Account ]
+                    </button>
+                  )}
                 </div>
+                {isAdmin && (
+                  <div className="flex flex-wrap items-center gap-1.5 my-2 p-1.5 bg-black/40 border border-white/20 rounded-lg">
+                    <span className="text-[10px] font-mono text-gray-400 px-1 uppercase font-semibold">
+                      Department View:
+                    </span>
+                    {DEPARTMENTS.map((dept) => (
+                      <button
+                        key={dept.name}
+                        type="button"
+                        onClick={() => handleAdminDeptChange(dept.name)}
+                        className={`px-2.5 py-1 rounded text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                          departmentName === dept.name
+                            ? "bg-white text-black shadow"
+                            : "text-gray-300 hover:text-white hover:bg-white/10"
+                        }`}
+                      >
+                        {dept.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <h1 className="font-mono text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-2">
                   {">_"} ADDSEC_PORTAL
                 </h1>
@@ -1419,12 +1496,43 @@ export default function AddSecDashboard() {
                 </button>
                 <div className="flex flex-wrap items-center gap-2 mb-1">
                   <span className="px-2.5 py-0.5 rounded text-xs font-mono font-bold uppercase tracking-wider bg-white/10 text-white border border-white/30">
-                    {departmentName} Department
+                    {departmentName} Department {isAdmin && "(Admin View)"}
                   </span>
                   <span className="text-xs font-mono text-gray-400">
                     Logged in as <strong className="text-white">{session?.user?.username}</strong>
                   </span>
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="text-[11px] font-mono text-amber-400 hover:text-amber-300 underline underline-offset-2 ml-1 cursor-pointer"
+                      title="Sign out Admin to log into a specific Department AddSec account"
+                    >
+                      [ Switch to AddSec Account ]
+                    </button>
+                  )}
                 </div>
+                {isAdmin && (
+                  <div className="flex flex-wrap items-center gap-1.5 my-2 p-1.5 bg-black/40 border border-white/20 rounded-lg">
+                    <span className="text-[10px] font-mono text-gray-400 px-1 uppercase font-semibold">
+                      Department View:
+                    </span>
+                    {DEPARTMENTS.map((dept) => (
+                      <button
+                        key={dept.name}
+                        type="button"
+                        onClick={() => handleAdminDeptChange(dept.name)}
+                        className={`px-2.5 py-1 rounded text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                          departmentName === dept.name
+                            ? "bg-white text-black shadow"
+                            : "text-gray-300 hover:text-white hover:bg-white/10"
+                        }`}
+                      >
+                        {dept.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <h1 className="font-mono text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-2">
                   {">_"} RECRUITMENT_DETAILS
                 </h1>

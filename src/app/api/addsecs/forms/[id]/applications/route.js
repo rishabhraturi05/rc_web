@@ -21,7 +21,18 @@ export async function GET(req, { params }) {
     }
 
     const { id } = await params;
-    const userDepartment = session.user?.department;
+    const { searchParams } = new URL(req.url);
+    const requestedDept = searchParams.get("department");
+
+    // AddSec is locked to their assigned department. Admin can specify a department (defaults to "Software").
+    let userDepartment =
+      session.user?.role === "addsec"
+        ? session.user?.department
+        : (requestedDept || "Software");
+
+    if (!userDepartment) {
+      userDepartment = "Software";
+    }
 
     await connectDB();
 
@@ -34,7 +45,7 @@ export async function GET(req, { params }) {
     }
 
     // Security check: If AddSec, ensure form includes their department
-    if (userDepartment && !form.departments?.includes(userDepartment)) {
+    if (session.user?.role === "addsec" && userDepartment && !form.departments?.includes(userDepartment)) {
       return NextResponse.json(
         { success: false, message: `Access denied. This form is not assigned to ${userDepartment} department.` },
         { status: 403 }
@@ -42,10 +53,7 @@ export async function GET(req, { params }) {
     }
 
     // Filter applications strictly for this department
-    const query = { formId: form._id };
-    if (userDepartment) {
-      query.department = userDepartment;
-    }
+    const query = { formId: form._id, department: userDepartment };
 
     const applications = await RecruitmentApplication.find(query)
       .sort({ createdAt: -1 })
@@ -65,7 +73,7 @@ export async function GET(req, { params }) {
     return NextResponse.json(
       {
         success: true,
-        department: userDepartment || "All",
+        department: userDepartment,
         data: { form: normalizedForm, applications },
       },
       { headers: { "Cache-Control": "no-store, max-age=0" } }

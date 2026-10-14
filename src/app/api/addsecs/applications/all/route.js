@@ -9,7 +9,7 @@ import { DEFAULT_YEAR_OPTIONS, getRecruitmentFormTitle } from "@/app/lib/recruit
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export async function GET() {
+export async function GET(req) {
   try {
     const session = await getServerSession(authOptions);
 
@@ -20,17 +20,26 @@ export async function GET() {
       );
     }
 
-    const userDepartment = session.user?.department;
+    const { searchParams } = new URL(req.url);
+    const requestedDept = searchParams.get("department");
+
+    // AddSec is locked to their assigned department. Admin can specify a department (defaults to "Software").
+    let userDepartment =
+      session.user?.role === "addsec"
+        ? session.user?.department
+        : (requestedDept || "Software");
+
+    if (!userDepartment) {
+      userDepartment = "Software";
+    }
+
     await connectDB();
 
-    const formQuery = userDepartment ? { departments: userDepartment } : {};
+    const formQuery = { departments: userDepartment };
     const forms = await RecruitmentConfig.find(formQuery).lean();
 
     const formIds = forms.map((f) => f._id);
-    const appQuery = { formId: { $in: formIds } };
-    if (userDepartment) {
-      appQuery.department = userDepartment;
-    }
+    const appQuery = { formId: { $in: formIds }, department: userDepartment };
 
     const applications = await RecruitmentApplication.find(appQuery)
       .sort({ createdAt: -1 })
@@ -39,14 +48,14 @@ export async function GET() {
     const formsMap = {};
     for (const f of forms) {
       const years = Array.isArray(f.years) && f.years.length ? f.years : DEFAULT_YEAR_OPTIONS;
-      const title = f.title?.trim() || getRecruitmentFormTitle({ ...f, years });
+      const title = f.title?.trim() || getRecruitmentFormTitle({ ...form, years });
       formsMap[f._id.toString()] = { ...f, title, years };
     }
 
     return NextResponse.json(
       {
         success: true,
-        department: userDepartment || "All",
+        department: userDepartment,
         data: {
           formsMap,
           applications,
