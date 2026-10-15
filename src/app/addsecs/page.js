@@ -890,6 +890,7 @@ export default function AddSecDashboard() {
     }
   };
 
+
   // Dedicated interview status updater
   const saveInterviewStatus = async (appId, newStatus) => {
     if (!activeForm || !appId) return;
@@ -2386,6 +2387,7 @@ export default function AddSecDashboard() {
                                 {candidateYear}
                               </span>
                             </td>
+
 
                             {/* Read-only Score Badge */}
                             <td className="py-2.5 px-2 text-center overflow-hidden">

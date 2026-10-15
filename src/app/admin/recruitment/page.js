@@ -211,6 +211,7 @@ function buildSheetRows(form, applications, inlineEdits = {}) {
       "Negative Remarks (-1)": Array.isArray(negRemarks) ? negRemarks.join("; ") : "",
       "Interview Slot": formatTimeSlot(edit.interviewSlot !== undefined ? edit.interviewSlot : application.interviewSlot),
       "Interview Date": formatInterviewDate(edit.interviewDate !== undefined ? edit.interviewDate : application.interviewDate),
+      "Panel": edit.panel !== undefined ? edit.panel : (application.panel || ""),
       "Interview Status":
         application.interviewStatus === "in_queue"
           ? `In Queue (${application.queueDepartment || application.department})`
@@ -278,6 +279,7 @@ export default function RecruitmentAdminPage() {
   const [loadingQueueActionId, setLoadingQueueActionId] = useState(null);
   const [openQueueMenuId, setOpenQueueMenuId] = useState(null);
   const [queueModalCandidate, setQueueModalCandidate] = useState(null);
+  const [isRefreshingQueue, setIsRefreshingQueue] = useState(false);
 
   // Inline edits state: { [appId]: { points, comments, feedback, positiveRemarks, negativeRemarks, isDirty, isSaving, savedRecently } }
   const [inlineEdits, setInlineEdits] = useState({});
@@ -285,6 +287,8 @@ export default function RecruitmentAdminPage() {
   const [slotSavedId, setSlotSavedId] = useState(null);
   const [dateSavingId, setDateSavingId] = useState(null);
   const [dateSavedId, setDateSavedId] = useState(null);
+  const [panelSavingId, setPanelSavingId] = useState(null);
+  const [panelSavedId, setPanelSavedId] = useState(null);
 
   // Review Modal state
   const [modalAppIndex, setModalAppIndex] = useState(null);
@@ -1147,6 +1151,76 @@ export default function RecruitmentAdminPage() {
     }
   };
 
+  // Dedicated panel updater (allows quick inline saving from table & queue card)
+  const savePanel = async (appId, panelValue) => {
+    if (!selectedForm || !appId) return;
+    setPanelSavingId(appId);
+    try {
+      const trimmed = String(panelValue ?? "").trim();
+      const response = await fetch(`/api/admin/recruitment/${selectedForm._id}/applications`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId: appId,
+          panel: trimmed,
+        }),
+      });
+
+      const result = await response.json();
+      if (!result.success) {
+        setMessage(result.message || "Failed to update panel.");
+        return;
+      }
+
+      // Find candidate matching details so sibling applications update in state
+      const targetApp = applications.find((a) => a._id === appId);
+      const targetEmail = String(targetApp?.responses?.email || "").trim().toLowerCase();
+      const targetRoll = String(
+        targetApp?.responses?.rollno ||
+        targetApp?.responses?.rollNumber ||
+        targetApp?.responses?.roll ||
+        ""
+      ).trim().toLowerCase();
+
+      const isCandidateMatch = (app) => {
+        if (app._id === appId) return true;
+        const e = String(app.responses?.email || "").trim().toLowerCase();
+        const r = String(app.responses?.rollno || app.responses?.rollNumber || app.responses?.roll || "").trim().toLowerCase();
+        return (targetEmail && e && e === targetEmail) || (targetRoll && r && r === targetRoll);
+      };
+
+      setApplications((prev) =>
+        prev.map((app) =>
+          isCandidateMatch(app) ? { ...app, panel: trimmed } : app
+        )
+      );
+
+      setInlineEdits((prev) => {
+        const next = { ...prev };
+        applications.forEach((app) => {
+          if (isCandidateMatch(app)) {
+            next[app._id] = {
+              ...(next[app._id] || {}),
+              panel: trimmed,
+              isDirty: false,
+            };
+          }
+        });
+        return next;
+      });
+
+      setPanelSavedId(appId);
+      setTimeout(() => {
+        setPanelSavedId((prev) => (prev === appId ? null : prev));
+      }, 2500);
+    } catch (error) {
+      console.error("Save panel error:", error);
+      setMessage("Error updating panel.");
+    } finally {
+      setPanelSavingId(null);
+    }
+  };
+
   // Live remarks handlers with automatic score calculation (+1 / -1)
   const handleAddPositiveRemark = (appId) => {
     if (!newPositiveInput.trim() || !appId) return;
@@ -1388,6 +1462,9 @@ export default function RecruitmentAdminPage() {
           feedback: app.feedback || "",
           positiveRemarks: Array.isArray(app.positiveRemarks) ? [...app.positiveRemarks] : [],
           negativeRemarks: Array.isArray(app.negativeRemarks) ? [...app.negativeRemarks] : [],
+          panel: app.panel || "",
+          interviewSlot: app.interviewSlot || "",
+          interviewDate: app.interviewDate || "",
           isDirty: false,
           isSaving: false,
           savedRecently: false,
@@ -1406,6 +1483,56 @@ export default function RecruitmentAdminPage() {
       setInlineEdits({});
     }
   };
+
+  const fetchApplicationsSilently = async (formId) => {
+    if (!formId) return;
+    try {
+      setIsRefreshingQueue(true);
+      const response = await fetch(`/api/admin/recruitment/${formId}/applications`, {
+        cache: "no-store",
+        headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
+      });
+      const result = await response.json();
+      if (result.success && Array.isArray(result.data?.applications)) {
+        const apps = result.data.applications;
+        setApplications(apps);
+        setInlineEdits((prevEdits) => {
+          const nextEdits = { ...prevEdits };
+          apps.forEach((app) => {
+            if (!prevEdits[app._id]?.isDirty) {
+              nextEdits[app._id] = {
+                points: app.points || "",
+                comments: app.comments || "",
+                feedback: app.feedback || "",
+                positiveRemarks: Array.isArray(app.positiveRemarks) ? [...app.positiveRemarks] : [],
+                negativeRemarks: Array.isArray(app.negativeRemarks) ? [...app.negativeRemarks] : [],
+                panel: app.panel || "",
+                interviewSlot: app.interviewSlot || "",
+                interviewDate: app.interviewDate || "",
+                isDirty: false,
+                isSaving: false,
+                savedRecently: false,
+              };
+            }
+          });
+          return nextEdits;
+        });
+      }
+    } catch (error) {
+      console.error("Silent refresh applications error:", error);
+    } finally {
+      setIsRefreshingQueue(false);
+    }
+  };
+
+  // Auto-sync applications and evaluation scores when Interview Queue is open
+  useEffect(() => {
+    if (!isQueueOpen || !selectedForm?._id) return;
+    const interval = setInterval(() => {
+      fetchApplicationsSilently(selectedForm._id);
+    }, 12000);
+    return () => clearInterval(interval);
+  }, [isQueueOpen, selectedForm?._id]);
 
   const openApplicationEditor = (application, group = null) => {
     const targetGroup =
@@ -2674,272 +2801,272 @@ export default function RecruitmentAdminPage() {
             </div>
 
             {/* Sliding Layout: Main Table (Left) + 4-Department Queue Section (Right) */}
-            <div className="relative flex flex-col lg:flex-row gap-6 items-start w-full transition-all duration-500 ease-in-out">
+            <div className="relative flex flex-col lg:flex-row gap-4 xl:gap-5 items-start w-full max-w-full overflow-x-hidden transition-all duration-500 ease-in-out">
               {/* Main Content Area (Slides smoothly left when queue opens, expands right when closed) */}
               <div
-                className={`transition-all duration-500 ease-in-out min-w-0 ${
+                className={`transition-all duration-500 ease-in-out min-w-0 overflow-x-hidden ${
                   isQueueOpen
-                    ? "w-full lg:flex-1 lg:max-w-[calc(100%-25rem)] xl:max-w-[calc(100%-27rem)]"
-                    : "w-full"
+                    ? "w-full lg:flex-1 max-w-full"
+                    : "w-full max-w-full"
                 }`}
               >
                 {/* Search and Filters Bar */}
-                <div className="glass-panel p-4 rounded-xl border border-white/15 mb-6 space-y-3">
-              <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center">
-                {/* Search Input */}
-                <div className="relative flex-1 min-w-[200px]">
-                  <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search candidate by name, roll no, email, comments, or responses..."
-                    className="w-full pl-9 pr-8 py-2 bg-black/60 border border-white/20 rounded font-mono text-xs text-white placeholder-gray-500 focus:outline-none focus:border-white transition-colors"
-                  />
-                  {searchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchQuery("")}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white cursor-pointer"
-                    >
-                      <FaTimes className="text-xs" />
-                    </button>
-                  )}
-                </div>
-
-                {/* Dropdown Filters Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 lg:flex lg:items-center gap-2">
-                  {/* Department Filter */}
-                  <div className="flex flex-col xs:flex-row xs:items-center gap-1">
-                    <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Dept:</label>
-                    <select
-                      value={selectedDepartment}
-                      onChange={(e) => setSelectedDepartment(e.target.value)}
-                      className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-white w-full"
-                    >
-                      <option value="all">All ({applications.length})</option>
-                      {(selectedForm.departments || []).map((dept) => {
-                        const count = applications.filter((app) => app.department === dept).length;
-                        return (
-                          <option key={dept} value={dept}>
-                            {dept} ({count})
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
-
-                  {/* Year Filter */}
-                  <div className="flex flex-col xs:flex-row xs:items-center gap-1">
-                    <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Year:</label>
-                    <select
-                      value={selectedYear}
-                      onChange={(e) => setSelectedYear(e.target.value)}
-                      className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-white w-full"
-                    >
-                      <option value="all">All Years</option>
-                      {(selectedForm.years || DEFAULT_YEAR_OPTIONS).map((yr) => {
-                        const count = applications.filter((app) => (app.year || app.responses?.year) === yr).length;
-                        return (
-                          <option key={yr} value={yr}>
-                            {yr} ({count})
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
-
-                  {/* Evaluation Status Filter */}
-                  <div className="flex flex-col xs:flex-row xs:items-center gap-1">
-                    <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Status:</label>
-                    <select
-                      value={evaluationFilter}
-                      onChange={(e) => setEvaluationFilter(e.target.value)}
-                      className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-white w-full"
-                    >
-                      <option value="all">All Status</option>
-                      <option value="evaluated">
-                        ✓ Evaluated ({(() => {
-                          const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
-                          return base.filter((a) => getCandidateScoreInfo(a, inlineEdits[a._id]).isEvaluated).length;
-                        })()})
-                      </option>
-                      <option value="pending">
-                        ⚪ Pending ({(() => {
-                          const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
-                          return base.filter((a) => !getCandidateScoreInfo(a, inlineEdits[a._id]).isEvaluated).length;
-                        })()})
-                      </option>
-                    </select>
-                  </div>
-
-                  {/* Score Filter */}
-                  <div className="flex flex-col xs:flex-row xs:items-center gap-1">
-                    <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Score:</label>
-                    <select
-                      value={scoreFilter}
-                      onChange={(e) => setScoreFilter(e.target.value)}
-                      className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-white w-full"
-                    >
-                      <option value="all">All Scores</option>
-                      <option value="positive">🟢 Positive (&gt; 0)</option>
-                      <option value="zero">🟡 Zero (0)</option>
-                      <option value="negative">🔴 Negative (&lt; 0)</option>
-                      <option value="pending">⚪ Pending</option>
-                    </select>
-                  </div>
-
-                  {/* Filter According to Date */}
-                  <div className="flex flex-col xs:flex-row xs:items-center gap-1">
-                    <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap flex items-center gap-1">
-                      <FaCalendarAlt className="text-cyan-400 text-xs" />
-                      <span>Date:</span>
-                    </label>
-                    <div className="flex items-center gap-1 w-full">
-                      <select
-                        value={selectedDate}
-                        onChange={(e) => setSelectedDate(e.target.value)}
-                        className="bg-black/60 border border-white/20 rounded px-2 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-cyan-400 w-full"
-                      >
-                        <option value="all">All Dates</option>
-                        <option value="pending">
-                          ⚪ Date Pending ({(() => {
-                            const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
-                            return base.filter((a) => !(inlineEdits[a._id]?.interviewDate !== undefined ? inlineEdits[a._id].interviewDate : a.interviewDate)).length;
-                          })()})
-                        </option>
-                        <option value="has_date">
-                          📅 Date Assigned ({(() => {
-                            const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
-                            return base.filter((a) => Boolean(inlineEdits[a._id]?.interviewDate !== undefined ? inlineEdits[a._id].interviewDate : a.interviewDate)).length;
-                          })()})
-                        </option>
-                        {availableDates.map((dateStr) => {
-                          const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
-                          const count = base.filter((a) => (inlineEdits[a._id]?.interviewDate !== undefined ? inlineEdits[a._id].interviewDate : a.interviewDate) === dateStr).length;
-                          return (
-                            <option key={dateStr} value={dateStr}>
-                              📅 {formatInterviewDate(dateStr)} ({count})
-                            </option>
-                          );
-                        })}
-                      </select>
+                <div className="glass-panel p-4 rounded-xl border border-white/15 mb-6 space-y-3 overflow-hidden">
+                  <div className="flex flex-col gap-3">
+                    {/* Search Input */}
+                    <div className="relative w-full">
+                      <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
                       <input
-                        type="date"
-                        value={selectedDate !== "all" && selectedDate !== "pending" && selectedDate !== "has_date" ? selectedDate : ""}
-                        onChange={(e) => setSelectedDate(e.target.value || "all")}
-                        style={{ colorScheme: "dark" }}
-                        className="bg-black/60 border border-white/20 rounded px-1.5 py-1 text-xs font-mono text-cyan-200 focus:outline-none focus:border-cyan-400 cursor-pointer w-28 shrink-0"
-                        title="Pick specific interview date"
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search candidate by name, roll no, email, comments, or responses..."
+                        className="w-full pl-9 pr-8 py-2 bg-black/60 border border-white/20 rounded font-mono text-xs text-white placeholder-gray-500 focus:outline-none focus:border-white transition-colors"
                       />
-                      {selectedDate !== "all" && (
+                      {searchQuery && (
                         <button
                           type="button"
-                          onClick={() => setSelectedDate("all")}
-                          className="text-gray-400 hover:text-rose-400 text-xs px-1 cursor-pointer shrink-0"
-                          title="Clear date filter"
+                          onClick={() => setSearchQuery("")}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white cursor-pointer"
                         >
-                          <FaTimes />
+                          <FaTimes className="text-xs" />
                         </button>
                       )}
                     </div>
+
+                    {/* Dropdown Filters Grid (Responsive flex-wrap) */}
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      {/* Department Filter */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Dept:</label>
+                        <select
+                          value={selectedDepartment}
+                          onChange={(e) => setSelectedDepartment(e.target.value)}
+                          className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-white"
+                        >
+                          <option value="all">All ({applications.length})</option>
+                          {(selectedForm.departments || []).map((dept) => {
+                            const count = applications.filter((app) => app.department === dept).length;
+                            return (
+                              <option key={dept} value={dept}>
+                                {dept} ({count})
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+
+                      {/* Year Filter */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Year:</label>
+                        <select
+                          value={selectedYear}
+                          onChange={(e) => setSelectedYear(e.target.value)}
+                          className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-white"
+                        >
+                          <option value="all">All Years</option>
+                          {(selectedForm.years || DEFAULT_YEAR_OPTIONS).map((yr) => {
+                            const count = applications.filter((app) => (app.year || app.responses?.year) === yr).length;
+                            return (
+                              <option key={yr} value={yr}>
+                                {yr} ({count})
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+
+                      {/* Evaluation Status Filter */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Status:</label>
+                        <select
+                          value={evaluationFilter}
+                          onChange={(e) => setEvaluationFilter(e.target.value)}
+                          className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-white"
+                        >
+                          <option value="all">All Status</option>
+                          <option value="evaluated">
+                            ✓ Evaluated ({(() => {
+                              const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
+                              return base.filter((a) => getCandidateScoreInfo(a, inlineEdits[a._id]).isEvaluated).length;
+                            })()})
+                          </option>
+                          <option value="pending">
+                            ⚪ Pending ({(() => {
+                              const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
+                              return base.filter((a) => !getCandidateScoreInfo(a, inlineEdits[a._id]).isEvaluated).length;
+                            })()})
+                          </option>
+                        </select>
+                      </div>
+
+                      {/* Score Filter */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Score:</label>
+                        <select
+                          value={scoreFilter}
+                          onChange={(e) => setScoreFilter(e.target.value)}
+                          className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-white"
+                        >
+                          <option value="all">All Scores</option>
+                          <option value="positive">🟢 Positive (&gt; 0)</option>
+                          <option value="zero">🟡 Zero (0)</option>
+                          <option value="negative">🔴 Negative (&lt; 0)</option>
+                          <option value="pending">⚪ Pending</option>
+                        </select>
+                      </div>
+
+                      {/* Filter According to Date */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap flex items-center gap-1">
+                          <FaCalendarAlt className="text-cyan-400 text-xs" />
+                          <span>Date:</span>
+                        </label>
+                        <div className="flex items-center gap-1">
+                          <select
+                            value={selectedDate}
+                            onChange={(e) => setSelectedDate(e.target.value)}
+                            className="bg-black/60 border border-white/20 rounded px-2 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-cyan-400"
+                          >
+                            <option value="all">All Dates</option>
+                            <option value="pending">
+                              ⚪ Date Pending ({(() => {
+                                const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
+                                return base.filter((a) => !(inlineEdits[a._id]?.interviewDate !== undefined ? inlineEdits[a._id].interviewDate : a.interviewDate)).length;
+                              })()})
+                            </option>
+                            <option value="has_date">
+                              📅 Date Assigned ({(() => {
+                                const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
+                                return base.filter((a) => Boolean(inlineEdits[a._id]?.interviewDate !== undefined ? inlineEdits[a._id].interviewDate : a.interviewDate)).length;
+                              })()})
+                            </option>
+                            {availableDates.map((dateStr) => {
+                              const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
+                              const count = base.filter((a) => (inlineEdits[a._id]?.interviewDate !== undefined ? inlineEdits[a._id].interviewDate : a.interviewDate) === dateStr).length;
+                              return (
+                                <option key={dateStr} value={dateStr}>
+                                  📅 {formatInterviewDate(dateStr)} ({count})
+                                </option>
+                              );
+                            })}
+                          </select>
+                          <input
+                            type="date"
+                            value={selectedDate !== "all" && selectedDate !== "pending" && selectedDate !== "has_date" ? selectedDate : ""}
+                            onChange={(e) => setSelectedDate(e.target.value || "all")}
+                            style={{ colorScheme: "dark" }}
+                            className="bg-black/60 border border-white/20 rounded px-1.5 py-1 text-xs font-mono text-cyan-200 focus:outline-none focus:border-cyan-400 cursor-pointer w-28 shrink-0"
+                            title="Pick specific interview date"
+                          />
+                          {selectedDate !== "all" && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedDate("all")}
+                              className="text-gray-400 hover:text-rose-400 text-xs px-1 cursor-pointer shrink-0"
+                              title="Clear date filter"
+                            >
+                              <FaTimes />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Interview Status Filter */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Interview:</label>
+                        <select
+                          value={interviewStatusFilter}
+                          onChange={(e) => setInterviewStatusFilter(e.target.value)}
+                          className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-white"
+                        >
+                          <option value="all">All Status</option>
+                          <option value="pending">
+                            ⚪ Pending ({(() => {
+                              const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
+                              return base.filter((a) => !a.interviewStatus || a.interviewStatus === "pending").length;
+                            })()})
+                          </option>
+                          <option value="completed">
+                            ✓ Completed ({(() => {
+                              const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
+                              return base.filter((a) => a.interviewStatus === "completed").length;
+                            })()})
+                          </option>
+                          <option value="in_queue">
+                            🟢 In Queue ({(() => {
+                              const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
+                              return base.filter((a) => a.interviewStatus === "in_queue").length;
+                            })()})
+                          </option>
+                        </select>
+                      </div>
+
+                      {/* Slot & Date Filter */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Slot / Date:</label>
+                        <select
+                          value={slotFilter}
+                          onChange={(e) => setSlotFilter(e.target.value)}
+                          className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-white"
+                        >
+                          <option value="all">All Slots & Dates</option>
+                          <option value="slot_given">🕒 Slot Given ({applications.filter((a) => Boolean(a.interviewSlot)).length})</option>
+                          <option value="slot_not_given">⚪ Slot Not Given ({applications.filter((a) => !a.interviewSlot).length})</option>
+                          <option value="date_given">📅 Date Given ({applications.filter((a) => Boolean(a.interviewDate)).length})</option>
+                          <option value="date_not_given">⚪ Date Not Given ({applications.filter((a) => !a.interviewDate).length})</option>
+                          <option value="both_given">✓ Both Slot & Date Given ({applications.filter((a) => Boolean(a.interviewSlot) && Boolean(a.interviewDate)).length})</option>
+                          <option value="neither_given">✕ Neither Slot Nor Date ({applications.filter((a) => !a.interviewSlot && !a.interviewDate).length})</option>
+                          <option value="slot_no_date">⚠️ Slot Given (No Date) ({applications.filter((a) => Boolean(a.interviewSlot) && !a.interviewDate).length})</option>
+                        </select>
+                      </div>
+
+                      {/* Sort Filter */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Sort:</label>
+                        <select
+                          value={sortBy}
+                          onChange={(e) => setSortBy(e.target.value)}
+                          className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-white"
+                        >
+                          <option value="newest">Newest First</option>
+                          <option value="oldest">Oldest First</option>
+                          <option value="slot_asc">Time Slot: Earliest First (Asc)</option>
+                          <option value="slot_desc">Time Slot: Latest First (Desc)</option>
+                          <option value="points_desc">Points: High to Low</option>
+                          <option value="points_asc">Points: Low to High</option>
+                          <option value="name_asc">Name: A to Z</option>
+                        </select>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Interview Status Filter */}
-                  <div className="flex flex-col xs:flex-row xs:items-center gap-1">
-                    <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Interview:</label>
-                    <select
-                      value={interviewStatusFilter}
-                      onChange={(e) => setInterviewStatusFilter(e.target.value)}
-                      className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-white w-full"
-                    >
-                      <option value="all">All Status</option>
-                      <option value="pending">
-                        ⚪ Pending ({(() => {
-                          const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
-                          return base.filter((a) => !a.interviewStatus || a.interviewStatus === "pending").length;
-                        })()})
-                      </option>
-                      <option value="completed">
-                        ✓ Completed ({(() => {
-                          const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
-                          return base.filter((a) => a.interviewStatus === "completed").length;
-                        })()})
-                      </option>
-                      <option value="in_queue">
-                        🟢 In Queue ({(() => {
-                          const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
-                          return base.filter((a) => a.interviewStatus === "in_queue").length;
-                        })()})
-                      </option>
-                    </select>
-                  </div>
-
-                  {/* Slot & Date Filter */}
-                  <div className="flex flex-col xs:flex-row xs:items-center gap-1">
-                    <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Slot / Date:</label>
-                    <select
-                      value={slotFilter}
-                      onChange={(e) => setSlotFilter(e.target.value)}
-                      className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-white w-full"
-                    >
-                      <option value="all">All Slots & Dates</option>
-                      <option value="slot_given">🕒 Slot Given ({applications.filter((a) => Boolean(a.interviewSlot)).length})</option>
-                      <option value="slot_not_given">⚪ Slot Not Given ({applications.filter((a) => !a.interviewSlot).length})</option>
-                      <option value="date_given">📅 Date Given ({applications.filter((a) => Boolean(a.interviewDate)).length})</option>
-                      <option value="date_not_given">⚪ Date Not Given ({applications.filter((a) => !a.interviewDate).length})</option>
-                      <option value="both_given">✓ Both Slot & Date Given ({applications.filter((a) => Boolean(a.interviewSlot) && Boolean(a.interviewDate)).length})</option>
-                      <option value="neither_given">✕ Neither Slot Nor Date ({applications.filter((a) => !a.interviewSlot && !a.interviewDate).length})</option>
-                      <option value="slot_no_date">⚠️ Slot Given (No Date) ({applications.filter((a) => Boolean(a.interviewSlot) && !a.interviewDate).length})</option>
-                    </select>
-                  </div>
-
-                  {/* Sort Filter */}
-                  <div className="flex flex-col xs:flex-row xs:items-center gap-1">
-                    <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Sort:</label>
-                    <select
-                      value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value)}
-                      className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-white w-full"
-                    >
-                      <option value="newest">Newest First</option>
-                      <option value="oldest">Oldest First</option>
-                      <option value="slot_asc">Time Slot: Earliest First (Asc)</option>
-                      <option value="slot_desc">Time Slot: Latest First (Desc)</option>
-                      <option value="points_desc">Points: High to Low</option>
-                      <option value="points_asc">Points: Low to High</option>
-                      <option value="name_asc">Name: A to Z</option>
-                    </select>
-                  </div>
+                  {/* Active Filter Clear Bar */}
+                  {(searchQuery || selectedDepartment !== "all" || selectedYear !== "all" || evaluationFilter !== "all" || scoreFilter !== "all" || interviewStatusFilter !== "all" || selectedDate !== "all" || slotFilter !== "all" || sortBy !== "newest") && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-gray-400 pt-2 border-t border-white/10">
+                      <span>
+                        Filtered: Showing <strong className="text-white">{groupedApplications.length}</strong> of <strong className="text-white">{new Set(applications.map(getCandidateKey)).size}</strong> candidates
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearchQuery("");
+                          setSelectedDepartment("all");
+                          setSelectedYear("all");
+                          setEvaluationFilter("all");
+                          setScoreFilter("all");
+                          setInterviewStatusFilter("all");
+                          setSelectedDate("all");
+                          setSlotFilter("all");
+                          setSortBy("newest");
+                        }}
+                        className="text-blue-400 hover:underline cursor-pointer"
+                      >
+                        [ Reset Filters ]
+                      </button>
+                    </div>
+                  )}
                 </div>
-              </div>
-
-              {/* Active Filter Clear Bar */}
-              {(searchQuery || selectedDepartment !== "all" || selectedYear !== "all" || evaluationFilter !== "all" || scoreFilter !== "all" || interviewStatusFilter !== "all" || selectedDate !== "all" || slotFilter !== "all" || sortBy !== "newest") && (
-                <div className="flex items-center justify-between text-xs font-mono text-gray-400 pt-2 border-t border-white/10">
-                  <span>
-                    Filtered: Showing <strong className="text-white">{groupedApplications.length}</strong> of <strong className="text-white">{new Set(applications.map(getCandidateKey)).size}</strong> candidates
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearchQuery("");
-                      setSelectedDepartment("all");
-                      setSelectedYear("all");
-                      setEvaluationFilter("all");
-                      setScoreFilter("all");
-                      setInterviewStatusFilter("all");
-                      setSelectedDate("all");
-                      setSlotFilter("all");
-                      setSortBy("newest");
-                    }}
-                    className="text-blue-400 hover:underline cursor-pointer"
-                  >
-                    [ Reset Filters ]
-                  </button>
-                </div>
-              )}
-            </div>
 
             {/* Applications Display */}
             {groupedApplications.length === 0 ? (
@@ -3095,6 +3222,59 @@ export default function RecruitmentAdminPage() {
                             );
                           })}
                         </div>
+
+                        {/* Assigned Panel on Mobile */}
+                        {(() => {
+                          const candidateApp = group.primaryApp;
+                          const candidatePanelApp = group.deptApplications.find(
+                            (d) => (inlineEdits[d._id]?.panel !== undefined ? inlineEdits[d._id].panel : d.panel)
+                          );
+                          const currentPanel = candidatePanelApp
+                            ? (inlineEdits[candidatePanelApp._id]?.panel !== undefined ? inlineEdits[candidatePanelApp._id].panel : candidatePanelApp.panel)
+                            : (inlineEdits[candidateApp._id]?.panel !== undefined ? inlineEdits[candidateApp._id].panel : candidateApp.panel) || "";
+
+                          const isPanelSaving = group.deptApplications.some((d) => panelSavingId === d._id) || panelSavingId === candidateApp._id;
+                          const isPanelSaved = group.deptApplications.some((d) => panelSavedId === d._id) || panelSavedId === candidateApp._id;
+
+                          return (
+                            <div className="py-2 flex items-center justify-between text-xs font-mono border-b border-white/10 gap-2">
+                              <span className="text-[11px] text-gray-400 font-semibold uppercase tracking-wider">
+                                Assigned Panel:
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="text"
+                                  defaultValue={currentPanel}
+                                  key={`m-${candidateApp._id}-${currentPanel}`}
+                                  placeholder="No panel"
+                                  onBlur={(e) => {
+                                    const val = e.target.value.trim();
+                                    if (val !== (currentPanel || "")) {
+                                      handleInlineChange(candidateApp._id, "panel", val);
+                                      savePanel(candidateApp._id, val);
+                                    }
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.currentTarget.blur();
+                                    }
+                                  }}
+                                  className={`w-24 px-2 py-1 text-center rounded text-xs font-mono font-bold transition-all border focus:outline-none ${
+                                    currentPanel
+                                      ? "bg-cyan-950/50 border-cyan-400 text-cyan-200 focus:border-cyan-300"
+                                      : "bg-black/60 border-white/20 text-gray-400 focus:border-cyan-400"
+                                  }`}
+                                  title="Enter panel number (press Enter or tap away to save)"
+                                />
+                                {isPanelSaving ? (
+                                  <span className="text-[10px] font-mono text-cyan-400 animate-pulse">...</span>
+                                ) : isPanelSaved ? (
+                                  <FaCheckCircle className="text-emerald-400 text-xs shrink-0" title="Panel saved" />
+                                ) : null}
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         {/* Interview Date & Time Slot on Mobile */}
                         {(() => {
@@ -3296,16 +3476,19 @@ export default function RecruitmentAdminPage() {
                     <thead className="bg-white/5 border-b border-white/15 text-gray-400 uppercase tracking-wider text-[11px]">
                       <tr>
                         <th className="py-2.5 px-1.5 w-[3%] text-center">#</th>
-                        <th className="py-2.5 px-2 w-[18.5%]">Applicant Info</th>
-                        <th className="py-2.5 px-1.5 w-[9%]">Dept</th>
-                        <th className="py-2.5 px-1 w-[9%] text-center">Year</th>
+                        <th className="py-2.5 px-2 w-[17%]">Applicant Info</th>
+                        <th className="py-2.5 px-1.5 w-[8.5%]">Dept</th>
+                        <th className="py-2.5 px-1 w-[6.5%] text-center">Year</th>
+                        <th className="py-2.5 px-1 w-[8%] text-center">
+                          <span title="Assigned Interview Panel">Panel</span>
+                        </th>
                         <th className="py-2.5 px-1.5 w-[7.5%] text-center">
                           <div className="flex items-center justify-center gap-1">
                             <FaStar className="text-amber-400 text-xs" />
                             <span>Score</span>
                           </div>
                         </th>
-                        <th className="py-2.5 px-2 w-[17.5%]">
+                        <th className="py-2.5 px-2 w-[15%]">
                           <div className="flex items-center gap-1">
                             <FaRegCommentDots className="text-blue-400 text-xs" />
                             <span>Remarks</span>
@@ -3317,7 +3500,7 @@ export default function RecruitmentAdminPage() {
                             <span>Date & Slot</span>
                           </div>
                         </th>
-                        <th className="py-2.5 px-2 w-[19%] text-right">Actions</th>
+                        <th className="py-2.5 px-2 w-[18%] text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/10">
@@ -3431,6 +3614,58 @@ export default function RecruitmentAdminPage() {
                               <span className="inline-block px-1.5 py-0.5 rounded text-[10px] bg-white/10 text-gray-300 border border-white/20 whitespace-nowrap">
                                 {candidateYear}
                               </span>
+                            </td>
+
+                            {/* Panel Input */}
+                            <td className="py-2.5 px-1 text-center overflow-hidden">
+                              {(() => {
+                                const candidateApp = group.primaryApp;
+                                const candidatePanelApp = group.deptApplications.find(
+                                  (d) => (inlineEdits[d._id]?.panel !== undefined ? inlineEdits[d._id].panel : d.panel)
+                                );
+                                const currentPanel = candidatePanelApp
+                                  ? (inlineEdits[candidatePanelApp._id]?.panel !== undefined ? inlineEdits[candidatePanelApp._id].panel : candidatePanelApp.panel)
+                                  : (inlineEdits[candidateApp._id]?.panel !== undefined ? inlineEdits[candidateApp._id].panel : candidateApp.panel) || "";
+
+                                const isPanelSaving = group.deptApplications.some((d) => panelSavingId === d._id) || panelSavingId === candidateApp._id;
+                                const isPanelSaved = group.deptApplications.some((d) => panelSavedId === d._id) || panelSavedId === candidateApp._id;
+
+                                return (
+                                  <div className="flex items-center justify-center gap-1">
+                                    <input
+                                      type="text"
+                                      defaultValue={currentPanel}
+                                      key={`${candidateApp._id}-${currentPanel}`}
+                                      placeholder="—"
+                                      onBlur={(e) => {
+                                        const val = e.target.value.trim();
+                                        if (val !== (currentPanel || "")) {
+                                          handleInlineChange(candidateApp._id, "panel", val);
+                                          savePanel(candidateApp._id, val);
+                                        }
+                                      }}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                          e.currentTarget.blur();
+                                        }
+                                      }}
+                                      className={`w-full max-w-[54px] px-1 py-1 text-center rounded text-[11px] font-mono font-bold transition-all border focus:outline-none ${
+                                        currentPanel
+                                          ? "bg-cyan-950/50 border-cyan-400 text-cyan-200 focus:border-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.2)]"
+                                          : "bg-black/60 border-white/20 text-gray-400 hover:border-white/40 focus:border-cyan-400"
+                                      }`}
+                                      title="Enter panel number (e.g. 1, 2, A). Press Enter or click away to save."
+                                    />
+                                    {isPanelSaving ? (
+                                      <span className="text-[9px] font-mono text-cyan-400 animate-pulse">...</span>
+                                    ) : isPanelSaved ? (
+                                      <span className="text-[10px] text-emerald-400 shrink-0" title="Panel saved!">
+                                        <FaCheckCircle />
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                );
+                              })()}
                             </td>
 
                             {/* Read-only Score Badges */}
@@ -3714,12 +3949,15 @@ export default function RecruitmentAdminPage() {
 
           {/* 4-Department Queue Panel on the Right (Slides into view) */}
           {isQueueOpen && (
-            <div className="w-full lg:w-[24rem] xl:w-[26rem] shrink-0 transition-all duration-500 ease-in-out">
+            <div className="w-full lg:w-[22rem] xl:w-[24rem] shrink-0 transition-all duration-500 ease-in-out">
               <InterviewQueuePanel
                 isOpen={isQueueOpen}
                 onClose={() => setIsQueueOpen(false)}
                 applications={applications}
                 groupedApplications={groupedApplications}
+                inlineEdits={inlineEdits}
+                onRefresh={() => selectedForm?._id && fetchApplicationsSilently(selectedForm._id)}
+                isRefreshing={isRefreshingQueue}
                 onRemoveFromQueue={handleRemoveFromQueue}
                 onReorderQueue={handleReorderQueue}
                 onOpenReviewModal={(grp, deptAppId) => {
@@ -3728,6 +3966,7 @@ export default function RecruitmentAdminPage() {
                     openModal(idx, deptAppId);
                   }
                 }}
+                onUpdatePanel={savePanel}
                 loadingActionId={loadingQueueActionId}
               />
             </div>

@@ -411,4 +411,84 @@ export function parseTimeSlotToMinutes(timeStr) {
   return hours * 60 + minutes;
 }
 
+export function getCandidateScoreInfo(app, edit) {
+  const currentPos =
+    edit?.positiveRemarks !== undefined
+      ? edit.positiveRemarks
+      : Array.isArray(app?.positiveRemarks)
+      ? app.positiveRemarks
+      : [];
+  const currentNeg =
+    edit?.negativeRemarks !== undefined
+      ? edit.negativeRemarks
+      : Array.isArray(app?.negativeRemarks)
+      ? app.negativeRemarks
+      : [];
+
+  const hasRemarks = currentPos.length > 0 || currentNeg.length > 0;
+  const currentPoints = edit?.points !== undefined ? edit.points : app?.points;
+  const hasPoints =
+    currentPoints !== undefined &&
+    currentPoints !== null &&
+    String(currentPoints).trim() !== "";
+  const currentComments =
+    edit?.comments !== undefined ? edit.comments : app?.comments;
+  const hasComments = Boolean(currentComments && String(currentComments).trim() !== "");
+
+  const currentFeedback = edit?.feedback !== undefined ? edit.feedback : app?.feedback;
+  const hasFeedback = Boolean(
+    currentFeedback &&
+    String(currentFeedback).trim() !== "" &&
+    !["pending", "none", "null", "undefined"].includes(String(currentFeedback).trim().toLowerCase())
+  );
+
+  const currentEvaluator = edit?.evaluatedBy !== undefined ? edit.evaluatedBy : app?.evaluatedBy;
+  const hasEvaluator = Boolean(
+    currentEvaluator &&
+    String(currentEvaluator).trim() !== "" &&
+    !["pending", "none", "null", "undefined"].includes(String(currentEvaluator).trim().toLowerCase())
+  );
+
+  let scoreNum = null;
+  let scoreFormatted = "—";
+  const isEvaluated = Boolean(hasRemarks || hasPoints || hasComments || hasFeedback || hasEvaluator);
+
+  if (hasRemarks) {
+    scoreNum = currentPos.length - currentNeg.length;
+    scoreFormatted = scoreNum > 0 ? `+${scoreNum}` : `${scoreNum}`;
+  } else if (hasPoints) {
+    const parsed = parseFloat(currentPoints);
+    if (!Number.isNaN(parsed)) {
+      scoreNum = parsed;
+      scoreFormatted = parsed > 0 ? `+${parsed}` : `${parsed}`;
+    } else {
+      scoreFormatted = String(currentPoints);
+    }
+  }
+
+  let status = "pending";
+  if (scoreNum !== null) {
+    if (scoreNum > 0) status = "positive";
+    else if (scoreNum === 0) status = "zero";
+    else status = "negative";
+  } else if (isEvaluated) {
+    status = "zero";
+  }
+
+  return {
+    scoreNum,
+    scoreFormatted,
+    isEvaluated,
+    status, // 'positive' (>0), 'zero' (=0), 'negative' (<0), 'pending'
+    posCount: currentPos.length,
+    negCount: currentNeg.length,
+    points: currentPoints || "",
+    comments: currentComments || "",
+    feedback: currentFeedback || "",
+    evaluatedBy: currentEvaluator || "",
+    evaluatedAt: app?.evaluatedAt || null,
+  };
+}
+
+
 

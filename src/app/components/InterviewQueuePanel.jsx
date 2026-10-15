@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   FaTimes,
   FaCheck,
@@ -18,8 +18,10 @@ import {
   FaHistory,
   FaTrash,
   FaUndo,
+  FaStar,
+  FaSyncAlt,
 } from "react-icons/fa";
-import { formatTimeSlot } from "@/app/lib/recruitment";
+import { formatTimeSlot, getCandidateScoreInfo } from "@/app/lib/recruitment";
 
 export const QUEUE_DEPARTMENTS = [
   {
@@ -57,9 +59,13 @@ export default function InterviewQueuePanel({
   onClose,
   applications = [],
   groupedApplications = [],
+  inlineEdits = {},
   onRemoveFromQueue, // (appId, markDone: boolean) => void
   onReorderQueue,    // (dept, newItems) => void
   onOpenReviewModal, // (candidateGroup, deptAppId) => void
+  onUpdatePanel,     // (appId, panel) => void
+  onRefresh,
+  isRefreshing = false,
   loadingActionId,
 }) {
   const [activeTab, setActiveTab] = useState("All");
@@ -184,14 +190,31 @@ export default function InterviewQueuePanel({
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={onClose}
-          className="cursor-pointer text-gray-400 hover:text-white p-1.5 rounded-lg border border-white/10 hover:border-white/30 bg-white/5 transition-colors"
-          title="Close Queue Panel"
-        >
-          <FaTimes className="text-xs" />
-        </button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {onRefresh && (
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              className={`cursor-pointer text-cyan-400 hover:text-white p-1.5 rounded-lg border border-cyan-500/30 hover:border-cyan-400/60 bg-cyan-950/30 hover:bg-cyan-900/40 transition-all flex items-center gap-1 text-[11px] ${
+                isRefreshing ? "opacity-75" : ""
+              }`}
+              title="Refresh queue and live evaluation scores from interviewers"
+            >
+              <FaSyncAlt className={`text-xs ${isRefreshing ? "animate-spin text-cyan-300" : ""}`} />
+              <span className="hidden sm:inline text-[10px] font-mono">Sync</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="cursor-pointer text-gray-400 hover:text-white p-1.5 rounded-lg border border-white/10 hover:border-white/30 bg-white/5 transition-colors"
+            title="Close Queue Panel"
+          >
+            <FaTimes className="text-xs" />
+          </button>
+        </div>
       </div>
 
       {/* Department Tabs Bar */}
@@ -291,8 +314,10 @@ export default function InterviewQueuePanel({
                           const grp = findGroupForApp(app);
                           if (grp && onOpenReviewModal) onOpenReviewModal(grp, app._id);
                         }}
+                        onUpdatePanel={onUpdatePanel}
                         loadingActionId={loadingActionId}
                         waitingText={formatWaitingDuration(app.queueAddedAt)}
+                        inlineEdit={inlineEdits[app._id]}
                       />
                     ))}
                   </div>
@@ -344,8 +369,10 @@ export default function InterviewQueuePanel({
                           const grp = findGroupForApp(app);
                           if (grp && onOpenReviewModal) onOpenReviewModal(grp, app._id);
                         }}
+                        onUpdatePanel={onUpdatePanel}
                         loadingActionId={loadingActionId}
                         waitingText={formatWaitingDuration(app.queueAddedAt)}
+                        inlineEdit={inlineEdits[app._id]}
                       />
                     ))}
                   </div>
@@ -389,6 +416,7 @@ export default function InterviewQueuePanel({
                         minute: "2-digit",
                       })
                     : "Completed";
+                  const scoreInfo = getCandidateScoreInfo(app, inlineEdits[app._id]);
 
                   return (
                     <div
@@ -399,9 +427,27 @@ export default function InterviewQueuePanel({
                         <div className="font-bold text-gray-200 truncate flex items-center gap-1.5">
                           <FaCheckCircle className="text-emerald-400 shrink-0 text-[10px]" />
                           <span className="truncate">{candidateName}</span>
+                          {scoreInfo.isEvaluated && (
+                            <span
+                              className={`px-1.5 py-0.2 rounded font-mono font-bold text-[9px] shrink-0 ${
+                                scoreInfo.status === "positive"
+                                  ? "bg-emerald-500 text-black"
+                                  : scoreInfo.status === "negative"
+                                  ? "bg-rose-500 text-white"
+                                  : "bg-amber-400 text-black"
+                              }`}
+                            >
+                              Score: {scoreInfo.scoreFormatted}
+                            </span>
+                          )}
                         </div>
                         <div className="text-gray-400 text-[9px] mt-0.5">
                           {app.department} • Roll: {candidateRoll} • {doneTime}
+                          {app.panel && (
+                            <span className="text-cyan-300 font-mono ml-1 font-bold">
+                              • Panel {app.panel}
+                            </span>
+                          )}
                         </div>
                       </div>
 
@@ -447,34 +493,68 @@ function QueueCard({
   onRemove,
   onMove,
   onReview,
+  onUpdatePanel,
   loadingActionId,
   waitingText,
+  inlineEdit,
 }) {
   const candidateName = app.responses?.name || app.responses?.fullName || "Candidate";
   const candidateRoll = app.responses?.rollno || app.responses?.rollNumber || "—";
   const candidateYear = app.year || app.responses?.year || "";
   const slotTime = app.interviewSlot ? formatTimeSlot(app.interviewSlot) : null;
   const isLoading = loadingActionId === app._id;
+  const scoreInfo = getCandidateScoreInfo(app, inlineEdit);
+
+  const currentPanel = inlineEdit?.panel !== undefined ? inlineEdit.panel : (app.panel || "");
+  const [panelInput, setPanelInput] = useState(currentPanel);
+
+  useEffect(() => {
+    setPanelInput(currentPanel);
+  }, [currentPanel]);
 
   return (
     <div
       className={`rounded-xl border transition-all p-3 space-y-2.5 relative ${
         isFirst
-          ? "border-emerald-400 bg-emerald-950/30 shadow-[0_0_20px_rgba(16,185,129,0.22)] ring-1 ring-emerald-500/30"
+          ? scoreInfo.isEvaluated
+            ? "border-emerald-400 bg-emerald-950/40 shadow-[0_0_22px_rgba(16,185,129,0.3)] ring-1 ring-emerald-400/60"
+            : "border-cyan-400/80 bg-cyan-950/20 shadow-[0_0_20px_rgba(6,182,212,0.25)] ring-1 ring-cyan-500/30"
           : "border-white/15 bg-black/60 hover:border-white/30"
       }`}
     >
       {/* Top Tag: Position & Status */}
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           {isFirst ? (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500 text-black shadow-sm">
-              <span className="w-1.5 h-1.5 rounded-full bg-black animate-ping" />
-              #1 NOW INTERVIEWING
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm ${
+                scoreInfo.isEvaluated
+                  ? "bg-emerald-500 text-black shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+                  : "bg-cyan-400 text-black"
+              }`}
+            >
+              {scoreInfo.isEvaluated ? (
+                <FaCheckCircle className="text-[10px]" />
+              ) : (
+                <span className="w-1.5 h-1.5 rounded-full bg-black animate-ping" />
+              )}
+              <span>{scoreInfo.isEvaluated ? "#1 NOW INTERVIEWING • EVALUATED" : "#1 NOW INTERVIEWING"}</span>
             </span>
           ) : (
             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-white/10 text-gray-300 border border-white/20">
               #{index + 1} In Line
+            </span>
+          )}
+
+          {/* Prominent Panel badge */}
+          {panelInput ? (
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-950/80 text-cyan-300 border border-cyan-400/60 flex items-center gap-1 shadow-[0_0_8px_rgba(6,182,212,0.2)]">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+              <span>Panel {panelInput}</span>
+            </span>
+          ) : (
+            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono text-gray-500 bg-white/5 border border-white/10">
+              Panel Unassigned
             </span>
           )}
 
@@ -512,11 +592,15 @@ function QueueCard({
       </div>
 
       {/* Candidate Details */}
-      <div className="space-y-0.5">
+      <div className="space-y-1">
         <div className="flex items-start justify-between gap-2">
           <h4
             className={`font-bold truncate text-sm ${
-              isFirst ? "text-emerald-200" : "text-white"
+              isFirst
+                ? scoreInfo.isEvaluated
+                  ? "text-emerald-300"
+                  : "text-cyan-200"
+                : "text-white"
             }`}
             title={candidateName}
           >
@@ -529,15 +613,115 @@ function QueueCard({
           )}
         </div>
 
-        <div className="flex items-center gap-2 text-[11px] text-gray-400 font-mono">
+        <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-[11px] text-gray-400 font-mono">
           <span>Roll: <strong className="text-gray-200">{candidateRoll}</strong></span>
           {slotTime && (
             <span className="text-cyan-300 border border-cyan-500/30 bg-cyan-950/30 px-1 rounded text-[10px]">
               {slotTime}
             </span>
           )}
+          {/* Panel inline pill / input */}
+          <div className="inline-flex items-center gap-1 bg-black/60 border border-white/15 rounded px-1.5 py-0.5 text-[10px]">
+            <span className="text-gray-400 uppercase font-bold text-[9px]">Panel:</span>
+            {onUpdatePanel ? (
+              <input
+                type="text"
+                value={panelInput}
+                onChange={(e) => setPanelInput(e.target.value)}
+                onBlur={() => {
+                  const trimmed = panelInput.trim();
+                  if (trimmed !== (currentPanel || "")) {
+                    onUpdatePanel(app._id, trimmed);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.currentTarget.blur();
+                  }
+                }}
+                placeholder="—"
+                className="w-9 text-center font-bold font-mono text-cyan-300 bg-cyan-950/60 border border-cyan-500/40 rounded focus:border-cyan-300 focus:outline-none px-0.5 text-[10px]"
+                title="Assigned panel number (e.g. 1, 2, A). Press Enter or click away to save."
+              />
+            ) : (
+              <span className="font-bold text-cyan-300">{currentPanel || "—"}</span>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Interview Evaluation Score Section */}
+      {scoreInfo.isEvaluated ? (
+        <div className="p-2.5 rounded-lg border border-emerald-500/40 bg-emerald-950/40 space-y-1.5 shadow-[0_0_15px_rgba(16,185,129,0.12)]">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              <FaCheckCircle className="text-emerald-400 text-xs shrink-0" />
+              <span className="font-bold text-emerald-300 text-[11px] uppercase tracking-wider">
+                Score Updated
+              </span>
+            </div>
+
+            {/* Score Pill */}
+            <span
+              className={`px-2 py-0.5 rounded font-mono font-bold text-xs flex items-center gap-1 shadow-sm ${
+                scoreInfo.status === "positive"
+                  ? "bg-emerald-500 text-black"
+                  : scoreInfo.status === "negative"
+                  ? "bg-rose-500 text-white"
+                  : "bg-amber-400 text-black"
+              }`}
+            >
+              <FaStar className="text-[9px]" />
+              <span>Score: {scoreInfo.scoreFormatted}</span>
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] font-mono text-gray-300 pt-1 border-t border-emerald-500/20">
+            <div className="flex items-center gap-2">
+              {(scoreInfo.posCount > 0 || scoreInfo.negCount > 0) && (
+                <span>
+                  <strong className="text-emerald-400">+{scoreInfo.posCount}</strong>
+                  <span className="text-gray-500"> / </span>
+                  <strong className="text-rose-400">-{scoreInfo.negCount}</strong>
+                </span>
+              )}
+              {scoreInfo.points && !scoreInfo.posCount && !scoreInfo.negCount && (
+                <span>Pts: <strong className="text-white">{scoreInfo.points}</strong></span>
+              )}
+              {scoreInfo.evaluatedBy && (
+                <span className="text-gray-400 truncate max-w-[120px]" title={scoreInfo.evaluatedBy}>
+                  By: <strong className="text-gray-200">{scoreInfo.evaluatedBy}</strong>
+                </span>
+              )}
+            </div>
+
+            <span className="text-emerald-300 font-bold bg-emerald-500/20 border border-emerald-400/40 px-1.5 py-0.2 rounded text-[9px] uppercase tracking-wider flex items-center gap-1">
+              <FaCheck className="text-[8px]" /> {panelInput ? `Panel ${panelInput} Free For Next` : "Panel Free For Next"}
+            </span>
+          </div>
+
+          {scoreInfo.comments && (
+            <p className="text-[10px] text-gray-400 italic line-clamp-1 truncate font-sans" title={scoreInfo.comments}>
+              &quot;{scoreInfo.comments}&quot;
+            </p>
+          )}
+        </div>
+      ) : isFirst ? (
+        <div className="p-2 rounded-lg border border-amber-500/30 bg-amber-950/20 flex items-center justify-between gap-2 text-[10px] font-mono">
+          <div className="flex items-center gap-1.5 text-amber-300 min-w-0">
+            <FaClock className="text-amber-400 text-xs shrink-0 animate-pulse" />
+            <span className="truncate">Interview in progress • Awaiting score</span>
+          </div>
+          <span className="text-amber-300 font-bold text-[9px] bg-black/40 px-1.5 py-0.5 rounded border border-amber-500/30 shrink-0">
+            {panelInput ? `Panel ${panelInput} Busy` : "Panel Busy"}
+          </span>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between text-[10px] text-gray-500 font-mono pt-0.5">
+          <span>{panelInput ? `Assigned: Panel ${panelInput}` : "Panel: Unassigned"}</span>
+          <span className="text-gray-600">Waiting turn</span>
+        </div>
+      )}
 
       {/* Action Buttons */}
       <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-1.5">
@@ -547,25 +731,41 @@ function QueueCard({
           disabled={isLoading}
           onClick={() => onRemove(app._id, true)}
           className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg font-bold text-[11px] tracking-wide transition-all cursor-pointer ${
-            isFirst
+            isFirst && scoreInfo.isEvaluated
+              ? "bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_15px_rgba(16,185,129,0.5)] ring-2 ring-emerald-400/50"
+              : isFirst
               ? "bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_12px_rgba(16,185,129,0.4)]"
               : "bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40"
           }`}
-          title="Interview is finished: Mark Interview Done and Remove from Queue"
+          title={
+            scoreInfo.isEvaluated
+              ? `Score is updated! Mark interview done and free ${panelInput ? `Panel ${panelInput}` : "panel"} for next candidate.`
+              : "Interview is finished: Mark Interview Done and Remove from Queue"
+          }
         >
           <FaCheck className="text-[10px]" />
-          <span>Mark Done</span>
+          <span>
+            {isFirst && scoreInfo.isEvaluated
+              ? panelInput
+                ? `Mark Done & Free Panel ${panelInput}`
+                : "Mark Done & Free Panel"
+              : "Mark Done"}
+          </span>
         </button>
 
         {/* Review Candidate */}
         <button
           type="button"
           onClick={onReview}
-          className="cursor-pointer flex items-center gap-1 py-1.5 px-2 rounded-lg font-bold text-[11px] bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 transition-colors"
+          className={`cursor-pointer flex items-center gap-1 py-1.5 px-2 rounded-lg font-bold text-[11px] transition-colors ${
+            scoreInfo.isEvaluated
+              ? "bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 border border-emerald-500/40"
+              : "bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40"
+          }`}
           title="Review applicant responses & evaluate"
         >
           <FaEye className="text-[10px]" />
-          <span>Review</span>
+          <span>{scoreInfo.isEvaluated ? "View Score" : "Review"}</span>
         </button>
 
         {/* Dismiss / Remove from Queue without marking done */}

@@ -203,6 +203,7 @@ export async function PUT(req, { params }) {
       negativeRemarks,
       interviewSlot,
       interviewDate,
+      panel,
       interviewStatus,
       queueDepartment,
       queueAddedAt,
@@ -399,6 +400,19 @@ export async function PUT(req, { params }) {
           await RecruitmentApplication.updateMany(
             { formId: id, $or: siblingFilter },
             { $set: { interviewDate: cleanDate } }
+          );
+        }
+      }
+
+      if (panel !== undefined) {
+        const cleanPanel = String(panel || "").trim();
+        application.panel = cleanPanel;
+
+        // Synchronize panel across all applications of this candidate in this recruitment drive
+        if (siblingFilter.length > 0) {
+          await RecruitmentApplication.updateMany(
+            { formId: id, $or: siblingFilter },
+            { $set: { panel: cleanPanel } }
           );
         }
       }
