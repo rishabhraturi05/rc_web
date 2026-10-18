@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -136,6 +136,9 @@ export default function AddSecDashboard() {
   const [showResumeSplit, setShowResumeSplit] = useState(true);
   const [newPositiveInput, setNewPositiveInput] = useState("");
   const [newNegativeInput, setNewNegativeInput] = useState("");
+  const initialLoadedRef = useRef(false);
+  const lastDeptRef = useRef(null);
+  const debounceTimers = useRef({});
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -208,11 +211,15 @@ export default function AddSecDashboard() {
   // Auth protection check: load department forms when authenticated
   useEffect(() => {
     if (status === "authenticated" && (session?.user?.role === "addsec" || session?.user?.role === "admin")) {
-      fetchDepartmentForms(departmentName);
+      if (!initialLoadedRef.current || lastDeptRef.current !== departmentName) {
+        initialLoadedRef.current = true;
+        lastDeptRef.current = departmentName;
+        fetchDepartmentForms(departmentName);
+      }
     } else if (status !== "loading") {
       setLoading(false);
     }
-  }, [status, session, departmentName]);
+  }, [status, session?.user?.role, departmentName]);
 
   // Auto-dismiss feedback message after 4s
   useEffect(() => {
@@ -238,8 +245,10 @@ export default function AddSecDashboard() {
     }
   };
 
-  const fetchDepartmentForms = async (overrideDept) => {
-    setLoading(true);
+  const fetchDepartmentForms = async (overrideDept, isManual = false) => {
+    if (!forms.length && !isManual) {
+      setLoading(true);
+    }
     try {
       const activeDept = overrideDept || departmentName;
       const url = isAdmin
@@ -313,7 +322,15 @@ export default function AddSecDashboard() {
             savedRecently: false,
           };
         });
-        setInlineEdits(edits);
+        setInlineEdits((prev) => {
+          const merged = { ...edits };
+          Object.keys(prev).forEach((id) => {
+            if (prev[id]?.isDirty) {
+              merged[id] = { ...merged[id], ...prev[id] };
+            }
+          });
+          return merged;
+        });
       } else {
         showToast(result.message || "Failed to fetch applicants.", "error");
       }
@@ -613,23 +630,44 @@ export default function AddSecDashboard() {
     return { total, evaluated, pending, avgScore, positiveCount, zeroCount, negativeCount };
   }, [applications, inlineEdits, getCandidateScoreInfo]);
 
-  // Handle inline change
+  // Handle inline change with debounced auto-save directly to MongoDB
   const handleInlineChange = (appId, field, value) => {
+    const nextEdit = {
+      ...(inlineEdits[appId] || {}),
+      [field]: value,
+      isDirty: true,
+      savedRecently: false,
+    };
+
     setInlineEdits((prev) => ({
       ...prev,
-      [appId]: {
-        ...(prev[appId] || {}),
-        [field]: value,
-        isDirty: true,
-        savedRecently: false,
-      },
+      [appId]: nextEdit,
     }));
+
+    if (debounceTimers.current[appId]) {
+      clearTimeout(debounceTimers.current[appId]);
+    }
+    debounceTimers.current[appId] = setTimeout(() => {
+      saveEvaluation(appId, nextEdit, true);
+    }, 800);
   };
 
-  // Save evaluation for a single application
-  const saveEvaluation = async (appId, customOverrides = null) => {
-    const edit = customOverrides ? { ...(inlineEdits[appId] || {}), ...customOverrides } : inlineEdits[appId];
-    if (!activeForm || !edit) return;
+  // Save evaluation for a single application directly to MongoDB
+  const saveEvaluation = async (appId, customOverrides = null, silent = false) => {
+    const currentApp = applications.find((a) => a._id === appId);
+    const existingEdit = inlineEdits[appId] || {};
+    const edit = {
+      points: currentApp?.points || "",
+      comments: currentApp?.comments || "",
+      feedback: currentApp?.feedback || "",
+      positiveRemarks: Array.isArray(currentApp?.positiveRemarks) ? [...currentApp.positiveRemarks] : [],
+      negativeRemarks: Array.isArray(currentApp?.negativeRemarks) ? [...currentApp.negativeRemarks] : [],
+      interviewSlot: currentApp?.interviewSlot || "",
+      interviewDate: currentApp?.interviewDate || "",
+      ...existingEdit,
+      ...(customOverrides || {}),
+    };
+    if (!activeForm || !appId) return;
 
     setInlineEdits((prev) => ({
       ...prev,
@@ -655,7 +693,9 @@ export default function AddSecDashboard() {
 
       const result = await response.json();
       if (!result.success) {
-        showToast(result.message || "Failed to save evaluation.", "error");
+        if (!silent) {
+          showToast(result.message || "Failed to save evaluation.", "error");
+        }
         setInlineEdits((prev) => ({
           ...prev,
           [appId]: { ...(prev[appId] || {}), isSaving: false },
@@ -735,10 +775,14 @@ export default function AddSecDashboard() {
         },
       }));
 
-      showToast("Evaluation saved to MongoDB.", "success");
+      if (!silent) {
+        showToast("Evaluation saved to MongoDB.", "success");
+      }
     } catch (error) {
       console.error("Save evaluation error:", error);
-      showToast("Network error while saving.", "error");
+      if (!silent) {
+        showToast("Network error while saving.", "error");
+      }
       setInlineEdits((prev) => ({
         ...prev,
         [appId]: { ...(prev[appId] || {}), isSaving: false },
@@ -950,7 +994,7 @@ export default function AddSecDashboard() {
   };
 
   // Live remarks handlers with automatic score calculation (+1 / -1)
-  const handleAddPositiveRemark = (appId) => {
+  const handleAddPositiveRemark = async (appId) => {
     if (!newPositiveInput.trim() || !appId) return;
     const text = newPositiveInput.trim();
     const currentEdit = inlineEdits[appId] || {};
@@ -965,22 +1009,48 @@ export default function AddSecDashboard() {
     const nextPos = [...currentPos, text];
     const nextScore = nextPos.length - currentNeg.length;
     const scoreStr = nextScore > 0 ? `+${nextScore}` : `${nextScore}`;
+    const nextFeedback = nextScore > 0 ? "positive" : nextScore < 0 ? "negative" : "waitlist";
+    const commentsVal = currentEdit.comments !== undefined ? currentEdit.comments : (currentApp?.comments || "");
+
+    const newEdit = {
+      ...currentEdit,
+      positiveRemarks: nextPos,
+      negativeRemarks: currentNeg,
+      points: scoreStr,
+      feedback: nextFeedback,
+      comments: commentsVal,
+      isDirty: false,
+      isSaving: true,
+      savedRecently: false,
+    };
 
     setInlineEdits((prev) => ({
       ...prev,
-      [appId]: {
-        ...(prev[appId] || {}),
-        positiveRemarks: nextPos,
-        negativeRemarks: currentNeg,
-        points: scoreStr,
-        isDirty: true,
-        savedRecently: false,
-      },
+      [appId]: newEdit,
     }));
+
+    setApplications((prev) =>
+      prev.map((app) =>
+        app._id === appId
+          ? {
+              ...app,
+              positiveRemarks: nextPos,
+              negativeRemarks: currentNeg,
+              points: scoreStr,
+              feedback: nextFeedback,
+              comments: commentsVal,
+            }
+          : app
+      )
+    );
+
     setNewPositiveInput("");
+
+    // Directly persist to MongoDB
+    await saveEvaluation(appId, newEdit, true);
   };
 
-  const handleRemovePositiveRemark = (appId, index) => {
+  const handleRemovePositiveRemark = async (appId, index) => {
     if (!appId) return;
     const currentEdit = inlineEdits[appId] || {};
     const currentApp = applications.find((a) => a._id === appId);
@@ -994,21 +1064,46 @@ export default function AddSecDashboard() {
     const nextPos = currentPos.filter((_, i) => i !== index);
     const nextScore = nextPos.length - currentNeg.length;
     const scoreStr = nextScore > 0 ? `+${nextScore}` : `${nextScore}`;
+    const nextFeedback = nextScore > 0 ? "positive" : nextScore < 0 ? "negative" : "waitlist";
+    const commentsVal = currentEdit.comments !== undefined ? currentEdit.comments : (currentApp?.comments || "");
+
+    const newEdit = {
+      ...currentEdit,
+      positiveRemarks: nextPos,
+      negativeRemarks: currentNeg,
+      points: scoreStr,
+      feedback: nextFeedback,
+      comments: commentsVal,
+      isDirty: false,
+      isSaving: true,
+      savedRecently: false,
+    };
 
     setInlineEdits((prev) => ({
       ...prev,
-      [appId]: {
-        ...(prev[appId] || {}),
-        positiveRemarks: nextPos,
-        negativeRemarks: currentNeg,
-        points: scoreStr,
-        isDirty: true,
-        savedRecently: false,
-      },
+      [appId]: newEdit,
     }));
+
+    setApplications((prev) =>
+      prev.map((app) =>
+        app._id === appId
+          ? {
+              ...app,
+              positiveRemarks: nextPos,
+              negativeRemarks: currentNeg,
+              points: scoreStr,
+              feedback: nextFeedback,
+              comments: commentsVal,
+            }
+          : app
+      )
+    );
+
+    // Directly persist to MongoDB
+    await saveEvaluation(appId, newEdit, true);
   };
 
-  const handleAddNegativeRemark = (appId) => {
+  const handleAddNegativeRemark = async (appId) => {
     if (!newNegativeInput.trim() || !appId) return;
     const text = newNegativeInput.trim();
     const currentEdit = inlineEdits[appId] || {};
@@ -1023,22 +1118,48 @@ export default function AddSecDashboard() {
     const nextNeg = [...currentNeg, text];
     const nextScore = currentPos.length - nextNeg.length;
     const scoreStr = nextScore > 0 ? `+${nextScore}` : `${nextScore}`;
+    const nextFeedback = nextScore > 0 ? "positive" : nextScore < 0 ? "negative" : "waitlist";
+    const commentsVal = currentEdit.comments !== undefined ? currentEdit.comments : (currentApp?.comments || "");
+
+    const newEdit = {
+      ...currentEdit,
+      positiveRemarks: currentPos,
+      negativeRemarks: nextNeg,
+      points: scoreStr,
+      feedback: nextFeedback,
+      comments: commentsVal,
+      isDirty: false,
+      isSaving: true,
+      savedRecently: false,
+    };
 
     setInlineEdits((prev) => ({
       ...prev,
-      [appId]: {
-        ...(prev[appId] || {}),
-        positiveRemarks: currentPos,
-        negativeRemarks: nextNeg,
-        points: scoreStr,
-        isDirty: true,
-        savedRecently: false,
-      },
+      [appId]: newEdit,
     }));
+
+    setApplications((prev) =>
+      prev.map((app) =>
+        app._id === appId
+          ? {
+              ...app,
+              positiveRemarks: currentPos,
+              negativeRemarks: nextNeg,
+              points: scoreStr,
+              feedback: nextFeedback,
+              comments: commentsVal,
+            }
+          : app
+      )
+    );
+
     setNewNegativeInput("");
+
+    // Directly persist to MongoDB
+    await saveEvaluation(appId, newEdit, true);
   };
 
-  const handleRemoveNegativeRemark = (appId, index) => {
+  const handleRemoveNegativeRemark = async (appId, index) => {
     if (!appId) return;
     const currentEdit = inlineEdits[appId] || {};
     const currentApp = applications.find((a) => a._id === appId);
@@ -1052,18 +1173,43 @@ export default function AddSecDashboard() {
     const nextNeg = currentNeg.filter((_, i) => i !== index);
     const nextScore = currentPos.length - nextNeg.length;
     const scoreStr = nextScore > 0 ? `+${nextScore}` : `${nextScore}`;
+    const nextFeedback = nextScore > 0 ? "positive" : nextScore < 0 ? "negative" : "waitlist";
+    const commentsVal = currentEdit.comments !== undefined ? currentEdit.comments : (currentApp?.comments || "");
+
+    const newEdit = {
+      ...currentEdit,
+      positiveRemarks: currentPos,
+      negativeRemarks: nextNeg,
+      points: scoreStr,
+      feedback: nextFeedback,
+      comments: commentsVal,
+      isDirty: false,
+      isSaving: true,
+      savedRecently: false,
+    };
 
     setInlineEdits((prev) => ({
       ...prev,
-      [appId]: {
-        ...(prev[appId] || {}),
-        positiveRemarks: currentPos,
-        negativeRemarks: nextNeg,
-        points: scoreStr,
-        isDirty: true,
-        savedRecently: false,
-      },
+      [appId]: newEdit,
     }));
+
+    setApplications((prev) =>
+      prev.map((app) =>
+        app._id === appId
+          ? {
+              ...app,
+              positiveRemarks: currentPos,
+              negativeRemarks: nextNeg,
+              points: scoreStr,
+              feedback: nextFeedback,
+              comments: commentsVal,
+            }
+          : app
+      )
+    );
+
+    // Directly persist to MongoDB
+    await saveEvaluation(appId, newEdit, true);
   };
 
   // Helper to build Excel rows
@@ -1252,6 +1398,11 @@ export default function AddSecDashboard() {
     }
   };
 
+  const currentModalApp =
+    modalAppIndex !== null && filteredApplications[modalAppIndex]
+      ? filteredApplications[modalAppIndex]
+      : null;
+
   // Modal navigation
   const openModal = (index, forceResumeSplit = false) => {
     setModalAppIndex(index);
@@ -1264,6 +1415,12 @@ export default function AddSecDashboard() {
   };
 
   const closeModal = () => {
+    if (currentModalApp && inlineEdits[currentModalApp._id]?.isDirty) {
+      if (debounceTimers.current[currentModalApp._id]) {
+        clearTimeout(debounceTimers.current[currentModalApp._id]);
+      }
+      saveEvaluation(currentModalApp._id, null, true);
+    }
     setModalOpen(false);
     setModalAppIndex(null);
     setNewPositiveInput("");
@@ -1271,6 +1428,12 @@ export default function AddSecDashboard() {
   };
 
   const nextModalApp = () => {
+    if (currentModalApp && inlineEdits[currentModalApp._id]?.isDirty) {
+      if (debounceTimers.current[currentModalApp._id]) {
+        clearTimeout(debounceTimers.current[currentModalApp._id]);
+      }
+      saveEvaluation(currentModalApp._id, null, true);
+    }
     if (modalAppIndex !== null && modalAppIndex < filteredApplications.length - 1) {
       setModalAppIndex(modalAppIndex + 1);
       setNewPositiveInput("");
@@ -1279,17 +1442,18 @@ export default function AddSecDashboard() {
   };
 
   const prevModalApp = () => {
+    if (currentModalApp && inlineEdits[currentModalApp._id]?.isDirty) {
+      if (debounceTimers.current[currentModalApp._id]) {
+        clearTimeout(debounceTimers.current[currentModalApp._id]);
+      }
+      saveEvaluation(currentModalApp._id, null, true);
+    }
     if (modalAppIndex !== null && modalAppIndex > 0) {
       setModalAppIndex(modalAppIndex - 1);
       setNewPositiveInput("");
       setNewNegativeInput("");
     }
   };
-
-  const currentModalApp =
-    modalAppIndex !== null && filteredApplications[modalAppIndex]
-      ? filteredApplications[modalAppIndex]
-      : null;
 
   if (status === "unauthenticated" || (status !== "loading" && session?.user?.role !== "addsec" && session?.user?.role !== "admin")) {
     return (

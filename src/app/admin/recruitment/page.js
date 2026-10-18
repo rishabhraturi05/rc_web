@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
@@ -298,6 +298,8 @@ export default function RecruitmentAdminPage() {
   const [newPositiveInput, setNewPositiveInput] = useState("");
   const [newNegativeInput, setNewNegativeInput] = useState("");
   const [mounted, setMounted] = useState(false);
+  const initialLoadedRef = useRef(false);
+  const debounceTimers = useRef({});
 
   useEffect(() => {
     setMounted(true);
@@ -333,8 +335,11 @@ export default function RecruitmentAdminPage() {
       router.push("/admin/login");
       return;
     }
-    fetchForms();
-  }, [status, session, router]);
+    if (!initialLoadedRef.current) {
+      initialLoadedRef.current = true;
+      fetchForms();
+    }
+  }, [status, session?.user?.role, router]);
 
   const activeForms = useMemo(
     () => forms.filter((form) => form.isOpen && (!form.deadline || new Date(form.deadline) > new Date())),
@@ -676,17 +681,26 @@ export default function RecruitmentAdminPage() {
     return { total, evaluated, pending, avgScore, positiveCount, zeroCount, negativeCount };
   }, [applications, selectedDepartment, inlineEdits]);
 
-  // Handle inline change for points, comments, verdict
+  // Handle inline change for points, comments, verdict with debounced auto-save directly to MongoDB
   const handleInlineChange = (appId, field, value) => {
+    const nextEdit = {
+      ...(inlineEdits[appId] || {}),
+      [field]: value,
+      isDirty: true,
+      savedRecently: false,
+    };
+
     setInlineEdits((prev) => ({
       ...prev,
-      [appId]: {
-        ...(prev[appId] || {}),
-        [field]: value,
-        isDirty: true,
-        savedRecently: false,
-      },
+      [appId]: nextEdit,
     }));
+
+    if (debounceTimers.current[appId]) {
+      clearTimeout(debounceTimers.current[appId]);
+    }
+    debounceTimers.current[appId] = setTimeout(() => {
+      saveEvaluation(appId, nextEdit, true);
+    }, 800);
   };
 
   // Queue Position & Status Helpers
@@ -888,10 +902,22 @@ export default function RecruitmentAdminPage() {
     }
   };
 
-  // Save evaluation for a single applicant (points, comments, feedback, remarks)
-  const saveEvaluation = async (appId, customOverrides = null) => {
-    const edit = customOverrides ? { ...(inlineEdits[appId] || {}), ...customOverrides } : inlineEdits[appId];
-    if (!selectedForm || !edit) return;
+  // Save evaluation for a single applicant (points, comments, feedback, remarks) directly to MongoDB
+  const saveEvaluation = async (appId, customOverrides = null, silent = false) => {
+    const currentApp = applications.find((a) => a._id === appId);
+    const existingEdit = inlineEdits[appId] || {};
+    const edit = {
+      points: currentApp?.points || "",
+      comments: currentApp?.comments || "",
+      feedback: currentApp?.feedback || "",
+      positiveRemarks: Array.isArray(currentApp?.positiveRemarks) ? [...currentApp.positiveRemarks] : [],
+      negativeRemarks: Array.isArray(currentApp?.negativeRemarks) ? [...currentApp.negativeRemarks] : [],
+      interviewSlot: currentApp?.interviewSlot || "",
+      interviewDate: currentApp?.interviewDate || "",
+      ...existingEdit,
+      ...(customOverrides || {}),
+    };
+    if (!selectedForm || !appId) return;
 
     setInlineEdits((prev) => ({
       ...prev,
@@ -916,7 +942,9 @@ export default function RecruitmentAdminPage() {
 
       const result = await response.json();
       if (!result.success) {
-        setMessage(result.message || "Failed to save evaluation.");
+        if (!silent) {
+          setMessage(result.message || "Failed to save evaluation.");
+        }
         setInlineEdits((prev) => ({
           ...prev,
           [appId]: { ...(prev[appId] || {}), isSaving: false },
@@ -996,6 +1024,10 @@ export default function RecruitmentAdminPage() {
         });
       }
 
+      if (!silent) {
+        setMessage("Evaluation saved successfully.");
+      }
+
       setTimeout(() => {
         setInlineEdits((prev) => ({
           ...prev,
@@ -1004,7 +1036,9 @@ export default function RecruitmentAdminPage() {
       }, 3000);
     } catch (error) {
       console.error("Save evaluation error:", error);
-      setMessage("Error saving evaluation.");
+      if (!silent) {
+        setMessage("Error saving evaluation.");
+      }
       setInlineEdits((prev) => ({
         ...prev,
         [appId]: { ...(prev[appId] || {}), isSaving: false },
@@ -1222,7 +1256,7 @@ export default function RecruitmentAdminPage() {
   };
 
   // Live remarks handlers with automatic score calculation (+1 / -1)
-  const handleAddPositiveRemark = (appId) => {
+  const handleAddPositiveRemark = async (appId) => {
     if (!newPositiveInput.trim() || !appId) return;
     const text = newPositiveInput.trim();
     const currentEdit = inlineEdits[appId] || {};
@@ -1237,22 +1271,48 @@ export default function RecruitmentAdminPage() {
     const nextPos = [...currentPos, text];
     const nextScore = nextPos.length - currentNeg.length;
     const scoreStr = nextScore > 0 ? `+${nextScore}` : `${nextScore}`;
+    const nextFeedback = nextScore > 0 ? "positive" : nextScore < 0 ? "negative" : "waitlist";
+    const commentsVal = currentEdit.comments !== undefined ? currentEdit.comments : (currentApp?.comments || "");
+
+    const newEdit = {
+      ...currentEdit,
+      positiveRemarks: nextPos,
+      negativeRemarks: currentNeg,
+      points: scoreStr,
+      feedback: nextFeedback,
+      comments: commentsVal,
+      isDirty: false,
+      isSaving: true,
+      savedRecently: false,
+    };
 
     setInlineEdits((prev) => ({
       ...prev,
-      [appId]: {
-        ...(prev[appId] || {}),
-        positiveRemarks: nextPos,
-        negativeRemarks: currentNeg,
-        points: scoreStr,
-        isDirty: true,
-        savedRecently: false,
-      },
+      [appId]: newEdit,
     }));
+
+    setApplications((prev) =>
+      prev.map((app) =>
+        app._id === appId
+          ? {
+              ...app,
+              positiveRemarks: nextPos,
+              negativeRemarks: currentNeg,
+              points: scoreStr,
+              feedback: nextFeedback,
+              comments: commentsVal,
+            }
+          : app
+      )
+    );
+
     setNewPositiveInput("");
+
+    // Directly persist to MongoDB
+    await saveEvaluation(appId, newEdit, true);
   };
 
-  const handleRemovePositiveRemark = (appId, index) => {
+  const handleRemovePositiveRemark = async (appId, index) => {
     if (!appId) return;
     const currentEdit = inlineEdits[appId] || {};
     const currentApp = applications.find((a) => a._id === appId);
@@ -1266,21 +1326,46 @@ export default function RecruitmentAdminPage() {
     const nextPos = currentPos.filter((_, i) => i !== index);
     const nextScore = nextPos.length - currentNeg.length;
     const scoreStr = nextScore > 0 ? `+${nextScore}` : `${nextScore}`;
+    const nextFeedback = nextScore > 0 ? "positive" : nextScore < 0 ? "negative" : "waitlist";
+    const commentsVal = currentEdit.comments !== undefined ? currentEdit.comments : (currentApp?.comments || "");
+
+    const newEdit = {
+      ...currentEdit,
+      positiveRemarks: nextPos,
+      negativeRemarks: currentNeg,
+      points: scoreStr,
+      feedback: nextFeedback,
+      comments: commentsVal,
+      isDirty: false,
+      isSaving: true,
+      savedRecently: false,
+    };
 
     setInlineEdits((prev) => ({
       ...prev,
-      [appId]: {
-        ...(prev[appId] || {}),
-        positiveRemarks: nextPos,
-        negativeRemarks: currentNeg,
-        points: scoreStr,
-        isDirty: true,
-        savedRecently: false,
-      },
+      [appId]: newEdit,
     }));
+
+    setApplications((prev) =>
+      prev.map((app) =>
+        app._id === appId
+          ? {
+              ...app,
+              positiveRemarks: nextPos,
+              negativeRemarks: currentNeg,
+              points: scoreStr,
+              feedback: nextFeedback,
+              comments: commentsVal,
+            }
+          : app
+      )
+    );
+
+    // Directly persist to MongoDB
+    await saveEvaluation(appId, newEdit, true);
   };
 
-  const handleAddNegativeRemark = (appId) => {
+  const handleAddNegativeRemark = async (appId) => {
     if (!newNegativeInput.trim() || !appId) return;
     const text = newNegativeInput.trim();
     const currentEdit = inlineEdits[appId] || {};
@@ -1295,22 +1380,48 @@ export default function RecruitmentAdminPage() {
     const nextNeg = [...currentNeg, text];
     const nextScore = currentPos.length - nextNeg.length;
     const scoreStr = nextScore > 0 ? `+${nextScore}` : `${nextScore}`;
+    const nextFeedback = nextScore > 0 ? "positive" : nextScore < 0 ? "negative" : "waitlist";
+    const commentsVal = currentEdit.comments !== undefined ? currentEdit.comments : (currentApp?.comments || "");
+
+    const newEdit = {
+      ...currentEdit,
+      positiveRemarks: currentPos,
+      negativeRemarks: nextNeg,
+      points: scoreStr,
+      feedback: nextFeedback,
+      comments: commentsVal,
+      isDirty: false,
+      isSaving: true,
+      savedRecently: false,
+    };
 
     setInlineEdits((prev) => ({
       ...prev,
-      [appId]: {
-        ...(prev[appId] || {}),
-        positiveRemarks: currentPos,
-        negativeRemarks: nextNeg,
-        points: scoreStr,
-        isDirty: true,
-        savedRecently: false,
-      },
+      [appId]: newEdit,
     }));
+
+    setApplications((prev) =>
+      prev.map((app) =>
+        app._id === appId
+          ? {
+              ...app,
+              positiveRemarks: currentPos,
+              negativeRemarks: nextNeg,
+              points: scoreStr,
+              feedback: nextFeedback,
+              comments: commentsVal,
+            }
+          : app
+      )
+    );
+
     setNewNegativeInput("");
+
+    // Directly persist to MongoDB
+    await saveEvaluation(appId, newEdit, true);
   };
 
-  const handleRemoveNegativeRemark = (appId, index) => {
+  const handleRemoveNegativeRemark = async (appId, index) => {
     if (!appId) return;
     const currentEdit = inlineEdits[appId] || {};
     const currentApp = applications.find((a) => a._id === appId);
@@ -1324,19 +1435,58 @@ export default function RecruitmentAdminPage() {
     const nextNeg = currentNeg.filter((_, i) => i !== index);
     const nextScore = currentPos.length - nextNeg.length;
     const scoreStr = nextScore > 0 ? `+${nextScore}` : `${nextScore}`;
+    const nextFeedback = nextScore > 0 ? "positive" : nextScore < 0 ? "negative" : "waitlist";
+    const commentsVal = currentEdit.comments !== undefined ? currentEdit.comments : (currentApp?.comments || "");
+
+    const newEdit = {
+      ...currentEdit,
+      positiveRemarks: currentPos,
+      negativeRemarks: nextNeg,
+      points: scoreStr,
+      feedback: nextFeedback,
+      comments: commentsVal,
+      isDirty: false,
+      isSaving: true,
+      savedRecently: false,
+    };
 
     setInlineEdits((prev) => ({
       ...prev,
-      [appId]: {
-        ...(prev[appId] || {}),
-        positiveRemarks: currentPos,
-        negativeRemarks: nextNeg,
-        points: scoreStr,
-        isDirty: true,
-        savedRecently: false,
-      },
+      [appId]: newEdit,
     }));
+
+    setApplications((prev) =>
+      prev.map((app) =>
+        app._id === appId
+          ? {
+              ...app,
+              positiveRemarks: currentPos,
+              negativeRemarks: nextNeg,
+              points: scoreStr,
+              feedback: nextFeedback,
+              comments: commentsVal,
+            }
+          : app
+      )
+    );
+
+    // Directly persist to MongoDB
+    await saveEvaluation(appId, newEdit, true);
   };
+
+  const currentModalGroup =
+    modalAppIndex !== null && groupedApplications[modalAppIndex]
+      ? groupedApplications[modalAppIndex]
+      : null;
+
+  const currentModalApp = useMemo(() => {
+    if (!currentModalGroup) return null;
+    if (activeModalAppId) {
+      const found = currentModalGroup.deptApplications.find((d) => d._id === activeModalAppId);
+      if (found) return found;
+    }
+    return currentModalGroup.deptApplications[0] || null;
+  }, [currentModalGroup, activeModalAppId]);
 
   // Modal navigation
   const openModal = (groupIndex, targetAppId = null, forceSplit = true) => {
@@ -1357,6 +1507,12 @@ export default function RecruitmentAdminPage() {
   };
 
   const closeModal = () => {
+    if (currentModalApp && inlineEdits[currentModalApp._id]?.isDirty) {
+      if (debounceTimers.current[currentModalApp._id]) {
+        clearTimeout(debounceTimers.current[currentModalApp._id]);
+      }
+      saveEvaluation(currentModalApp._id, null, true);
+    }
     setModalOpen(false);
     setModalAppIndex(null);
     setActiveModalAppId(null);
@@ -1365,6 +1521,12 @@ export default function RecruitmentAdminPage() {
   };
 
   const nextModalApp = () => {
+    if (currentModalApp && inlineEdits[currentModalApp._id]?.isDirty) {
+      if (debounceTimers.current[currentModalApp._id]) {
+        clearTimeout(debounceTimers.current[currentModalApp._id]);
+      }
+      saveEvaluation(currentModalApp._id, null, true);
+    }
     if (modalAppIndex !== null && modalAppIndex < groupedApplications.length - 1) {
       const nextIdx = modalAppIndex + 1;
       setModalAppIndex(nextIdx);
@@ -1376,6 +1538,12 @@ export default function RecruitmentAdminPage() {
   };
 
   const prevModalApp = () => {
+    if (currentModalApp && inlineEdits[currentModalApp._id]?.isDirty) {
+      if (debounceTimers.current[currentModalApp._id]) {
+        clearTimeout(debounceTimers.current[currentModalApp._id]);
+      }
+      saveEvaluation(currentModalApp._id, null, true);
+    }
     if (modalAppIndex !== null && modalAppIndex > 0) {
       const prevIdx = modalAppIndex - 1;
       setModalAppIndex(prevIdx);
@@ -1386,23 +1554,11 @@ export default function RecruitmentAdminPage() {
     }
   };
 
-  const currentModalGroup =
-    modalAppIndex !== null && groupedApplications[modalAppIndex]
-      ? groupedApplications[modalAppIndex]
-      : null;
-
-  const currentModalApp = useMemo(() => {
-    if (!currentModalGroup) return null;
-    if (activeModalAppId) {
-      const found = currentModalGroup.deptApplications.find((d) => d._id === activeModalAppId);
-      if (found) return found;
-    }
-    return currentModalGroup.deptApplications[0] || null;
-  }, [currentModalGroup, activeModalAppId]);
-
-  const fetchForms = async () => {
+  const fetchForms = async (isManualRefresh = false) => {
     try {
-      setLoading(true);
+      if (!forms.length && !isManualRefresh) {
+        setLoading(true);
+      }
       const response = await fetch("/api/admin/recruitment", {
         cache: "no-store",
         headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
@@ -1470,7 +1626,15 @@ export default function RecruitmentAdminPage() {
           savedRecently: false,
         };
       });
-      setInlineEdits(edits);
+      setInlineEdits((prev) => {
+        const merged = { ...edits };
+        Object.keys(prev).forEach((id) => {
+          if (prev[id]?.isDirty) {
+            merged[id] = { ...merged[id], ...prev[id] };
+          }
+        });
+        return merged;
+      });
 
       const form = result.data.form;
       const departmentOptions = Array.isArray(form?.departments) ? form.departments : [];
