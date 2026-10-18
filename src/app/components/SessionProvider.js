@@ -3,10 +3,6 @@
 import { SessionProvider as NextAuthSessionProvider } from "next-auth/react";
 
 export default function SessionProvider({ children }) {
-  return (
-    <NextAuthSessionProvider refetchOnWindowFocus={false}>
-      {children}
-    </NextAuthSessionProvider>
-  );
+  return <NextAuthSessionProvider>{children}</NextAuthSessionProvider>;
 }
 

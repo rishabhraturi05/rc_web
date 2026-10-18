@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSession, signIn, signOut } from "next-auth/react";
@@ -34,11 +35,13 @@ import {
   FaFilePdf,
   FaColumns,
   FaExternalLinkAlt,
+  FaKey,
+  FaCalendarAlt,
+  FaSyncAlt,
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
-import { getRecruitmentFormTitle, getApplicantResumeInfo } from "@/app/lib/recruitment";
-
-
+import { getRecruitmentFormTitle, getApplicantResumeInfo, normalizeToTimeInputValue, formatTimeSlot, formatInterviewDate, parseTimeSlotToMinutes } from "@/app/lib/recruitment";
+import ChangeCredentialsModal from "@/app/components/ChangeCredentialsModal";
 
 const DEPARTMENTS = [
   {
@@ -77,6 +80,7 @@ export default function AddSecDashboard() {
   const [loading, setLoading] = useState(true);
   const [loadingApps, setLoadingApps] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState({ text: "", type: "info" });
+  const [credsModalOpen, setCredsModalOpen] = useState(false);
 
   // Direct Inline Login State when unauthenticated
   const [loginCreds, setLoginCreds] = useState({ username: "", password: "" });
@@ -113,10 +117,18 @@ export default function AddSecDashboard() {
   const [selectedYear, setSelectedYear] = useState("all");
   const [evaluationFilter, setEvaluationFilter] = useState("all"); // 'all', 'evaluated', 'pending'
   const [scoreFilter, setScoreFilter] = useState("all"); // 'all', 'positive', 'zero', 'negative', 'pending'
-  const [sortBy, setSortBy] = useState("newest"); // 'newest', 'oldest', 'points_desc', 'points_asc', 'name_asc'
+  const [selectedDate, setSelectedDate] = useState("all"); // 'all', 'pending', 'has_date', or 'YYYY-MM-DD'
+  const [interviewFilter, setInterviewFilter] = useState("all"); // 'all', 'pending', 'completed', 'in_queue', 'scheduled', 'unscheduled'
+  const [sortBy, setSortBy] = useState("newest"); // 'newest', 'oldest', 'points_desc', 'points_asc', 'name_asc', 'slot_asc', 'slot_desc'
 
   // Inline edits state: { [appId]: { points, comments, feedback, positiveRemarks, negativeRemarks, isDirty, isSaving, savedRecently } }
   const [inlineEdits, setInlineEdits] = useState({});
+  const [slotFilter, setSlotFilter] = useState("all");
+  const [slotSavingId, setSlotSavingId] = useState(null);
+  const [slotSavedId, setSlotSavedId] = useState(null);
+  const [dateSavingId, setDateSavingId] = useState(null);
+  const [dateSavedId, setDateSavedId] = useState(null);
+  const [statusSavingId, setStatusSavingId] = useState(null);
 
   // Review Modal state
   const [modalAppIndex, setModalAppIndex] = useState(null); // index in filteredApplications
@@ -124,25 +136,83 @@ export default function AddSecDashboard() {
   const [showResumeSplit, setShowResumeSplit] = useState(true);
   const [newPositiveInput, setNewPositiveInput] = useState("");
   const [newNegativeInput, setNewNegativeInput] = useState("");
+  const [mounted, setMounted] = useState(false);
 
-  // Department name from session
-  const departmentName = session?.user?.department || "Department";
-
-  const initialFetchDone = useRef(false);
-  const debounceTimers = useRef({});
-  const userRole = session?.user?.role;
-
-  // Auth protection check: load department forms when authenticated (only once on load)
   useEffect(() => {
-    if (status === "authenticated" && (userRole === "addsec" || userRole === "admin")) {
-      if (!initialFetchDone.current) {
-        initialFetchDone.current = true;
-        fetchDepartmentForms(true);
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (modalOpen) {
+      document.body.style.overflow = "hidden";
+      document.body.classList.add("admin-modal-open");
+    } else {
+      document.body.style.overflow = "";
+      document.body.classList.remove("admin-modal-open");
+    }
+    return () => {
+      document.body.style.overflow = "";
+      document.body.classList.remove("admin-modal-open");
+    };
+  }, [modalOpen]);
+
+  const isAdmin = session?.user?.role === "admin";
+  const [adminSelectedDept, setAdminSelectedDept] = useState("Software");
+
+  // Helper to ensure clean department name without "Department Department"
+  const cleanDepartmentName = useCallback((raw) => {
+    if (!raw) return "Software";
+    const cleaned = String(raw).replace(/\s*department\s*$/i, "").trim();
+    if (!cleaned || cleaned.toLowerCase() === "department") return "Software";
+    return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+  }, []);
+
+  // Load saved admin department preference if admin
+  useEffect(() => {
+    if (isAdmin && typeof window !== "undefined") {
+      const saved = localStorage.getItem("rc_admin_addsec_dept");
+      if (saved && ["Software", "Mechanical", "Embedded", "PR"].includes(saved)) {
+        setAdminSelectedDept(saved);
       }
+    }
+  }, [isAdmin]);
+
+  const handleAdminDeptChange = (dept) => {
+    const cleaned = cleanDepartmentName(dept);
+    setAdminSelectedDept(cleaned);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("rc_admin_addsec_dept", cleaned);
+    }
+    handleSelectForm(null);
+  };
+
+  // Department name strictly formatted without duplicates:
+  const departmentName = cleanDepartmentName(
+    isAdmin ? adminSelectedDept : session?.user?.department
+  );
+
+  // Restore active recruitment form from URL or sessionStorage on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const queryForm = params.get("form");
+      const savedForm = sessionStorage.getItem("rc_addsec_active_form");
+      if (queryForm) {
+        setActiveFormId(queryForm);
+      } else if (savedForm) {
+        setActiveFormId(savedForm);
+      }
+    }
+  }, []);
+
+  // Auth protection check: load department forms when authenticated
+  useEffect(() => {
+    if (status === "authenticated" && (session?.user?.role === "addsec" || session?.user?.role === "admin")) {
+      fetchDepartmentForms(departmentName);
     } else if (status !== "loading") {
       setLoading(false);
     }
-  }, [status, userRole]);
+  }, [status, session, departmentName]);
 
   // Auto-dismiss feedback message after 4s
   useEffect(() => {
@@ -168,12 +238,17 @@ export default function AddSecDashboard() {
     }
   };
 
-  const fetchDepartmentForms = async (isInitial = false) => {
-    if (isInitial && !forms.length) {
-      setLoading(true);
-    }
+  const fetchDepartmentForms = async (overrideDept) => {
+    setLoading(true);
     try {
-      const response = await fetch("/api/addsecs/forms");
+      const activeDept = overrideDept || departmentName;
+      const url = isAdmin
+        ? `/api/addsecs/forms?department=${encodeURIComponent(activeDept)}`
+        : "/api/addsecs/forms";
+      const response = await fetch(url, {
+        cache: "no-store",
+        headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
+      });
       const result = await response.json();
 
       if (!result.success) {
@@ -185,11 +260,18 @@ export default function AddSecDashboard() {
       const formList = result.data || [];
       setForms(formList);
 
-      if (activeFormId && formList.some((f) => f._id === activeFormId)) {
-        await fetchApplications(activeFormId);
-      } else if (formList.length > 0 && !activeFormId) {
-        setActiveFormId(formList[0]._id);
-        await fetchApplications(formList[0]._id);
+      const targetFormId =
+        activeFormId ||
+        (typeof window !== "undefined"
+          ? sessionStorage.getItem("rc_addsec_active_form") ||
+            new URLSearchParams(window.location.search).get("form")
+          : "");
+
+      if (targetFormId && formList.some((f) => f._id === targetFormId)) {
+        if (activeFormId !== targetFormId) {
+          setActiveFormId(targetFormId);
+        }
+        await fetchApplications(targetFormId, activeDept);
       }
     } catch (error) {
       console.error("Error fetching forms:", error);
@@ -199,20 +281,25 @@ export default function AddSecDashboard() {
     }
   };
 
-  const fetchApplications = async (formId) => {
+  const fetchApplications = async (formId, overrideDept) => {
     if (!formId) return;
-    if (!applications.length) {
-      setLoadingApps(true);
-    }
+    setLoadingApps(true);
     try {
-      const response = await fetch(`/api/addsecs/forms/${formId}/applications`);
+      const activeDept = overrideDept || departmentName;
+      const url = isAdmin
+        ? `/api/addsecs/forms/${formId}/applications?department=${encodeURIComponent(activeDept)}`
+        : `/api/addsecs/forms/${formId}/applications`;
+      const response = await fetch(url, {
+        cache: "no-store",
+        headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
+      });
       const result = await response.json();
 
       if (result.success) {
         const apps = result.data?.applications || [];
         setApplications(apps);
 
-        // Initialize inline edits directly from MongoDB applications data
+        // Initialize inline edits
         const edits = {};
         apps.forEach((app) => {
           edits[app._id] = {
@@ -239,15 +326,38 @@ export default function AddSecDashboard() {
   };
 
   const handleSelectForm = (formId) => {
-    if (formId === activeFormId) return;
-    setActiveFormId(formId);
-    fetchApplications(formId);
+    setActiveFormId(formId || null);
+    if (typeof window !== "undefined") {
+      if (formId) {
+        sessionStorage.setItem("rc_addsec_active_form", formId);
+        window.history.replaceState(null, "", `/addsecs?form=${encodeURIComponent(formId)}`);
+      } else {
+        sessionStorage.removeItem("rc_addsec_active_form");
+        window.history.replaceState(null, "", `/addsecs`);
+      }
+    }
+    if (formId) {
+      fetchApplications(formId, departmentName);
+    }
   };
 
   const activeForm = useMemo(
     () => forms.find((f) => f._id === activeFormId) || null,
     [forms, activeFormId]
   );
+
+  // Available distinct interview dates in current application list
+  const availableDates = useMemo(() => {
+    const dates = new Set();
+    applications.forEach((app) => {
+      const editDate = inlineEdits[app._id]?.interviewDate;
+      const d = editDate !== undefined ? editDate : app.interviewDate;
+      if (d && String(d).trim()) {
+        dates.add(String(d).trim());
+      }
+    });
+    return Array.from(dates).sort();
+  }, [applications, inlineEdits]);
 
   // Helper to extract net score, formatting, and classification status
   const getCandidateScoreInfo = useCallback((app, edit) => {
@@ -274,14 +384,26 @@ export default function AddSecDashboard() {
       edit?.comments !== undefined ? edit.comments : app?.comments;
     const hasComments = Boolean(currentComments && String(currentComments).trim() !== "");
 
+    const currentFeedback = edit?.feedback !== undefined ? edit.feedback : app?.feedback;
+    const hasFeedback = Boolean(
+      currentFeedback &&
+      String(currentFeedback).trim() !== "" &&
+      !["pending", "none", "null", "undefined"].includes(String(currentFeedback).trim().toLowerCase())
+    );
+
+    const hasEvaluator = Boolean(
+      app?.evaluatedBy &&
+      String(app.evaluatedBy).trim() !== "" &&
+      !["pending", "none", "null", "undefined"].includes(String(app.evaluatedBy).trim().toLowerCase())
+    );
+
     let scoreNum = null;
     let scoreFormatted = "—";
-    let isEvaluated = false;
+    const isEvaluated = Boolean(hasRemarks || hasPoints || hasComments || hasFeedback || hasEvaluator);
 
     if (hasRemarks) {
       scoreNum = currentPos.length - currentNeg.length;
       scoreFormatted = scoreNum > 0 ? `+${scoreNum}` : `${scoreNum}`;
-      isEvaluated = true;
     } else if (hasPoints) {
       const parsed = parseFloat(currentPoints);
       if (!Number.isNaN(parsed)) {
@@ -290,9 +412,6 @@ export default function AddSecDashboard() {
       } else {
         scoreFormatted = String(currentPoints);
       }
-      isEvaluated = true;
-    } else if (hasComments) {
-      isEvaluated = true;
     }
 
     let status = "pending";
@@ -326,9 +445,10 @@ export default function AddSecDashboard() {
         return false;
       }
 
-      const scoreInfo = getCandidateScoreInfo(app, inlineEdits[app._id]);
+      const edit = inlineEdits[app._id];
+      const scoreInfo = getCandidateScoreInfo(app, edit);
 
-      // 2. Evaluation status filter
+      // 2. Evaluation status filter (Evaluated vs Pending)
       if (evaluationFilter === "evaluated" && !scoreInfo.isEvaluated) return false;
       if (evaluationFilter === "pending" && scoreInfo.isEvaluated) return false;
 
@@ -338,7 +458,43 @@ export default function AddSecDashboard() {
       if (scoreFilter === "negative" && scoreInfo.status !== "negative") return false;
       if (scoreFilter === "pending" && scoreInfo.isEvaluated) return false;
 
-      // 4. Search query
+      const appSlot = edit?.interviewSlot !== undefined ? edit.interviewSlot : app.interviewSlot || "";
+      const appDate = edit?.interviewDate !== undefined ? edit.interviewDate : app.interviewDate || "";
+      const appInterviewStatus = edit?.interviewStatus !== undefined ? edit.interviewStatus : app.interviewStatus || "pending";
+
+      // 4. Date filter (filter according to date)
+      if (selectedDate === "pending" || selectedDate === "no_date") {
+        if (Boolean(appDate)) return false;
+      } else if (selectedDate === "has_date") {
+        if (!appDate) return false;
+      } else if (selectedDate !== "all") {
+        if (appDate !== selectedDate) return false;
+      }
+
+      // 5. Interview status filter (pending, completed, in_queue, scheduled, unscheduled)
+      if (interviewFilter === "pending") {
+        // Pending interview: not completed yet
+        if (appInterviewStatus === "completed") return false;
+      } else if (interviewFilter === "completed") {
+        if (appInterviewStatus !== "completed") return false;
+      } else if (interviewFilter === "in_queue") {
+        if (appInterviewStatus !== "in_queue") return false;
+      } else if (interviewFilter === "scheduled") {
+        if (!appSlot || !appDate) return false;
+      } else if (interviewFilter === "unscheduled") {
+        if (Boolean(appSlot)) return false;
+      }
+
+      // Legacy slotFilter compatibility
+      if (slotFilter === "slot_given" && !appSlot) return false;
+      if (slotFilter === "slot_not_given" && Boolean(appSlot)) return false;
+      if (slotFilter === "date_given" && !appDate) return false;
+      if (slotFilter === "date_not_given" && Boolean(appDate)) return false;
+      if (slotFilter === "both_given" && (!appSlot || !appDate)) return false;
+      if (slotFilter === "neither_given" && (Boolean(appSlot) || Boolean(appDate))) return false;
+      if (slotFilter === "slot_no_date" && (!appSlot || Boolean(appDate))) return false;
+
+      // 6. Search query
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim();
         const candidateName = String(app.responses?.name || app.responses?.fullName || "").toLowerCase();
@@ -351,11 +507,16 @@ export default function AddSecDashboard() {
           .map((v) => String(v).toLowerCase())
           .join(" ");
 
+        const cSlot = String(appSlot).toLowerCase();
+        const cDate = String(appDate).toLowerCase();
+
         const matches =
           candidateName.includes(query) ||
           candidateRoll.includes(query) ||
           candidateEmail.includes(query) ||
           candidateComments.includes(query) ||
+          cSlot.includes(query) ||
+          cDate.includes(query) ||
           allAnswers.includes(query);
 
         if (!matches) return false;
@@ -368,6 +529,22 @@ export default function AddSecDashboard() {
     list = [...list].sort((a, b) => {
       if (sortBy === "oldest") {
         return new Date(a.createdAt) - new Date(b.createdAt);
+      }
+      if (sortBy === "slot_asc" || sortBy === "slot_desc") {
+        const slotA = inlineEdits[a._id]?.interviewSlot !== undefined ? inlineEdits[a._id].interviewSlot : a.interviewSlot || "";
+        const slotB = inlineEdits[b._id]?.interviewSlot !== undefined ? inlineEdits[b._id].interviewSlot : b.interviewSlot || "";
+        const minA = parseTimeSlotToMinutes(slotA);
+        const minB = parseTimeSlotToMinutes(slotB);
+
+        if (minA !== null && minB !== null) {
+          if (minA !== minB) {
+            return sortBy === "slot_asc" ? minA - minB : minB - minA;
+          }
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        }
+        if (minA !== null && minB === null) return -1;
+        if (minA === null && minB !== null) return 1;
+        return new Date(b.createdAt) - new Date(a.createdAt);
       }
       if (sortBy === "points_desc") {
         const infoA = getCandidateScoreInfo(a, inlineEdits[a._id]);
@@ -393,7 +570,19 @@ export default function AddSecDashboard() {
     });
 
     return list;
-  }, [applications, selectedYear, evaluationFilter, scoreFilter, searchQuery, sortBy, inlineEdits, getCandidateScoreInfo]);
+  }, [
+    applications,
+    selectedYear,
+    evaluationFilter,
+    scoreFilter,
+    selectedDate,
+    interviewFilter,
+    slotFilter,
+    searchQuery,
+    sortBy,
+    inlineEdits,
+    getCandidateScoreInfo,
+  ]);
 
   // Overall Statistics for this Form & Department (Score-driven)
   const stats = useMemo(() => {
@@ -424,44 +613,23 @@ export default function AddSecDashboard() {
     return { total, evaluated, pending, avgScore, positiveCount, zeroCount, negativeCount };
   }, [applications, inlineEdits, getCandidateScoreInfo]);
 
-  // Handle inline change with direct MongoDB debounced auto-save
+  // Handle inline change
   const handleInlineChange = (appId, field, value) => {
-    const nextEdit = {
-      ...(inlineEdits[appId] || {}),
-      [field]: value,
-      isDirty: true,
-      savedRecently: false,
-    };
-
     setInlineEdits((prev) => ({
       ...prev,
-      [appId]: nextEdit,
+      [appId]: {
+        ...(prev[appId] || {}),
+        [field]: value,
+        isDirty: true,
+        savedRecently: false,
+      },
     }));
-
-    // Debounce auto-save directly to MongoDB (700ms)
-    if (debounceTimers.current[appId]) {
-      clearTimeout(debounceTimers.current[appId]);
-    }
-    debounceTimers.current[appId] = setTimeout(() => {
-      saveEvaluation(appId, nextEdit, true);
-    }, 700);
   };
 
-  // Save evaluation for a single application directly to MongoDB
-  const saveEvaluation = async (appId, customOverrides = null, silent = false) => {
-    const currentApp = applications.find((a) => a._id === appId);
-    const existingEdit = inlineEdits[appId] || {};
-    const edit = {
-      points: currentApp?.points || "",
-      comments: currentApp?.comments || "",
-      feedback: currentApp?.feedback || "",
-      positiveRemarks: Array.isArray(currentApp?.positiveRemarks) ? [...currentApp.positiveRemarks] : [],
-      negativeRemarks: Array.isArray(currentApp?.negativeRemarks) ? [...currentApp.negativeRemarks] : [],
-      ...existingEdit,
-      ...(customOverrides || {}),
-    };
-
-    if (!activeForm || !appId) return;
+  // Save evaluation for a single application
+  const saveEvaluation = async (appId, customOverrides = null) => {
+    const edit = customOverrides ? { ...(inlineEdits[appId] || {}), ...customOverrides } : inlineEdits[appId];
+    if (!activeForm || !edit) return;
 
     setInlineEdits((prev) => ({
       ...prev,
@@ -479,12 +647,15 @@ export default function AddSecDashboard() {
           feedback: edit.feedback,
           positiveRemarks: edit.positiveRemarks || [],
           negativeRemarks: edit.negativeRemarks || [],
+          interviewSlot: edit.interviewSlot,
+          interviewDate: edit.interviewDate,
+          department: departmentName,
         }),
       });
 
       const result = await response.json();
       if (!result.success) {
-        if (!silent) showToast(result.message || "Failed to save evaluation.", "error");
+        showToast(result.message || "Failed to save evaluation.", "error");
         setInlineEdits((prev) => ({
           ...prev,
           [appId]: { ...(prev[appId] || {}), isSaving: false },
@@ -492,23 +663,66 @@ export default function AddSecDashboard() {
         return;
       }
 
-      // Update local application record in state so it matches MongoDB
+      // Helper to match candidate sibling applications across departments
+      const targetApp = applications.find((a) => a._id === appId);
+      const targetEmail = String(targetApp?.responses?.email || "").trim().toLowerCase();
+      const targetRoll = String(
+        targetApp?.responses?.rollno ||
+        targetApp?.responses?.rollNumber ||
+        targetApp?.responses?.roll ||
+        ""
+      ).trim().toLowerCase();
+
+      const isCandidateMatch = (app) => {
+        if (app._id === appId) return true;
+        const e = String(app.responses?.email || "").trim().toLowerCase();
+        const r = String(app.responses?.rollno || app.responses?.rollNumber || app.responses?.roll || "").trim().toLowerCase();
+        return (targetEmail && e && e === targetEmail) || (targetRoll && r && r === targetRoll);
+      };
+
+      // Update local application record (syncing slot & date across all of candidate's applications)
       setApplications((prev) =>
-        prev.map((app) =>
-          app._id === appId
-            ? {
-                ...app,
-                points: edit.points,
-                comments: edit.comments,
-                feedback: edit.feedback,
-                positiveRemarks: edit.positiveRemarks || [],
-                negativeRemarks: edit.negativeRemarks || [],
-                evaluatedBy: result.data?.evaluatedBy || session?.user?.username || "addsec",
-                evaluatedAt: result.data?.evaluatedAt || new Date().toISOString(),
-              }
-            : app
-        )
+        prev.map((app) => {
+          if (app._id === appId) {
+            return {
+              ...app,
+              points: edit.points,
+              comments: edit.comments,
+              feedback: edit.feedback,
+              positiveRemarks: edit.positiveRemarks || [],
+              negativeRemarks: edit.negativeRemarks || [],
+              interviewSlot: edit.interviewSlot !== undefined ? edit.interviewSlot : app.interviewSlot,
+              interviewDate: edit.interviewDate !== undefined ? edit.interviewDate : app.interviewDate,
+              evaluatedBy: result.data?.evaluatedBy,
+              evaluatedAt: result.data?.evaluatedAt,
+            };
+          }
+          if (isCandidateMatch(app)) {
+            const updated = { ...app };
+            if (edit.interviewSlot !== undefined) updated.interviewSlot = edit.interviewSlot;
+            if (edit.interviewDate !== undefined) updated.interviewDate = edit.interviewDate;
+            return updated;
+          }
+          return app;
+        })
       );
+
+      // Also sync inline edits for sibling applications if slot or date was updated
+      if (edit.interviewSlot !== undefined || edit.interviewDate !== undefined) {
+        setInlineEdits((prev) => {
+          const next = { ...prev };
+          applications.forEach((app) => {
+            if (isCandidateMatch(app) && app._id !== appId) {
+              next[app._id] = {
+                ...(next[app._id] || {}),
+                ...(edit.interviewSlot !== undefined && { interviewSlot: edit.interviewSlot }),
+                ...(edit.interviewDate !== undefined && { interviewDate: edit.interviewDate }),
+              };
+            }
+          });
+          return next;
+        });
+      }
 
       setInlineEdits((prev) => ({
         ...prev,
@@ -521,19 +735,10 @@ export default function AddSecDashboard() {
         },
       }));
 
-      if (!silent) {
-        showToast("Evaluation saved to MongoDB.", "success");
-      }
-
-      setTimeout(() => {
-        setInlineEdits((prev) => ({
-          ...prev,
-          [appId]: { ...(prev[appId] || {}), savedRecently: false },
-        }));
-      }, 2500);
+      showToast("Evaluation saved to MongoDB.", "success");
     } catch (error) {
       console.error("Save evaluation error:", error);
-      if (!silent) showToast("Network error while saving.", "error");
+      showToast("Network error while saving.", "error");
       setInlineEdits((prev) => ({
         ...prev,
         [appId]: { ...(prev[appId] || {}), isSaving: false },
@@ -541,12 +746,213 @@ export default function AddSecDashboard() {
     }
   };
 
-  // Live remarks handlers with automatic score calculation (+1 / -1) and direct MongoDB persistence
-  const handleAddPositiveRemark = async (appId) => {
+  // Dedicated interview slot updater (allows quick inline saving from table)
+  const saveInterviewSlot = async (appId, slotValue) => {
+    if (!activeForm || !appId) return;
+    setSlotSavingId(appId);
+    try {
+      const trimmed = String(slotValue ?? "").trim();
+      const response = await fetch(`/api/addsecs/forms/${activeForm._id}/applications`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId: appId,
+          interviewSlot: trimmed,
+          department: departmentName,
+        }),
+      });
+
+      const result = await response.json();
+      if (!result.success) {
+        showToast(result.message || "Failed to update interview slot.", "error");
+        return;
+      }
+
+      // Find candidate matching details so sibling applications update in state
+      const targetApp = applications.find((a) => a._id === appId);
+      const targetEmail = String(targetApp?.responses?.email || "").trim().toLowerCase();
+      const targetRoll = String(
+        targetApp?.responses?.rollno ||
+        targetApp?.responses?.rollNumber ||
+        targetApp?.responses?.roll ||
+        ""
+      ).trim().toLowerCase();
+
+      const isCandidateMatch = (app) => {
+        if (app._id === appId) return true;
+        const e = String(app.responses?.email || "").trim().toLowerCase();
+        const r = String(app.responses?.rollno || app.responses?.rollNumber || app.responses?.roll || "").trim().toLowerCase();
+        return (targetEmail && e && e === targetEmail) || (targetRoll && r && r === targetRoll);
+      };
+
+      setApplications((prev) =>
+        prev.map((app) =>
+          isCandidateMatch(app) ? { ...app, interviewSlot: trimmed } : app
+        )
+      );
+
+      setInlineEdits((prev) => {
+        const next = { ...prev };
+        applications.forEach((app) => {
+          if (isCandidateMatch(app)) {
+            next[app._id] = {
+              ...(next[app._id] || {}),
+              interviewSlot: trimmed,
+              isDirty: false,
+            };
+          }
+        });
+        return next;
+      });
+
+      setSlotSavedId(appId);
+      showToast("Interview slot updated.", "success");
+      setTimeout(() => {
+        setSlotSavedId((prev) => (prev === appId ? null : prev));
+      }, 2500);
+    } catch (err) {
+      console.error("Save interview slot error:", err);
+      showToast("Error updating interview slot.", "error");
+    } finally {
+      setSlotSavingId(null);
+    }
+  };
+
+  // Dedicated interview date updater (allows quick inline saving from table)
+  const saveInterviewDate = async (appId, dateValue) => {
+    if (!activeForm || !appId) return;
+    setDateSavingId(appId);
+    try {
+      const trimmed = String(dateValue ?? "").trim();
+      const response = await fetch(`/api/addsecs/forms/${activeForm._id}/applications`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId: appId,
+          interviewDate: trimmed,
+          department: departmentName,
+        }),
+      });
+
+      const result = await response.json();
+      if (!result.success) {
+        showToast(result.message || "Failed to update interview date.", "error");
+        return;
+      }
+
+      // Find candidate matching details so sibling applications update in state
+      const targetApp = applications.find((a) => a._id === appId);
+      const targetEmail = String(targetApp?.responses?.email || "").trim().toLowerCase();
+      const targetRoll = String(
+        targetApp?.responses?.rollno ||
+        targetApp?.responses?.rollNumber ||
+        targetApp?.responses?.roll ||
+        ""
+      ).trim().toLowerCase();
+
+      const isCandidateMatch = (app) => {
+        if (app._id === appId) return true;
+        const e = String(app.responses?.email || "").trim().toLowerCase();
+        const r = String(app.responses?.rollno || app.responses?.rollNumber || app.responses?.roll || "").trim().toLowerCase();
+        return (targetEmail && e && e === targetEmail) || (targetRoll && r && r === targetRoll);
+      };
+
+      setApplications((prev) =>
+        prev.map((app) =>
+          isCandidateMatch(app) ? { ...app, interviewDate: trimmed } : app
+        )
+      );
+
+      setInlineEdits((prev) => {
+        const next = { ...prev };
+        applications.forEach((app) => {
+          if (isCandidateMatch(app)) {
+            next[app._id] = {
+              ...(next[app._id] || {}),
+              interviewDate: trimmed,
+              isDirty: false,
+            };
+          }
+        });
+        return next;
+      });
+
+      setDateSavedId(appId);
+      showToast("Interview date updated.", "success");
+      setTimeout(() => {
+        setDateSavedId((prev) => (prev === appId ? null : prev));
+      }, 2500);
+    } catch (err) {
+      console.error("Save interview date error:", err);
+      showToast("Error updating interview date.", "error");
+    } finally {
+      setDateSavingId(null);
+    }
+  };
+
+
+  // Dedicated interview status updater
+  const saveInterviewStatus = async (appId, newStatus) => {
+    if (!activeForm || !appId) return;
+    setStatusSavingId(appId);
+    const cleanStatus = String(newStatus || "pending").trim().toLowerCase();
+    const completedAt = cleanStatus === "completed" ? new Date().toISOString() : null;
+
+    try {
+      const response = await fetch(`/api/addsecs/forms/${activeForm._id}/applications`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId: appId,
+          interviewStatus: cleanStatus,
+          department: departmentName,
+        }),
+      });
+
+      const result = await response.json();
+      if (!result.success) {
+        showToast(result.message || "Failed to update interview status.", "error");
+        return;
+      }
+
+      setApplications((prev) =>
+        prev.map((app) =>
+          app._id === appId
+            ? {
+                ...app,
+                interviewStatus: cleanStatus,
+                interviewCompletedAt: completedAt,
+              }
+            : app
+        )
+      );
+
+      setInlineEdits((prev) => ({
+        ...prev,
+        [appId]: {
+          ...(prev[appId] || {}),
+          interviewStatus: cleanStatus,
+        },
+      }));
+
+      showToast(
+        cleanStatus === "completed"
+          ? "Interview marked as completed!"
+          : "Interview marked as pending.",
+        "success"
+      );
+    } catch (err) {
+      console.error("Save interview status error:", err);
+      showToast("Error updating interview status.", "error");
+    } finally {
+      setStatusSavingId(null);
+    }
+  };
+
+  // Live remarks handlers with automatic score calculation (+1 / -1)
+  const handleAddPositiveRemark = (appId) => {
     if (!newPositiveInput.trim() || !appId) return;
     const text = newPositiveInput.trim();
-    setNewPositiveInput("");
-
     const currentEdit = inlineEdits[appId] || {};
     const currentApp = applications.find((a) => a._id === appId);
     const currentPos = currentEdit.positiveRemarks !== undefined
@@ -559,46 +965,22 @@ export default function AddSecDashboard() {
     const nextPos = [...currentPos, text];
     const nextScore = nextPos.length - currentNeg.length;
     const scoreStr = nextScore > 0 ? `+${nextScore}` : `${nextScore}`;
-    const nextFeedback = nextScore > 0 ? "positive" : nextScore < 0 ? "negative" : "waitlist";
-    const commentsVal = currentEdit.comments !== undefined ? currentEdit.comments : (currentApp?.comments || "");
-
-    const newEdit = {
-      ...currentEdit,
-      positiveRemarks: nextPos,
-      negativeRemarks: currentNeg,
-      points: scoreStr,
-      feedback: nextFeedback,
-      comments: commentsVal,
-      isDirty: false,
-      isSaving: true,
-      savedRecently: false,
-    };
 
     setInlineEdits((prev) => ({
       ...prev,
-      [appId]: newEdit,
+      [appId]: {
+        ...(prev[appId] || {}),
+        positiveRemarks: nextPos,
+        negativeRemarks: currentNeg,
+        points: scoreStr,
+        isDirty: true,
+        savedRecently: false,
+      },
     }));
-
-    setApplications((prev) =>
-      prev.map((app) =>
-        app._id === appId
-          ? {
-              ...app,
-              positiveRemarks: nextPos,
-              negativeRemarks: currentNeg,
-              points: scoreStr,
-              feedback: nextFeedback,
-              comments: commentsVal,
-            }
-          : app
-      )
-    );
-
-    // Persist directly to MongoDB
-    await saveEvaluation(appId, newEdit, true);
+    setNewPositiveInput("");
   };
 
-  const handleRemovePositiveRemark = async (appId, index) => {
+  const handleRemovePositiveRemark = (appId, index) => {
     if (!appId) return;
     const currentEdit = inlineEdits[appId] || {};
     const currentApp = applications.find((a) => a._id === appId);
@@ -612,50 +994,23 @@ export default function AddSecDashboard() {
     const nextPos = currentPos.filter((_, i) => i !== index);
     const nextScore = nextPos.length - currentNeg.length;
     const scoreStr = nextScore > 0 ? `+${nextScore}` : `${nextScore}`;
-    const nextFeedback = nextScore > 0 ? "positive" : nextScore < 0 ? "negative" : "waitlist";
-    const commentsVal = currentEdit.comments !== undefined ? currentEdit.comments : (currentApp?.comments || "");
-
-    const newEdit = {
-      ...currentEdit,
-      positiveRemarks: nextPos,
-      negativeRemarks: currentNeg,
-      points: scoreStr,
-      feedback: nextFeedback,
-      comments: commentsVal,
-      isDirty: false,
-      isSaving: true,
-      savedRecently: false,
-    };
 
     setInlineEdits((prev) => ({
       ...prev,
-      [appId]: newEdit,
+      [appId]: {
+        ...(prev[appId] || {}),
+        positiveRemarks: nextPos,
+        negativeRemarks: currentNeg,
+        points: scoreStr,
+        isDirty: true,
+        savedRecently: false,
+      },
     }));
-
-    setApplications((prev) =>
-      prev.map((app) =>
-        app._id === appId
-          ? {
-              ...app,
-              positiveRemarks: nextPos,
-              negativeRemarks: currentNeg,
-              points: scoreStr,
-              feedback: nextFeedback,
-              comments: commentsVal,
-            }
-          : app
-      )
-    );
-
-    // Persist directly to MongoDB
-    await saveEvaluation(appId, newEdit, true);
   };
 
-  const handleAddNegativeRemark = async (appId) => {
+  const handleAddNegativeRemark = (appId) => {
     if (!newNegativeInput.trim() || !appId) return;
     const text = newNegativeInput.trim();
-    setNewNegativeInput("");
-
     const currentEdit = inlineEdits[appId] || {};
     const currentApp = applications.find((a) => a._id === appId);
     const currentPos = currentEdit.positiveRemarks !== undefined
@@ -668,46 +1023,22 @@ export default function AddSecDashboard() {
     const nextNeg = [...currentNeg, text];
     const nextScore = currentPos.length - nextNeg.length;
     const scoreStr = nextScore > 0 ? `+${nextScore}` : `${nextScore}`;
-    const nextFeedback = nextScore > 0 ? "positive" : nextScore < 0 ? "negative" : "waitlist";
-    const commentsVal = currentEdit.comments !== undefined ? currentEdit.comments : (currentApp?.comments || "");
-
-    const newEdit = {
-      ...currentEdit,
-      positiveRemarks: currentPos,
-      negativeRemarks: nextNeg,
-      points: scoreStr,
-      feedback: nextFeedback,
-      comments: commentsVal,
-      isDirty: false,
-      isSaving: true,
-      savedRecently: false,
-    };
 
     setInlineEdits((prev) => ({
       ...prev,
-      [appId]: newEdit,
+      [appId]: {
+        ...(prev[appId] || {}),
+        positiveRemarks: currentPos,
+        negativeRemarks: nextNeg,
+        points: scoreStr,
+        isDirty: true,
+        savedRecently: false,
+      },
     }));
-
-    setApplications((prev) =>
-      prev.map((app) =>
-        app._id === appId
-          ? {
-              ...app,
-              positiveRemarks: currentPos,
-              negativeRemarks: nextNeg,
-              points: scoreStr,
-              feedback: nextFeedback,
-              comments: commentsVal,
-            }
-          : app
-      )
-    );
-
-    // Persist directly to MongoDB
-    await saveEvaluation(appId, newEdit, true);
+    setNewNegativeInput("");
   };
 
-  const handleRemoveNegativeRemark = async (appId, index) => {
+  const handleRemoveNegativeRemark = (appId, index) => {
     if (!appId) return;
     const currentEdit = inlineEdits[appId] || {};
     const currentApp = applications.find((a) => a._id === appId);
@@ -721,43 +1052,18 @@ export default function AddSecDashboard() {
     const nextNeg = currentNeg.filter((_, i) => i !== index);
     const nextScore = currentPos.length - nextNeg.length;
     const scoreStr = nextScore > 0 ? `+${nextScore}` : `${nextScore}`;
-    const nextFeedback = nextScore > 0 ? "positive" : nextScore < 0 ? "negative" : "waitlist";
-    const commentsVal = currentEdit.comments !== undefined ? currentEdit.comments : (currentApp?.comments || "");
-
-    const newEdit = {
-      ...currentEdit,
-      positiveRemarks: currentPos,
-      negativeRemarks: nextNeg,
-      points: scoreStr,
-      feedback: nextFeedback,
-      comments: commentsVal,
-      isDirty: false,
-      isSaving: true,
-      savedRecently: false,
-    };
 
     setInlineEdits((prev) => ({
       ...prev,
-      [appId]: newEdit,
+      [appId]: {
+        ...(prev[appId] || {}),
+        positiveRemarks: currentPos,
+        negativeRemarks: nextNeg,
+        points: scoreStr,
+        isDirty: true,
+        savedRecently: false,
+      },
     }));
-
-    setApplications((prev) =>
-      prev.map((app) =>
-        app._id === appId
-          ? {
-              ...app,
-              positiveRemarks: currentPos,
-              negativeRemarks: nextNeg,
-              points: scoreStr,
-              feedback: nextFeedback,
-              comments: commentsVal,
-            }
-          : app
-      )
-    );
-
-    // Persist directly to MongoDB
-    await saveEvaluation(appId, newEdit, true);
   };
 
   // Helper to build Excel rows
@@ -812,6 +1118,8 @@ export default function AddSecDashboard() {
       row["Points / Score"] = scoreInfo.isEvaluated ? scoreInfo.scoreFormatted : "";
       row["Positive Remarks (+1)"] = Array.isArray(posRemarks) ? posRemarks.join("; ") : "";
       row["Negative Remarks (-1)"] = Array.isArray(negRemarks) ? negRemarks.join("; ") : "";
+      row["Interview Date"] = formatInterviewDate(edit.interviewDate !== undefined ? edit.interviewDate : app.interviewDate);
+      row["Interview Slot"] = formatTimeSlot(edit.interviewSlot !== undefined ? edit.interviewSlot : app.interviewSlot);
       row["Comments / Remarks"] = commentsVal;
       row["Evaluated By"] = app.evaluatedBy || "";
       row["Evaluated At"] = app.evaluatedAt ? new Date(app.evaluatedAt).toLocaleString() : "";
@@ -860,7 +1168,13 @@ export default function AddSecDashboard() {
   const exportAllForms = async () => {
     try {
       showToast("Preparing department full export...", "info");
-      const response = await fetch("/api/addsecs/applications/all");
+      const url = isAdmin
+        ? `/api/addsecs/applications/all?department=${encodeURIComponent(departmentName)}`
+        : "/api/addsecs/applications/all";
+      const response = await fetch(url, {
+        cache: "no-store",
+        headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
+      });
       const result = await response.json();
 
       if (!result.success || !result.data?.applications?.length) {
@@ -918,6 +1232,8 @@ export default function AddSecDashboard() {
         row["Points / Score"] = scoreInfo.isEvaluated ? scoreInfo.scoreFormatted : "";
         row["Positive Remarks (+1)"] = Array.isArray(posRemarks) ? posRemarks.join("; ") : "";
         row["Negative Remarks (-1)"] = Array.isArray(negRemarks) ? negRemarks.join("; ") : "";
+        row["Interview Date"] = formatInterviewDate(edit.interviewDate !== undefined ? edit.interviewDate : app.interviewDate);
+        row["Interview Slot"] = formatTimeSlot(edit.interviewSlot !== undefined ? edit.interviewSlot : app.interviewSlot);
         row["Comments / Remarks"] = commentsVal;
         row["Evaluated By"] = app.evaluatedBy || "";
         row["Evaluated At"] = app.evaluatedAt ? new Date(app.evaluatedAt).toLocaleString() : "";
@@ -948,12 +1264,6 @@ export default function AddSecDashboard() {
   };
 
   const closeModal = () => {
-    if (currentModalApp && inlineEdits[currentModalApp._id]?.isDirty) {
-      if (debounceTimers.current[currentModalApp._id]) {
-        clearTimeout(debounceTimers.current[currentModalApp._id]);
-      }
-      saveEvaluation(currentModalApp._id, null, true);
-    }
     setModalOpen(false);
     setModalAppIndex(null);
     setNewPositiveInput("");
@@ -962,12 +1272,6 @@ export default function AddSecDashboard() {
 
   const nextModalApp = () => {
     if (modalAppIndex !== null && modalAppIndex < filteredApplications.length - 1) {
-      if (currentModalApp && inlineEdits[currentModalApp._id]?.isDirty) {
-        if (debounceTimers.current[currentModalApp._id]) {
-          clearTimeout(debounceTimers.current[currentModalApp._id]);
-        }
-        saveEvaluation(currentModalApp._id, null, true);
-      }
       setModalAppIndex(modalAppIndex + 1);
       setNewPositiveInput("");
       setNewNegativeInput("");
@@ -976,12 +1280,6 @@ export default function AddSecDashboard() {
 
   const prevModalApp = () => {
     if (modalAppIndex !== null && modalAppIndex > 0) {
-      if (currentModalApp && inlineEdits[currentModalApp._id]?.isDirty) {
-        if (debounceTimers.current[currentModalApp._id]) {
-          clearTimeout(debounceTimers.current[currentModalApp._id]);
-        }
-        saveEvaluation(currentModalApp._id, null, true);
-      }
       setModalAppIndex(modalAppIndex - 1);
       setNewPositiveInput("");
       setNewNegativeInput("");
@@ -1173,6 +1471,27 @@ export default function AddSecDashboard() {
                     Logged in as <strong className="text-white">{session?.user?.username}</strong>
                   </span>
                 </div>
+                {isAdmin && (
+                  <div className="flex flex-wrap items-center gap-1.5 my-2 p-1.5 bg-black/40 border border-white/20 rounded-lg">
+                    <span className="text-[10px] font-mono text-gray-400 px-1 uppercase font-semibold">
+                      Department:
+                    </span>
+                    {DEPARTMENTS.map((dept) => (
+                      <button
+                        key={dept.name}
+                        type="button"
+                        onClick={() => handleAdminDeptChange(dept.name)}
+                        className={`px-2.5 py-1 rounded text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                          departmentName === dept.name
+                            ? "bg-white text-black shadow"
+                            : "text-gray-300 hover:text-white hover:bg-white/10"
+                        }`}
+                      >
+                        {dept.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <h1 className="font-mono text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-2">
                   {">_"} ADDSEC_PORTAL
                 </h1>
@@ -1182,6 +1501,14 @@ export default function AddSecDashboard() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => setCredsModalOpen(true)}
+                  className="px-4 py-2 bg-white/5 hover:bg-white/15 text-gray-200 hover:text-white border border-white/20 hover:border-cyan-400 rounded font-mono text-xs uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer"
+                  title="Change User ID and Password"
+                >
+                  <FaKey className="text-xs text-cyan-400" />
+                  [ Change Credentials ]
+                </button>
                 <button
                   onClick={handleLogout}
                   className="px-4 py-2 bg-transparent hover:bg-red-600/30 text-gray-300 hover:text-white border border-white/20 hover:border-red-500/50 rounded font-mono text-xs uppercase tracking-wider flex items-center gap-2 transition-colors"
@@ -1307,6 +1634,14 @@ export default function AddSecDashboard() {
             {/* Top Header Bar */}
             <div className="glass-panel p-5 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-white/20">
               <div>
+                <button
+                  type="button"
+                  onClick={() => handleSelectForm(null)}
+                  className="inline-flex items-center gap-2 text-gray-400 hover:text-white font-mono text-xs mb-2.5 transition-colors cursor-pointer"
+                  title="Return to AddSec Portal Home"
+                >
+                  <FaArrowLeft size={11} /> Back to AddSec Home
+                </button>
                 <div className="flex flex-wrap items-center gap-2 mb-1">
                   <span className="px-2.5 py-0.5 rounded text-xs font-mono font-bold uppercase tracking-wider bg-white/10 text-white border border-white/30">
                     {departmentName} Department
@@ -1325,16 +1660,29 @@ export default function AddSecDashboard() {
 
               <div className="flex flex-wrap items-center gap-2">
                 <button
-                  onClick={() => setActiveFormId(null)}
-                  className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/30 rounded font-mono text-xs uppercase tracking-wider flex items-center gap-2 transition-colors"
-                  title="Return to recruitment selection"
+                  type="button"
+                  onClick={() => {
+                    fetchApplications(activeFormId, departmentName);
+                    showToast("Synchronized latest updates.", "info");
+                  }}
+                  disabled={loadingApps}
+                  className="px-3.5 py-2 bg-emerald-950/60 hover:bg-emerald-900/70 text-emerald-300 border border-emerald-500/40 rounded font-mono text-xs uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="Sync and view latest progress from other team evaluators"
+                >
+                  <FaSyncAlt className={`text-xs ${loadingApps ? "animate-spin" : ""}`} />
+                  <span>[ Sync / Refresh ]</span>
+                </button>
+                <button
+                  onClick={() => handleSelectForm(null)}
+                  className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/30 rounded font-mono text-xs uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer"
+                  title="Return to AddSec Home"
                 >
                   <FaArrowLeft className="text-xs" />
-                  [ Switch Recruitment ]
+                  [ Back to Home ]
                 </button>
                 <button
                   onClick={exportAllForms}
-                  className="px-4 py-2 bg-white/5 hover:bg-white/10 text-gray-200 border border-white/20 rounded font-mono text-xs uppercase tracking-wider flex items-center gap-2 transition-colors"
+                  className="px-4 py-2 bg-white/5 hover:bg-white/10 text-gray-200 border border-white/20 rounded font-mono text-xs uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer"
                   title="Download all entries for your department across all recruitment forms"
                 >
                   <FaDownload className="text-xs" />
@@ -1342,7 +1690,7 @@ export default function AddSecDashboard() {
                 </button>
                 <button
                   onClick={handleLogout}
-                  className="px-4 py-2 bg-transparent hover:bg-red-600/30 text-gray-300 hover:text-white border border-white/20 hover:border-red-500/50 rounded font-mono text-xs uppercase tracking-wider flex items-center gap-2 transition-colors"
+                  className="px-4 py-2 bg-transparent hover:bg-red-600/30 text-gray-300 hover:text-white border border-white/20 hover:border-red-500/50 rounded font-mono text-xs uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer"
                 >
                   <FaSignOutAlt className="text-xs" />
                   [ Logout ]
@@ -1518,8 +1866,12 @@ export default function AddSecDashboard() {
                     className="bg-black/60 border border-white/20 rounded px-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-white"
                   >
                     <option value="all">All Status</option>
-                    <option value="evaluated">Evaluated Only</option>
-                    <option value="pending">Pending Only</option>
+                    <option value="evaluated">
+                      ✓ Evaluated ({applications.filter((a) => getCandidateScoreInfo(a, inlineEdits[a._id]).isEvaluated).length})
+                    </option>
+                    <option value="pending">
+                      ⚪ Pending ({applications.filter((a) => !getCandidateScoreInfo(a, inlineEdits[a._id]).isEvaluated).length})
+                    </option>
                   </select>
                 </div>
 
@@ -1539,6 +1891,84 @@ export default function AddSecDashboard() {
                   </select>
                 </div>
 
+                {/* Filter According to Date */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap flex items-center gap-1">
+                    <FaCalendarAlt className="text-cyan-400 text-xs" />
+                    <span>Date:</span>
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <select
+                      value={selectedDate}
+                      onChange={(e) => setSelectedDate(e.target.value)}
+                      className="bg-black/60 border border-white/20 rounded px-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-cyan-400"
+                    >
+                      <option value="all">All Dates</option>
+                      <option value="pending">
+                        ⚪ Date Pending ({applications.filter((a) => !(inlineEdits[a._id]?.interviewDate !== undefined ? inlineEdits[a._id].interviewDate : a.interviewDate)).length})
+                      </option>
+                      <option value="has_date">
+                        📅 Date Assigned ({applications.filter((a) => Boolean(inlineEdits[a._id]?.interviewDate !== undefined ? inlineEdits[a._id].interviewDate : a.interviewDate)).length})
+                      </option>
+                      {availableDates.map((dateStr) => {
+                        const count = applications.filter(
+                          (a) => (inlineEdits[a._id]?.interviewDate !== undefined ? inlineEdits[a._id].interviewDate : a.interviewDate) === dateStr
+                        ).length;
+                        return (
+                          <option key={dateStr} value={dateStr}>
+                            📅 {formatInterviewDate(dateStr)} ({count})
+                          </option>
+                        );
+                      })}
+                    </select>
+                    <input
+                      type="date"
+                      value={selectedDate !== "all" && selectedDate !== "pending" && selectedDate !== "has_date" ? selectedDate : ""}
+                      onChange={(e) => setSelectedDate(e.target.value || "all")}
+                      style={{ colorScheme: "dark" }}
+                      className="bg-black/60 border border-white/20 rounded px-1.5 py-1 text-xs font-mono text-cyan-200 focus:outline-none focus:border-cyan-400 cursor-pointer w-28"
+                      title="Select or pick specific date"
+                    />
+                    {selectedDate !== "all" && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDate("all")}
+                        className="text-gray-400 hover:text-rose-400 text-xs px-1 cursor-pointer"
+                        title="Clear date filter"
+                      >
+                        <FaTimes />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Interview Status Filter */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Interview:</label>
+                  <select
+                    value={interviewFilter}
+                    onChange={(e) => setInterviewFilter(e.target.value)}
+                    className="bg-black/60 border border-white/20 rounded px-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-white"
+                  >
+                    <option value="all">All Interviews</option>
+                    <option value="pending">
+                      ⚪ Pending ({applications.filter((a) => a.interviewStatus !== "completed").length})
+                    </option>
+                    <option value="completed">
+                      ✓ Completed ({applications.filter((a) => a.interviewStatus === "completed").length})
+                    </option>
+                    <option value="in_queue">
+                      🟢 In Queue ({applications.filter((a) => a.interviewStatus === "in_queue").length})
+                    </option>
+                    <option value="scheduled">
+                      🕒 Scheduled ({applications.filter((a) => Boolean(a.interviewSlot) && Boolean(a.interviewDate)).length})
+                    </option>
+                    <option value="unscheduled">
+                      ⚠️ Unscheduled ({applications.filter((a) => !a.interviewSlot).length})
+                    </option>
+                  </select>
+                </div>
+
                 {/* Sort By Filter */}
                 <div className="flex items-center gap-1 shrink-0">
                   <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Sort:</label>
@@ -1549,6 +1979,8 @@ export default function AddSecDashboard() {
                   >
                     <option value="newest">Newest First</option>
                     <option value="oldest">Oldest First</option>
+                    <option value="slot_asc">Time Slot: Earliest First (Asc)</option>
+                    <option value="slot_desc">Time Slot: Latest First (Desc)</option>
                     <option value="points_desc">Points: High to Low</option>
                     <option value="points_asc">Points: Low to High</option>
                     <option value="name_asc">Name: A to Z</option>
@@ -1561,13 +1993,16 @@ export default function AddSecDashboard() {
                     Showing <strong className="text-white">{filteredApplications.length}</strong> of{" "}
                     <strong className="text-white">{applications.length}</strong>
                   </span>
-                  {(searchQuery || selectedYear !== "all" || evaluationFilter !== "all" || scoreFilter !== "all" || sortBy !== "newest") && (
+                  {(searchQuery || selectedYear !== "all" || evaluationFilter !== "all" || scoreFilter !== "all" || selectedDate !== "all" || interviewFilter !== "all" || slotFilter !== "all" || sortBy !== "newest") && (
                     <button
                       onClick={() => {
                         setSearchQuery("");
                         setSelectedYear("all");
                         setEvaluationFilter("all");
                         setScoreFilter("all");
+                        setSelectedDate("all");
+                        setInterviewFilter("all");
+                        setSlotFilter("all");
                         setSortBy("newest");
                       }}
                       className="text-blue-400 hover:underline cursor-pointer"
@@ -1717,6 +2152,133 @@ export default function AddSecDashboard() {
                           </div>
                         )}
 
+                        {/* Interview Date & Time Slot on Mobile */}
+                        {(() => {
+                          const currentSlot = edit.interviewSlot !== undefined ? edit.interviewSlot : (app.interviewSlot || "");
+                          const currentDate = edit.interviewDate !== undefined ? edit.interviewDate : (app.interviewDate || "");
+                          const isSlotSaving = slotSavingId === app._id;
+                          const isSlotSaved = slotSavedId === app._id;
+                          const isDateSaving = dateSavingId === app._id;
+                          const isDateSaved = dateSavedId === app._id;
+
+                          return (
+                            <div className="py-2.5 space-y-2 border-b border-white/10">
+                              <div className="flex items-center justify-between text-[11px] font-mono text-gray-400 font-semibold uppercase tracking-wider">
+                                <div className="flex items-center gap-1.5">
+                                  <FaCalendarAlt className="text-cyan-400 text-xs" />
+                                  <span>Interview Schedule</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => saveInterviewStatus(app._id, app.interviewStatus === "completed" ? "pending" : "completed")}
+                                  disabled={statusSavingId === app._id}
+                                  className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase transition-all cursor-pointer flex items-center gap-1 ${
+                                    app.interviewStatus === "completed"
+                                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 hover:bg-emerald-500/30"
+                                      : app.interviewStatus === "in_queue"
+                                      ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/50"
+                                      : "bg-white/10 text-gray-300 border border-white/20 hover:bg-white/20 hover:text-white"
+                                  }`}
+                                  title={app.interviewStatus === "completed" ? "Interview marked completed. Click to mark pending." : "Click to mark interview as completed."}
+                                >
+                                  {statusSavingId === app._id ? (
+                                    <span className="animate-pulse">Saving...</span>
+                                  ) : app.interviewStatus === "completed" ? (
+                                    <>
+                                      <FaCheckCircle className="text-emerald-400 text-[10px]" />
+                                      <span>Done</span>
+                                    </>
+                                  ) : app.interviewStatus === "in_queue" ? (
+                                    <span>In Queue</span>
+                                  ) : (
+                                    <>
+                                      <span className="text-gray-500">⚪</span>
+                                      <span>Pending</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {/* Date Input */}
+                                <div className="flex items-center gap-1.5">
+                                  <input
+                                    type="date"
+                                    value={currentDate}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      handleInlineChange(app._id, "interviewDate", val);
+                                      saveInterviewDate(app._id, val);
+                                    }}
+                                    style={{ colorScheme: "dark" }}
+                                    className={`flex-1 px-2.5 py-1.5 rounded text-xs font-mono transition-all border focus:outline-none cursor-pointer ${
+                                      currentDate
+                                        ? "bg-cyan-950/40 border-cyan-500/50 text-cyan-200 focus:border-cyan-400"
+                                        : "bg-black/60 border-white/15 text-gray-400 focus:border-cyan-500/50"
+                                    }`}
+                                    title="Click to select interview date"
+                                  />
+                                  {currentDate ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        handleInlineChange(app._id, "interviewDate", "");
+                                        saveInterviewDate(app._id, "");
+                                      }}
+                                      className="text-gray-500 hover:text-rose-400 text-xs px-1.5 py-1 rounded transition-colors cursor-pointer shrink-0"
+                                      title="Clear date"
+                                    >
+                                      <FaTimes />
+                                    </button>
+                                  ) : null}
+                                  {isDateSaving ? (
+                                    <span className="text-[10px] font-mono text-cyan-400 animate-pulse px-1">...</span>
+                                  ) : isDateSaved ? (
+                                    <FaCheckCircle className="text-emerald-400 text-xs shrink-0" title="Date saved" />
+                                  ) : null}
+                                </div>
+
+                                {/* Time Slot Input */}
+                                <div className="flex items-center gap-1.5">
+                                  <input
+                                    type="time"
+                                    value={normalizeToTimeInputValue(currentSlot)}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      handleInlineChange(app._id, "interviewSlot", val);
+                                      saveInterviewSlot(app._id, val);
+                                    }}
+                                    style={{ colorScheme: "dark" }}
+                                    className={`flex-1 px-2.5 py-1.5 rounded text-xs font-mono transition-all border focus:outline-none cursor-pointer ${
+                                      currentSlot
+                                        ? "bg-cyan-950/40 border-cyan-500/50 text-cyan-200 focus:border-cyan-400"
+                                        : "bg-black/60 border-white/15 text-gray-400 focus:border-cyan-500/50"
+                                    }`}
+                                    title="Click to select interview time"
+                                  />
+                                  {currentSlot ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        handleInlineChange(app._id, "interviewSlot", "");
+                                        saveInterviewSlot(app._id, "");
+                                      }}
+                                      className="text-gray-500 hover:text-rose-400 text-xs px-1.5 py-1 rounded transition-colors cursor-pointer shrink-0"
+                                      title="Clear time slot"
+                                    >
+                                      <FaTimes />
+                                    </button>
+                                  ) : null}
+                                  {isSlotSaving ? (
+                                    <span className="text-[10px] font-mono text-cyan-400 animate-pulse px-1">...</span>
+                                  ) : isSlotSaved ? (
+                                    <FaCheckCircle className="text-emerald-400 text-xs shrink-0" title="Time slot saved" />
+                                  ) : null}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+
                         {/* Card Actions Footer */}
                         <div className="pt-2.5 flex items-center justify-between text-xs font-mono mt-1">
                           <div className="text-[10px] text-gray-500">
@@ -1751,157 +2313,288 @@ export default function AddSecDashboard() {
 
                 {/* 2. DESKTOP & TABLET HIGH-DENSITY DATA TABLE (hidden on mobile, visible on md and up) */}
                 <div className="hidden md:block glass-panel border border-white/15 overflow-hidden rounded-xl">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left font-mono text-xs">
-                      <thead className="bg-white/5 border-b border-white/15 text-gray-400 uppercase tracking-wider">
-                        <tr>
-                          <th className="py-3 px-3 w-12 text-center">#</th>
-                          <th className="py-3 px-4 min-w-[200px]">Applicant Info</th>
-                          <th className="py-3 px-3 min-w-[85px]">Year</th>
-                          <th className="py-3 px-3 min-w-[120px]">
-                            <div className="flex items-center gap-1">
-                              <FaStar className="text-amber-400 text-xs" />
-                              <span>Score</span>
-                            </div>
-                          </th>
-                          <th className="py-3 px-4 min-w-[260px]">
-                            <div className="flex items-center gap-1">
-                              <FaRegCommentDots className="text-blue-400 text-xs" />
-                              <span>Positive / Negative Points</span>
-                            </div>
-                          </th>
-                          <th className="py-3 px-3 min-w-[110px] text-center">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/10">
-                        {filteredApplications.map((app, index) => {
-                          const edit = inlineEdits[app._id] || {};
-                          const scoreInfo = getCandidateScoreInfo(app, edit);
-                          const appResume = getApplicantResumeInfo(app.responses, activeForm?.fields);
-                          const candidateName = app.responses?.name || app.responses?.fullName || "Applicant";
-                          const candidateRoll = app.responses?.rollno || app.responses?.rollNumber || "—";
-                          const candidateEmail = app.responses?.email || "—";
-                          const candidateYear = app.year || app.responses?.year || "—";
+                  <table className="w-full table-fixed text-left font-mono text-xs">
+                    <thead className="bg-white/5 border-b border-white/15 text-gray-400 uppercase tracking-wider text-[11px]">
+                      <tr>
+                        <th className="py-2.5 px-2 w-[4%] text-center">#</th>
+                        <th className="py-2.5 px-3 w-[23%]">Applicant Info</th>
+                        <th className="py-2.5 px-2 w-[7%] text-center">Year</th>
+                        <th className="py-2.5 px-2 w-[8%] text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <FaStar className="text-amber-400 text-xs" />
+                            <span>Score</span>
+                          </div>
+                        </th>
+                        <th className="py-2.5 px-2.5 w-[21%]">
+                          <div className="flex items-center gap-1">
+                            <FaRegCommentDots className="text-blue-400 text-xs" />
+                            <span>Remarks</span>
+                          </div>
+                        </th>
+                        <th className="py-2.5 px-2.5 w-[16%]">
+                          <div className="flex items-center gap-1.5">
+                            <FaCalendarAlt className="text-cyan-400 text-xs" />
+                            <span>Date & Slot</span>
+                          </div>
+                        </th>
+                        <th className="py-2.5 px-2 w-[10%] text-center">Interview</th>
+                        <th className="py-2.5 px-2 w-[11%] text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/10">
+                      {filteredApplications.map((app, index) => {
+                        const edit = inlineEdits[app._id] || {};
+                        const scoreInfo = getCandidateScoreInfo(app, edit);
+                        const appResume = getApplicantResumeInfo(app.responses, activeForm?.fields);
+                        const candidateName = app.responses?.name || app.responses?.fullName || "Applicant";
+                        const candidateRoll = app.responses?.rollno || app.responses?.rollNumber || "—";
+                        const candidateEmail = app.responses?.email || "—";
+                        const candidateYear = app.year || app.responses?.year || "—";
 
-                          return (
-                            <tr
-                              key={app._id}
-                              className={`transition-colors group ${
-                                scoreInfo.status === "positive"
-                                  ? "border-l-4 border-l-emerald-500 bg-emerald-950/20 hover:bg-emerald-950/30"
-                                  : scoreInfo.status === "zero" && scoreInfo.isEvaluated
-                                  ? "border-l-4 border-l-amber-400 bg-amber-950/20 hover:bg-amber-950/30"
-                                  : scoreInfo.status === "negative"
-                                  ? "border-l-4 border-l-rose-500 bg-rose-950/20 hover:bg-rose-950/30"
-                                  : "hover:bg-white/[0.03]"
-                              }`}
-                            >
-                              {/* Index */}
-                              <td className="py-3 px-3 text-center text-gray-500">{index + 1}</td>
+                        return (
+                          <tr
+                            key={app._id}
+                            className={`transition-colors group ${
+                              scoreInfo.status === "positive"
+                                ? "border-l-4 border-l-emerald-500 bg-emerald-950/20 hover:bg-emerald-950/30"
+                                : scoreInfo.status === "zero" && scoreInfo.isEvaluated
+                                ? "border-l-4 border-l-amber-400 bg-amber-950/20 hover:bg-amber-950/30"
+                                : scoreInfo.status === "negative"
+                                ? "border-l-4 border-l-rose-500 bg-rose-950/20 hover:bg-rose-950/30"
+                                : "hover:bg-white/[0.03]"
+                            }`}
+                          >
+                            {/* Index */}
+                            <td className="py-2.5 px-2 text-center text-gray-500 text-[11px] overflow-hidden">{index + 1}</td>
 
-                              {/* Applicant Info */}
-                              <td className="py-3 px-4">
-                                <div className="font-bold text-white text-sm">{candidateName}</div>
-                                <div className="text-gray-400 text-[11px] flex items-center gap-2 mt-0.5">
-                                  <span>Roll: <strong className="text-gray-300">{candidateRoll}</strong></span>
-                                </div>
-                                <div className="text-gray-500 text-[10px] truncate max-w-[200px]" title={candidateEmail}>
-                                  {candidateEmail}
-                                </div>
-                                <div className="text-gray-500 text-[10px] mt-0.5">
-                                  Submitted: {new Date(app.createdAt).toLocaleDateString()}
-                                </div>
-                              </td>
+                            {/* Applicant Info */}
+                            <td className="py-2.5 px-3 overflow-hidden">
+                              <div className="font-bold text-white text-xs truncate" title={candidateName}>{candidateName}</div>
+                              <div className="text-gray-400 text-[10px] truncate mt-0.5">
+                                Roll: <strong className="text-gray-300">{candidateRoll}</strong>
+                              </div>
+                              <div className="text-gray-500 text-[10px] truncate" title={candidateEmail}>
+                                {candidateEmail}
+                              </div>
+                              <div className="text-gray-500 text-[9px] truncate">
+                                {new Date(app.createdAt).toLocaleDateString()}
+                              </div>
+                            </td>
 
-                              {/* Year */}
-                              <td className="py-3 px-3">
-                                <span className="px-2 py-0.5 rounded text-[11px] bg-white/10 text-gray-300 border border-white/20 whitespace-nowrap">
-                                  {candidateYear}
+                            {/* Year */}
+                            <td className="py-2.5 px-2 text-center overflow-hidden">
+                              <span className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 text-gray-300 border border-white/20 whitespace-nowrap">
+                                {candidateYear}
+                              </span>
+                            </td>
+
+
+                            {/* Read-only Score Badge */}
+                            <td className="py-2.5 px-2 text-center overflow-hidden">
+                              {scoreInfo.isEvaluated ? (
+                                <span
+                                  className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold font-mono ${
+                                    scoreInfo.status === "positive"
+                                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/60"
+                                      : scoreInfo.status === "negative"
+                                      ? "bg-rose-500/20 text-rose-300 border border-rose-500/60"
+                                      : "bg-amber-400/20 text-amber-300 border border-amber-400/60"
+                                  }`}
+                                >
+                                  <span>{scoreInfo.scoreFormatted}</span>
+                                  <span className="text-[8px] opacity-75 ml-0.5">pts</span>
                                 </span>
-                              </td>
+                              ) : (
+                                <span className="text-gray-500 font-mono text-[11px]">—</span>
+                              )}
+                            </td>
 
-                              {/* Read-only Score Badge */}
-                              <td className="py-3 px-3">
-                                {scoreInfo.isEvaluated ? (
-                                  <span
-                                    className={`inline-flex items-center px-2.5 py-1 rounded text-xs font-bold font-mono ${
-                                      scoreInfo.status === "positive"
-                                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/60 shadow-[0_0_8px_rgba(16,185,129,0.25)]"
-                                        : scoreInfo.status === "negative"
-                                        ? "bg-rose-500/20 text-rose-300 border border-rose-500/60 shadow-[0_0_8px_rgba(244,63,94,0.25)]"
-                                        : "bg-amber-400/20 text-amber-300 border border-amber-400/60 shadow-[0_0_8px_rgba(251,191,36,0.25)]"
-                                    }`}
-                                  >
-                                    <span>{scoreInfo.scoreFormatted}</span>
-                                    <span className="text-[10px] opacity-75 ml-1">pts</span>
-                                  </span>
-                                ) : (
-                                  <span className="text-gray-500 font-mono text-xs">—</span>
+                            {/* Read-only Remarks & Comments Preview */}
+                            <td className="py-2.5 px-2.5 overflow-hidden">
+                              <div className="space-y-0.5">
+                                {(scoreInfo.posCount > 0 || scoreInfo.negCount > 0) && (
+                                  <div className="flex items-center gap-1 flex-wrap">
+                                    {scoreInfo.posCount > 0 && (
+                                      <span className="inline-flex items-center gap-0.5 text-[9px] font-mono font-bold px-1 py-0.5 rounded bg-emerald-950/70 text-emerald-300 border border-emerald-500/40">
+                                        +{scoreInfo.posCount}
+                                      </span>
+                                    )}
+                                    {scoreInfo.negCount > 0 && (
+                                      <span className="inline-flex items-center gap-0.5 text-[9px] font-mono font-bold px-1 py-0.5 rounded bg-rose-950/70 text-rose-300 border border-rose-500/40">
+                                        -{scoreInfo.negCount}
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
-                              </td>
+                                {scoreInfo.comments ? (
+                                  <div className="text-[10px] text-gray-300 truncate font-mono" title={scoreInfo.comments}>
+                                    {scoreInfo.comments}
+                                  </div>
+                                ) : !scoreInfo.posCount && !scoreInfo.negCount ? (
+                                  <span className="text-gray-600 text-[10px] italic">None</span>
+                                ) : null}
+                              </div>
+                            </td>
 
-                              {/* Read-only Remarks & Comments Preview (NO TEXTAREA) */}
-                              <td className="py-3 px-4 max-w-[280px]">
-                                <div className="space-y-1">
-                                  {(scoreInfo.posCount > 0 || scoreInfo.negCount > 0) && (
-                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                      {scoreInfo.posCount > 0 && (
-                                        <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-950/70 text-emerald-300 border border-emerald-500/40">
-                                          +{scoreInfo.posCount} Pos
-                                        </span>
-                                      )}
-                                      {scoreInfo.negCount > 0 && (
-                                        <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-rose-950/70 text-rose-300 border border-rose-500/40">
-                                          -{scoreInfo.negCount} Neg
-                                        </span>
-                                      )}
-                                    </div>
-                                  )}
-                                  {scoreInfo.comments ? (
-                                    <div className="text-xs text-gray-300 line-clamp-2 break-words font-mono" title={scoreInfo.comments}>
-                                      {scoreInfo.comments}
-                                    </div>
-                                  ) : !scoreInfo.posCount && !scoreInfo.negCount ? (
-                                    <span className="text-gray-500 text-xs italic">No remarks yet</span>
-                                  ) : null}
-                                  {app.evaluatedBy && (
-                                    <div className="text-[10px] text-gray-500">
-                                      By {app.evaluatedBy} • {app.evaluatedAt ? new Date(app.evaluatedAt).toLocaleDateString() : ""}
-                                    </div>
-                                  )}
-                                </div>
-                              </td>
+                            {/* Interview Slot & Date */}
+                            <td className="py-2.5 px-2.5 overflow-hidden">
+                              {(() => {
+                                const currentSlot = edit.interviewSlot !== undefined ? edit.interviewSlot : (app.interviewSlot || "");
+                                const currentDate = edit.interviewDate !== undefined ? edit.interviewDate : (app.interviewDate || "");
+                                const isSlotSaving = slotSavingId === app._id;
+                                const isSlotSaved = slotSavedId === app._id;
+                                const isDateSaving = dateSavingId === app._id;
+                                const isDateSaved = dateSavedId === app._id;
 
-                              {/* Review Actions */}
-                              <td className="py-3 px-3 text-center">
-                                <div className="flex items-center justify-center gap-1.5">
-                                  {appResume.hasResume && (
-                                    <button
-                                      type="button"
-                                      onClick={() => openModal(index, true)}
-                                      className="px-2.5 py-1.5 bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 border border-rose-500/40 rounded text-xs font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-1"
-                                      title="Open resume in parallel view & grade"
-                                    >
-                                      <FaFilePdf className="text-[11px]" />
-                                      <span>Resume</span>
-                                    </button>
-                                  )}
+                                return (
+                                  <div className="space-y-1">
+                                    {/* Date input */}
+                                    <div className="flex items-center gap-1">
+                                      <input
+                                        type="date"
+                                        value={currentDate}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          handleInlineChange(app._id, "interviewDate", val);
+                                          saveInterviewDate(app._id, val);
+                                        }}
+                                        style={{ colorScheme: "dark" }}
+                                        className={`w-full min-w-0 px-1.5 py-0.5 rounded text-[10px] font-mono transition-all border focus:outline-none cursor-pointer ${
+                                          currentDate
+                                            ? "bg-cyan-950/40 border-cyan-500/50 text-cyan-200 focus:border-cyan-400"
+                                            : "bg-black/60 border-white/15 text-gray-400 focus:border-cyan-500/50"
+                                        }`}
+                                        title="Click to select interview date"
+                                      />
+                                      {currentDate ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            handleInlineChange(app._id, "interviewDate", "");
+                                            saveInterviewDate(app._id, "");
+                                          }}
+                                          className="text-gray-500 hover:text-rose-400 text-[10px] px-1 py-0.5 rounded transition-colors cursor-pointer shrink-0"
+                                          title="Clear date"
+                                        >
+                                          <FaTimes />
+                                        </button>
+                                      ) : null}
+                                      {isDateSaving ? (
+                                        <span className="text-[9px] font-mono text-cyan-400 animate-pulse">...</span>
+                                      ) : isDateSaved ? (
+                                        <span className="text-[10px] text-emerald-400 shrink-0" title="Date saved!">
+                                          <FaCheckCircle />
+                                        </span>
+                                      ) : null}
+                                    </div>
+
+                                    {/* Time input */}
+                                    <div className="flex items-center gap-1">
+                                      <input
+                                        type="time"
+                                        value={normalizeToTimeInputValue(currentSlot)}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          handleInlineChange(app._id, "interviewSlot", val);
+                                          saveInterviewSlot(app._id, val);
+                                        }}
+                                        style={{ colorScheme: "dark" }}
+                                        className={`w-full min-w-0 px-1.5 py-0.5 rounded text-[10px] font-mono transition-all border focus:outline-none cursor-pointer ${
+                                          currentSlot
+                                            ? "bg-cyan-950/40 border-cyan-500/50 text-cyan-200 focus:border-cyan-400"
+                                            : "bg-black/60 border-white/15 text-gray-400 focus:border-cyan-500/50"
+                                        }`}
+                                        title="Click to select interview time"
+                                      />
+
+                                      {currentSlot ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            handleInlineChange(app._id, "interviewSlot", "");
+                                            saveInterviewSlot(app._id, "");
+                                          }}
+                                          className="text-gray-500 hover:text-rose-400 text-[10px] px-1 py-0.5 rounded transition-colors cursor-pointer shrink-0"
+                                          title="Clear time slot"
+                                        >
+                                          <FaTimes />
+                                        </button>
+                                      ) : null}
+
+                                      {isSlotSaving ? (
+                                        <span className="text-[9px] font-mono text-cyan-400 animate-pulse">...</span>
+                                      ) : isSlotSaved ? (
+                                        <span className="text-[10px] text-emerald-400 shrink-0" title="Time slot saved!">
+                                          <FaCheckCircle />
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+                            </td>
+
+                            {/* Interview Status Toggle Column */}
+                            <td className="py-2.5 px-2 text-center overflow-hidden">
+                              <button
+                                type="button"
+                                onClick={() => saveInterviewStatus(app._id, app.interviewStatus === "completed" ? "pending" : "completed")}
+                                disabled={statusSavingId === app._id}
+                                className={`px-2 py-1 rounded text-[10px] font-mono font-bold uppercase transition-all cursor-pointer inline-flex items-center gap-1 ${
+                                  app.interviewStatus === "completed"
+                                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 hover:bg-emerald-500/30"
+                                    : app.interviewStatus === "in_queue"
+                                    ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/50"
+                                    : "bg-white/5 text-gray-400 border border-white/15 hover:bg-white/15 hover:text-white"
+                                }`}
+                                title={app.interviewStatus === "completed" ? "Interview done. Click to mark pending." : "Click to mark interview as completed"}
+                              >
+                                {statusSavingId === app._id ? (
+                                  <span className="animate-pulse">...</span>
+                                ) : app.interviewStatus === "completed" ? (
+                                  <>
+                                    <FaCheckCircle className="text-emerald-400 text-[10px]" />
+                                    <span>Done</span>
+                                  </>
+                                ) : app.interviewStatus === "in_queue" ? (
+                                  <span>In Queue</span>
+                                ) : (
+                                  <>
+                                    <span className="text-gray-500">⚪</span>
+                                    <span>Pending</span>
+                                  </>
+                                )}
+                              </button>
+                            </td>
+
+                            {/* Review Actions */}
+                            <td className="py-2.5 px-2 text-center overflow-hidden">
+                              <div className="flex items-center justify-center gap-1">
+                                {appResume.hasResume && (
                                   <button
                                     type="button"
-                                    onClick={() => openModal(index)}
-                                    className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white border border-white/25 rounded text-xs font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer"
-                                    title="Open candidate detailed review modal to edit remarks and score"
+                                    onClick={() => openModal(index, true)}
+                                    className="px-1.5 py-1 bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 border border-rose-500/40 rounded text-[10px] font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-0.5"
+                                    title="Open resume"
                                   >
-                                    Review
+                                    <FaFilePdf className="text-[10px]" />
                                   </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => openModal(index)}
+                                  className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white border border-white/25 rounded text-[10px] font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                                  title="Review candidate"
+                                >
+                                  Review
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </>
             )}
@@ -1912,14 +2605,15 @@ export default function AddSecDashboard() {
       </div>
 
       {/* Detailed Candidate Review Modal */}
-      {modalOpen && currentModalApp && (() => {
-        const resumeInfo = getApplicantResumeInfo(currentModalApp.responses, activeForm?.fields);
-        const hasResume = resumeInfo.hasResume;
-        const isSplit = hasResume && showResumeSplit;
+      {modalOpen && currentModalApp && mounted && typeof document !== "undefined" && createPortal(
+        (() => {
+          const resumeInfo = getApplicantResumeInfo(currentModalApp.responses, activeForm?.fields);
+          const hasResume = resumeInfo.hasResume;
+          const isSplit = hasResume && showResumeSplit;
 
-        return (
-          <div className={`fixed inset-0 z-[100] flex ${isSplit ? "items-center justify-center p-2 sm:p-4" : "items-start justify-center pt-24 sm:pt-28 pb-8 px-2.5 sm:px-4 md:px-6 overflow-y-auto"} bg-black/85 backdrop-blur-sm`}>
-            <div className={`glass-panel w-full ${isSplit ? "max-w-[96vw] xl:max-w-7xl h-[92vh] max-h-[92vh]" : "max-w-3xl max-h-[calc(100vh-7.5rem)] sm:max-h-[calc(100vh-8.5rem)] overflow-y-auto"} border border-white/25 shadow-2xl flex flex-col rounded-xl my-auto transition-all duration-300`}>
+          return (
+            <div className={`fixed inset-0 z-[99999] flex ${isSplit ? "items-center justify-center p-2 sm:p-4" : "items-start justify-center pt-24 sm:pt-28 pb-8 px-2.5 sm:px-4 md:px-6 overflow-y-auto"} bg-black/90 backdrop-blur-md`}>
+              <div className={`glass-panel w-full ${isSplit ? "max-w-[96vw] xl:max-w-7xl h-[92vh] max-h-[92vh]" : "max-w-3xl max-h-[calc(100vh-7.5rem)] sm:max-h-[calc(100vh-8.5rem)] overflow-y-auto"} border border-white/25 shadow-2xl flex flex-col rounded-xl my-auto transition-all duration-300`}>
               {/* Modal Header */}
               <div className="p-3.5 sm:p-5 border-b border-white/15 flex items-center justify-between sticky top-0 bg-black/95 backdrop-blur z-20 gap-2">
                 <div className="min-w-0 flex-1 pr-2">
@@ -2417,6 +3111,138 @@ export default function AddSecDashboard() {
                       </div>
                     </div>
 
+                    {/* Interview Date & Slot */}
+                    <div className="p-3.5 rounded-lg bg-cyan-950/20 border border-cyan-500/30 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-mono text-cyan-300 uppercase tracking-wider flex items-center gap-1.5 font-bold">
+                          <FaCalendarAlt className="text-cyan-400 text-xs" />
+                          <span>Interview Date & Time</span>
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              saveInterviewStatus(
+                                currentModalApp._id,
+                                currentModalApp.interviewStatus === "completed" ? "pending" : "completed"
+                              )
+                            }
+                            disabled={statusSavingId === currentModalApp._id}
+                            className={`px-2.5 py-1 rounded text-xs font-mono font-bold uppercase transition-all cursor-pointer flex items-center gap-1.5 ${
+                              currentModalApp.interviewStatus === "completed"
+                                ? "bg-emerald-500/25 text-emerald-300 border border-emerald-500/60 hover:bg-emerald-500/40"
+                                : "bg-white/10 text-gray-300 border border-white/20 hover:bg-white/20 hover:text-white"
+                            }`}
+                            title={
+                              currentModalApp.interviewStatus === "completed"
+                                ? "Interview marked completed. Click to mark pending."
+                                : "Click to mark interview as completed."
+                            }
+                          >
+                            {statusSavingId === currentModalApp._id ? (
+                              <span className="animate-pulse">Saving...</span>
+                            ) : currentModalApp.interviewStatus === "completed" ? (
+                              <>
+                                <FaCheckCircle className="text-emerald-400 text-xs" />
+                                <span>Interview Completed</span>
+                              </>
+                            ) : currentModalApp.interviewStatus === "in_queue" ? (
+                              <span>In Queue</span>
+                            ) : (
+                              <>
+                                <span className="text-gray-500">⚪</span>
+                                <span>Interview Pending</span>
+                              </>
+                            )}
+                          </button>
+                          {dateSavedId === currentModalApp._id && (
+                            <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
+                              <FaCheckCircle /> Date Saved
+                            </span>
+                          )}
+                          {slotSavedId === currentModalApp._id && (
+                            <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
+                              <FaCheckCircle /> Slot Saved
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {/* Date input */}
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider block">Date</span>
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="date"
+                              value={modalEdit.interviewDate !== undefined ? modalEdit.interviewDate : (currentModalApp.interviewDate || "")}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                handleInlineChange(currentModalApp._id, "interviewDate", val);
+                                saveInterviewDate(currentModalApp._id, val);
+                              }}
+                              style={{ colorScheme: "dark" }}
+                              className="flex-1 px-3 py-2 bg-black/80 rounded text-xs font-mono text-cyan-200 border border-cyan-500/30 focus:border-cyan-400 focus:outline-none cursor-pointer"
+                              title="Click to select interview date"
+                            />
+                            {(modalEdit.interviewDate !== undefined ? modalEdit.interviewDate : currentModalApp.interviewDate) ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleInlineChange(currentModalApp._id, "interviewDate", "");
+                                  saveInterviewDate(currentModalApp._id, "");
+                                }}
+                                className="px-2 py-2 border border-rose-500/30 hover:border-rose-500 text-rose-400 font-mono text-xs rounded transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                                title="Clear date"
+                              >
+                                <FaTimes className="text-[10px]" />
+                              </button>
+                            ) : null}
+                            {dateSavingId === currentModalApp._id ? (
+                              <span className="text-[10px] font-mono text-cyan-400 animate-pulse">...</span>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        {/* Time input */}
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider block">Time Slot</span>
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="time"
+                              value={normalizeToTimeInputValue(modalEdit.interviewSlot !== undefined ? modalEdit.interviewSlot : (currentModalApp.interviewSlot || ""))}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                handleInlineChange(currentModalApp._id, "interviewSlot", val);
+                                saveInterviewSlot(currentModalApp._id, val);
+                              }}
+                              style={{ colorScheme: "dark" }}
+                              className="flex-1 px-3 py-2 bg-black/80 rounded text-xs font-mono text-cyan-200 border border-cyan-500/30 focus:border-cyan-400 focus:outline-none cursor-pointer"
+                              title="Click to select interview time"
+                            />
+                            {(modalEdit.interviewSlot !== undefined ? modalEdit.interviewSlot : currentModalApp.interviewSlot) ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleInlineChange(currentModalApp._id, "interviewSlot", "");
+                                  saveInterviewSlot(currentModalApp._id, "");
+                                }}
+                                className="px-2 py-2 border border-rose-500/30 hover:border-rose-500 text-rose-400 font-mono text-xs rounded transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                                title="Clear time slot"
+                              >
+                                <FaTimes className="text-[10px]" />
+                              </button>
+                            ) : null}
+                            {slotSavingId === currentModalApp._id ? (
+                              <span className="text-[10px] font-mono text-cyan-400 animate-pulse">...</span>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-[10px] font-mono text-gray-400 mt-1">
+                        Set the interview date and time slot. Any changes automatically save and reflect across the admin recruitment portal.
+                      </p>
+                    </div>
+
                     {/* Optional Overall Comments / Notes */}
                     <div>
                       <label className="block text-xs font-mono text-gray-300 mb-1 uppercase tracking-wider">
@@ -2446,8 +3272,17 @@ export default function AddSecDashboard() {
                         type="button"
                         onClick={() =>
                           saveEvaluation(currentModalApp._id, {
+                            ...modalEdit,
                             feedback: autoScore > 0 ? "positive" : autoScore < 0 ? "negative" : "waitlist",
                             points: displayScore,
+                            interviewSlot:
+                              modalEdit.interviewSlot !== undefined
+                                ? modalEdit.interviewSlot
+                                : currentModalApp.interviewSlot,
+                            interviewDate:
+                              modalEdit.interviewDate !== undefined
+                                ? modalEdit.interviewDate
+                                : currentModalApp.interviewDate,
                           })
                         }
                         disabled={modalEdit.isSaving}
@@ -2484,7 +3319,16 @@ export default function AddSecDashboard() {
           </div>
         </div>
         );
-      })()}
+      })(),
+      document.body
+    )}
+
+      {/* Change User ID and Password Modal */}
+      <ChangeCredentialsModal
+        isOpen={credsModalOpen}
+        onClose={() => setCredsModalOpen(false)}
+        session={session}
+      />
     </div>
   );
 }

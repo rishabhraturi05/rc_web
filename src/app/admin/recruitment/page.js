@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 import {
   FaArrowLeft,
@@ -29,8 +30,17 @@ import {
   FaFilePdf,
   FaColumns,
   FaExternalLinkAlt,
+  FaWhatsapp,
+  FaPhoneAlt,
+  FaUserTie,
+  FaSignOutAlt,
+  FaUserClock,
+  FaCheck,
+  FaUsers,
+  FaCalendarAlt,
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
+import InterviewQueuePanel from "@/app/components/InterviewQueuePanel";
 import {
   DEFAULT_DEPARTMENT_OPTIONS,
   DEFAULT_YEAR_OPTIONS,
@@ -40,6 +50,10 @@ import {
   isDepartmentField,
   isYearField,
   getApplicantResumeInfo,
+  normalizeToTimeInputValue,
+  formatTimeSlot,
+  formatInterviewDate,
+  parseTimeSlotToMinutes,
 } from "@/app/lib/recruitment";
 
 const DEFAULT_DEADLINE = "2026-12-31T23:59";
@@ -61,6 +75,11 @@ const blankForm = {
   deadline: DEFAULT_DEADLINE,
   departments: [...DEFAULT_DEPARTMENT_OPTIONS],
   years: [...DEFAULT_YEAR_OPTIONS],
+  whatsappLink: "",
+  pocs: [
+    { name: "", phone: "" },
+    { name: "", phone: "" },
+  ],
   fields: [
     { ...blankField(), name: "name", label: "Name", type: "text", required: true },
     { ...blankField(), name: "email", label: "Email", type: "email", required: true },
@@ -110,14 +129,26 @@ function getCandidateScoreInfo(app, edit) {
     edit?.comments !== undefined ? edit.comments : app?.comments;
   const hasComments = Boolean(currentComments && String(currentComments).trim() !== "");
 
+  const currentFeedback = edit?.feedback !== undefined ? edit.feedback : app?.feedback;
+  const hasFeedback = Boolean(
+    currentFeedback &&
+    String(currentFeedback).trim() !== "" &&
+    !["pending", "none", "null", "undefined"].includes(String(currentFeedback).trim().toLowerCase())
+  );
+
+  const hasEvaluator = Boolean(
+    app?.evaluatedBy &&
+    String(app.evaluatedBy).trim() !== "" &&
+    !["pending", "none", "null", "undefined"].includes(String(app.evaluatedBy).trim().toLowerCase())
+  );
+
   let scoreNum = null;
   let scoreFormatted = "—";
-  let isEvaluated = false;
+  const isEvaluated = Boolean(hasRemarks || hasPoints || hasComments || hasFeedback || hasEvaluator);
 
   if (hasRemarks) {
     scoreNum = currentPos.length - currentNeg.length;
     scoreFormatted = scoreNum > 0 ? `+${scoreNum}` : `${scoreNum}`;
-    isEvaluated = true;
   } else if (hasPoints) {
     const parsed = parseFloat(currentPoints);
     if (!Number.isNaN(parsed)) {
@@ -126,9 +157,6 @@ function getCandidateScoreInfo(app, edit) {
     } else {
       scoreFormatted = String(currentPoints);
     }
-    isEvaluated = true;
-  } else if (hasComments) {
-    isEvaluated = true;
   }
 
   let status = "pending";
@@ -181,6 +209,16 @@ function buildSheetRows(form, applications, inlineEdits = {}) {
       "Points / Score": scoreInfo.isEvaluated ? scoreInfo.scoreFormatted : "",
       "Positive Remarks (+1)": Array.isArray(posRemarks) ? posRemarks.join("; ") : "",
       "Negative Remarks (-1)": Array.isArray(negRemarks) ? negRemarks.join("; ") : "",
+      "Interview Slot": formatTimeSlot(edit.interviewSlot !== undefined ? edit.interviewSlot : application.interviewSlot),
+      "Interview Date": formatInterviewDate(edit.interviewDate !== undefined ? edit.interviewDate : application.interviewDate),
+      "Panel": edit.panel !== undefined ? edit.panel : (application.panel || ""),
+      "Interview Status":
+        application.interviewStatus === "in_queue"
+          ? `In Queue (${application.queueDepartment || application.department})`
+          : application.interviewStatus === "completed"
+          ? "Interview Done"
+          : "Pending",
+      "Interview Done At": application.interviewCompletedAt ? new Date(application.interviewCompletedAt).toLocaleString() : "",
       "Comments / Remarks": commentsVal,
       "Evaluated By": application.evaluatedBy || "Pending",
       "Evaluated At": application.evaluatedAt ? new Date(application.evaluatedAt).toLocaleString() : "",
@@ -221,6 +259,7 @@ export default function RecruitmentAdminPage() {
   const [editingApplication, setEditingApplication] = useState(null);
   const [savingApplication, setSavingApplication] = useState(false);
   const [applicationFormValues, setApplicationFormValues] = useState({
+    departments: [],
     department: "",
     year: "",
     responses: {},
@@ -231,32 +270,71 @@ export default function RecruitmentAdminPage() {
   const [evaluationFilter, setEvaluationFilter] = useState("all"); // 'all', 'evaluated', 'pending'
   const [scoreFilter, setScoreFilter] = useState("all"); // 'all', 'positive', 'zero', 'negative', 'pending'
   const [sortBy, setSortBy] = useState("newest"); // 'newest', 'oldest', 'points_desc', 'points_asc', 'name_asc'
+  const [interviewStatusFilter, setInterviewStatusFilter] = useState("all"); // 'all', 'in_queue', 'completed', 'pending'
+  const [selectedDate, setSelectedDate] = useState("all"); // 'all', 'pending', 'has_date', or 'YYYY-MM-DD'
+  const [slotFilter, setSlotFilter] = useState("all"); // 'all', 'slot_given', 'slot_not_given', 'date_given', 'date_not_given', 'both_given', 'neither_given', 'slot_no_date'
+
+  // Interview Queue state
+  const [isQueueOpen, setIsQueueOpen] = useState(false);
+  const [loadingQueueActionId, setLoadingQueueActionId] = useState(null);
+  const [openQueueMenuId, setOpenQueueMenuId] = useState(null);
+  const [queueModalCandidate, setQueueModalCandidate] = useState(null);
+  const [isRefreshingQueue, setIsRefreshingQueue] = useState(false);
 
   // Inline edits state: { [appId]: { points, comments, feedback, positiveRemarks, negativeRemarks, isDirty, isSaving, savedRecently } }
   const [inlineEdits, setInlineEdits] = useState({});
+  const [slotSavingId, setSlotSavingId] = useState(null);
+  const [slotSavedId, setSlotSavedId] = useState(null);
+  const [dateSavingId, setDateSavingId] = useState(null);
+  const [dateSavedId, setDateSavedId] = useState(null);
+  const [panelSavingId, setPanelSavingId] = useState(null);
+  const [panelSavedId, setPanelSavedId] = useState(null);
 
   // Review Modal state
   const [modalAppIndex, setModalAppIndex] = useState(null);
+  const [activeModalAppId, setActiveModalAppId] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [showResumeSplit, setShowResumeSplit] = useState(true);
   const [newPositiveInput, setNewPositiveInput] = useState("");
   const [newNegativeInput, setNewNegativeInput] = useState("");
+  const [mounted, setMounted] = useState(false);
 
-  const initialFetchDone = useRef(false);
-  const debounceTimers = useRef({});
-  const userRole = session?.user?.role;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const handleGlobalClick = (e) => {
+      if (openQueueMenuId && !e.target.closest(".relative")) {
+        setOpenQueueMenuId(null);
+      }
+    };
+    window.addEventListener("click", handleGlobalClick);
+    return () => window.removeEventListener("click", handleGlobalClick);
+  }, [openQueueMenuId]);
+
+  useEffect(() => {
+    if (modalOpen || editingApplication || queueModalCandidate) {
+      document.body.style.overflow = "hidden";
+      document.body.classList.add("admin-modal-open");
+    } else {
+      document.body.style.overflow = "";
+      document.body.classList.remove("admin-modal-open");
+    }
+    return () => {
+      document.body.style.overflow = "";
+      document.body.classList.remove("admin-modal-open");
+    };
+  }, [modalOpen, editingApplication, queueModalCandidate]);
 
   useEffect(() => {
     if (status === "loading") return;
-    if (status === "unauthenticated" || userRole !== "admin") {
+    if (status === "unauthenticated" || session?.user?.role !== "admin") {
       router.push("/admin/login");
       return;
     }
-    if (!initialFetchDone.current) {
-      initialFetchDone.current = true;
-      fetchForms(true);
-    }
-  }, [status, userRole, router]);
+    fetchForms();
+  }, [status, session, router]);
 
   const activeForms = useMemo(
     () => forms.filter((form) => form.isOpen && (!form.deadline || new Date(form.deadline) > new Date())),
@@ -279,52 +357,200 @@ export default function RecruitmentAdminPage() {
     );
   }, [selectedForm]);
 
-  const filteredApplications = useMemo(() => {
+  // Candidate identity key helper
+  const getCandidateKey = (app) => {
+    const email = String(app.responses?.email || "").trim().toLowerCase();
+    const roll = String(app.responses?.rollno || app.responses?.rollNumber || "").trim().toLowerCase();
+    if (email) return `email:${email}`;
+    if (roll) return `roll:${roll}`;
+    return `id:${app._id}`;
+  };
+
+  // Available distinct interview dates in current application list
+  const availableDates = useMemo(() => {
+    const dates = new Set();
+    applications.forEach((app) => {
+      const editDate = inlineEdits[app._id]?.interviewDate;
+      const d = editDate !== undefined ? editDate : app.interviewDate;
+      if (d && String(d).trim()) {
+        dates.add(String(d).trim());
+      }
+    });
+    return Array.from(dates).sort();
+  }, [applications, inlineEdits]);
+
+  const groupedApplications = useMemo(() => {
     if (!applications.length) return [];
 
-    let list = applications.filter((application) => {
+    // 1. Group raw applications by candidate identity
+    const groupsMap = new Map();
+    for (const app of applications) {
+      const key = getCandidateKey(app);
+      if (!groupsMap.has(key)) {
+        groupsMap.set(key, {
+          key,
+          primaryApp: app,
+          candidateName: app.responses?.name || app.responses?.fullName || "Applicant",
+          candidateRoll: app.responses?.rollno || app.responses?.rollNumber || "—",
+          candidateEmail: app.responses?.email || "—",
+          candidateYear: app.year || app.responses?.year || "—",
+          createdAt: app.createdAt,
+          deptApplications: [],
+        });
+      }
+      const group = groupsMap.get(key);
+      if (new Date(app.createdAt) > new Date(group.createdAt)) {
+        group.createdAt = app.createdAt;
+      }
+      group.deptApplications.push(app);
+    }
+
+    const allGroups = Array.from(groupsMap.values());
+
+    // 2. Filter groups
+    let list = allGroups.filter((group) => {
       // 1. Department filter
-      const matchDept = selectedDepartment === "all" || application.department === selectedDepartment;
-      if (!matchDept) return false;
+      if (selectedDepartment !== "all") {
+        const hasDept = group.deptApplications.some((d) => d.department === selectedDepartment);
+        if (!hasDept) return false;
+      }
 
       // 2. Year filter
-      const appYear = application.year || application.responses?.year || "";
-      const matchYear = selectedYear === "all" || appYear === selectedYear;
-      if (!matchYear) return false;
+      if (selectedYear !== "all") {
+        const matchYear = group.candidateYear === selectedYear;
+        if (!matchYear) return false;
+      }
 
-      const scoreInfo = getCandidateScoreInfo(application, inlineEdits[application._id]);
+      // Relevant department applications (scoped to selectedDepartment when filtered)
+      const relevantDeptApps = selectedDepartment !== "all"
+        ? group.deptApplications.filter((d) => d.department === selectedDepartment)
+        : group.deptApplications;
+
+      const deptScoreInfos = relevantDeptApps.map((d) =>
+        getCandidateScoreInfo(d, inlineEdits[d._id])
+      );
 
       // 3. Evaluation status filter
-      if (evaluationFilter === "evaluated" && !scoreInfo.isEvaluated) return false;
-      if (evaluationFilter === "pending" && scoreInfo.isEvaluated) return false;
+      if (evaluationFilter === "evaluated") {
+        const anyEvaluated = deptScoreInfos.some((info) => info.isEvaluated);
+        if (!anyEvaluated) return false;
+      } else if (evaluationFilter === "pending") {
+        const anyPending = deptScoreInfos.some((info) => !info.isEvaluated);
+        if (!anyPending) return false;
+      }
 
-      // 4. Score status filter (Positive / Zero / Negative / Pending)
-      if (scoreFilter === "positive" && scoreInfo.status !== "positive") return false;
-      if (scoreFilter === "zero" && (scoreInfo.status !== "zero" || !scoreInfo.isEvaluated)) return false;
-      if (scoreFilter === "negative" && scoreInfo.status !== "negative") return false;
-      if (scoreFilter === "pending" && scoreInfo.isEvaluated) return false;
+      // 4. Score filter
+      if (scoreFilter === "positive") {
+        const anyPos = deptScoreInfos.some((info) => info.status === "positive");
+        if (!anyPos) return false;
+      } else if (scoreFilter === "zero") {
+        const anyZero = deptScoreInfos.some((info) => info.status === "zero" && info.isEvaluated);
+        if (!anyZero) return false;
+      } else if (scoreFilter === "negative") {
+        const anyNeg = deptScoreInfos.some((info) => info.status === "negative");
+        if (!anyNeg) return false;
+      } else if (scoreFilter === "pending") {
+        const anyPending = deptScoreInfos.some((info) => !info.isEvaluated);
+        if (!anyPending) return false;
+      }
 
-      // 5. Search query
+      // 5. Interview status filter
+      if (interviewStatusFilter === "in_queue") {
+        const anyInQueue = relevantDeptApps.some((d) => d.interviewStatus === "in_queue");
+        if (!anyInQueue) return false;
+      } else if (interviewStatusFilter === "completed") {
+        const anyCompleted = relevantDeptApps.some((d) => d.interviewStatus === "completed");
+        if (!anyCompleted) return false;
+      } else if (interviewStatusFilter === "pending") {
+        const anyPendingOrUnmarked = relevantDeptApps.some(
+          (d) => !d.interviewStatus || d.interviewStatus === "pending"
+        );
+        if (!anyPendingOrUnmarked) return false;
+      }
+
+      // 6. Filter According to Date
+      if (selectedDate !== "all") {
+        const candidateDates = relevantDeptApps.map((d) => {
+          const editDate = inlineEdits[d._id]?.interviewDate;
+          return editDate !== undefined ? editDate : d.interviewDate || "";
+        });
+
+        if (selectedDate === "pending" || selectedDate === "no_date") {
+          const allNoDate = candidateDates.every((d) => !d);
+          if (!allNoDate) return false;
+        } else if (selectedDate === "has_date") {
+          const anyHasDate = candidateDates.some((d) => Boolean(d));
+          if (!anyHasDate) return false;
+        } else {
+          const matchDate = candidateDates.some((d) => d === selectedDate);
+          if (!matchDate) return false;
+        }
+      }
+
+      // 7. Slot & Date Filter
+      if (slotFilter !== "all") {
+        const cSlot = relevantDeptApps.find(
+          (d) => (inlineEdits[d._id]?.interviewSlot !== undefined ? inlineEdits[d._id].interviewSlot : d.interviewSlot)
+        );
+        const currentSlotVal = cSlot
+          ? (inlineEdits[cSlot._id]?.interviewSlot !== undefined ? inlineEdits[cSlot._id].interviewSlot : cSlot.interviewSlot)
+          : (inlineEdits[group.primaryApp._id]?.interviewSlot !== undefined ? inlineEdits[group.primaryApp._id].interviewSlot : group.primaryApp.interviewSlot) || "";
+
+        const cDate = relevantDeptApps.find(
+          (d) => (inlineEdits[d._id]?.interviewDate !== undefined ? inlineEdits[d._id].interviewDate : d.interviewDate)
+        );
+        const currentDateVal = cDate
+          ? (inlineEdits[cDate._id]?.interviewDate !== undefined ? inlineEdits[cDate._id].interviewDate : cDate.interviewDate)
+          : (inlineEdits[group.primaryApp._id]?.interviewDate !== undefined ? inlineEdits[group.primaryApp._id].interviewDate : group.primaryApp.interviewDate) || "";
+
+        const hasSlot = Boolean(String(currentSlotVal || "").trim());
+        const hasDate = Boolean(String(currentDateVal || "").trim());
+
+        if (slotFilter === "slot_given" && !hasSlot) return false;
+        if (slotFilter === "slot_not_given" && hasSlot) return false;
+        if (slotFilter === "date_given" && !hasDate) return false;
+        if (slotFilter === "date_not_given" && hasDate) return false;
+        if (slotFilter === "both_given" && (!hasSlot || !hasDate)) return false;
+        if (slotFilter === "neither_given" && (hasSlot || hasDate)) return false;
+        if (slotFilter === "slot_no_date" && (!hasSlot || hasDate)) return false;
+      }
+
+      // 8. Search query
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim();
-        const candidateName = String(
-          application.responses?.name || application.responses?.fullName || ""
-        ).toLowerCase();
-        const candidateRoll = String(
-          application.responses?.rollno || application.responses?.rollNumber || ""
-        ).toLowerCase();
-        const candidateEmail = String(application.responses?.email || "").toLowerCase();
-        const candidateComments = String(scoreInfo.comments).toLowerCase();
+        const cName = group.candidateName.toLowerCase();
+        const cRoll = group.candidateRoll.toLowerCase();
+        const cEmail = group.candidateEmail.toLowerCase();
+        const cDepts = group.deptApplications.map((d) => String(d.department || "").toLowerCase()).join(" ");
+        const cComments = deptScoreInfos.map((i) => String(i.comments).toLowerCase()).join(" ");
 
-        const allAnswers = Object.values(application.responses || {})
+        const cSlots = group.deptApplications
+          .map((d) => {
+            const editSlot = inlineEdits[d._id]?.interviewSlot;
+            return String(editSlot !== undefined ? editSlot : d.interviewSlot || "").toLowerCase();
+          })
+          .join(" ");
+
+        const cDates = group.deptApplications
+          .map((d) => {
+            const editDate = inlineEdits[d._id]?.interviewDate;
+            return String(editDate !== undefined ? editDate : d.interviewDate || "").toLowerCase();
+          })
+          .join(" ");
+
+        const allAnswers = group.deptApplications
+          .flatMap((d) => Object.values(d.responses || {}))
           .map((v) => String(v).toLowerCase())
           .join(" ");
 
         const matches =
-          candidateName.includes(query) ||
-          candidateRoll.includes(query) ||
-          candidateEmail.includes(query) ||
-          candidateComments.includes(query) ||
+          cName.includes(query) ||
+          cRoll.includes(query) ||
+          cEmail.includes(query) ||
+          cDepts.includes(query) ||
+          cComments.includes(query) ||
+          cSlots.includes(query) ||
+          cDates.includes(query) ||
           allAnswers.includes(query);
 
         if (!matches) return false;
@@ -333,29 +559,67 @@ export default function RecruitmentAdminPage() {
       return true;
     });
 
-    // Sorting
+    // 3. Sorting
     list = [...list].sort((a, b) => {
       if (sortBy === "oldest") {
         return new Date(a.createdAt) - new Date(b.createdAt);
       }
+      if (sortBy === "slot_asc" || sortBy === "slot_desc") {
+        const getGroupSlotMinutes = (group) => {
+          const candidateSlotApp = group.deptApplications.find(
+            (d) => (inlineEdits[d._id]?.interviewSlot !== undefined ? inlineEdits[d._id].interviewSlot : d.interviewSlot)
+          );
+          const slotVal = candidateSlotApp
+            ? (inlineEdits[candidateSlotApp._id]?.interviewSlot !== undefined ? inlineEdits[candidateSlotApp._id].interviewSlot : candidateSlotApp.interviewSlot)
+            : (inlineEdits[group.primaryApp._id]?.interviewSlot !== undefined ? inlineEdits[group.primaryApp._id].interviewSlot : group.primaryApp.interviewSlot) || "";
+          return parseTimeSlotToMinutes(slotVal);
+        };
+
+        const minA = getGroupSlotMinutes(a);
+        const minB = getGroupSlotMinutes(b);
+
+        if (minA !== null && minB !== null) {
+          if (minA !== minB) {
+            return sortBy === "slot_asc" ? minA - minB : minB - minA;
+          }
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        }
+        if (minA !== null && minB === null) return -1;
+        if (minA === null && minB !== null) return 1;
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      }
       if (sortBy === "points_desc") {
-        const infoA = getCandidateScoreInfo(a, inlineEdits[a._id]);
-        const infoB = getCandidateScoreInfo(b, inlineEdits[b._id]);
-        const pA = infoA.scoreNum !== null ? infoA.scoreNum : -999999;
-        const pB = infoB.scoreNum !== null ? infoB.scoreNum : -999999;
-        return pB - pA;
+        const maxScoreA = Math.max(
+          ...a.deptApplications.map((d) => {
+            const info = getCandidateScoreInfo(d, inlineEdits[d._id]);
+            return info.scoreNum !== null ? info.scoreNum : -999999;
+          })
+        );
+        const maxScoreB = Math.max(
+          ...b.deptApplications.map((d) => {
+            const info = getCandidateScoreInfo(d, inlineEdits[d._id]);
+            return info.scoreNum !== null ? info.scoreNum : -999999;
+          })
+        );
+        return maxScoreB - maxScoreA;
       }
       if (sortBy === "points_asc") {
-        const infoA = getCandidateScoreInfo(a, inlineEdits[a._id]);
-        const infoB = getCandidateScoreInfo(b, inlineEdits[b._id]);
-        const pA = infoA.scoreNum !== null ? infoA.scoreNum : 999999;
-        const pB = infoB.scoreNum !== null ? infoB.scoreNum : 999999;
-        return pA - pB;
+        const minScoreA = Math.min(
+          ...a.deptApplications.map((d) => {
+            const info = getCandidateScoreInfo(d, inlineEdits[d._id]);
+            return info.scoreNum !== null ? info.scoreNum : 999999;
+          })
+        );
+        const minScoreB = Math.min(
+          ...b.deptApplications.map((d) => {
+            const info = getCandidateScoreInfo(d, inlineEdits[d._id]);
+            return info.scoreNum !== null ? info.scoreNum : 999999;
+          })
+        );
+        return minScoreA - minScoreB;
       }
       if (sortBy === "name_asc") {
-        const nameA = String(a.responses?.name || "").toLowerCase();
-        const nameB = String(b.responses?.name || "").toLowerCase();
-        return nameA.localeCompare(nameB);
+        return a.candidateName.localeCompare(b.candidateName);
       }
       return new Date(b.createdAt) - new Date(a.createdAt);
     });
@@ -367,10 +631,17 @@ export default function RecruitmentAdminPage() {
     selectedYear,
     evaluationFilter,
     scoreFilter,
+    interviewStatusFilter,
+    selectedDate,
+    slotFilter,
     searchQuery,
     sortBy,
     inlineEdits,
   ]);
+
+  const filteredApplications = useMemo(() => {
+    return groupedApplications.flatMap((g) => g.deptApplications);
+  }, [groupedApplications]);
 
   // Overall Statistics for this Form (or selected department)
   const stats = useMemo(() => {
@@ -405,44 +676,222 @@ export default function RecruitmentAdminPage() {
     return { total, evaluated, pending, avgScore, positiveCount, zeroCount, negativeCount };
   }, [applications, selectedDepartment, inlineEdits]);
 
-  // Handle inline change with direct MongoDB debounced auto-save
+  // Handle inline change for points, comments, verdict
   const handleInlineChange = (appId, field, value) => {
-    const nextEdit = {
-      ...(inlineEdits[appId] || {}),
-      [field]: value,
-      isDirty: true,
-      savedRecently: false,
-    };
-
     setInlineEdits((prev) => ({
       ...prev,
-      [appId]: nextEdit,
+      [appId]: {
+        ...(prev[appId] || {}),
+        [field]: value,
+        isDirty: true,
+        savedRecently: false,
+      },
     }));
-
-    // Debounce auto-save directly to MongoDB (700ms)
-    if (debounceTimers.current[appId]) {
-      clearTimeout(debounceTimers.current[appId]);
-    }
-    debounceTimers.current[appId] = setTimeout(() => {
-      saveEvaluation(appId, nextEdit, true);
-    }, 700);
   };
 
-  // Save evaluation for a single applicant directly to MongoDB
-  const saveEvaluation = async (appId, customOverrides = null, silent = false) => {
-    const currentApp = applications.find((a) => a._id === appId);
-    const existingEdit = inlineEdits[appId] || {};
-    const edit = {
-      points: currentApp?.points || "",
-      comments: currentApp?.comments || "",
-      feedback: currentApp?.feedback || "",
-      positiveRemarks: Array.isArray(currentApp?.positiveRemarks) ? [...currentApp.positiveRemarks] : [],
-      negativeRemarks: Array.isArray(currentApp?.negativeRemarks) ? [...currentApp.negativeRemarks] : [],
-      ...existingEdit,
-      ...(customOverrides || {}),
-    };
+  // Queue Position & Status Helpers
+  const getQueuePositionInfo = (appId) => {
+    const targetApp = applications.find((a) => a._id === appId);
+    if (!targetApp || targetApp.interviewStatus !== "in_queue") return null;
 
-    if (!selectedForm || !appId) return;
+    const dept = targetApp.queueDepartment || targetApp.department || "Software";
+    const deptQueue = applications
+      .filter(
+        (a) =>
+          a.interviewStatus === "in_queue" &&
+          (a.queueDepartment === dept || a.department === dept)
+      )
+      .sort((a, b) => {
+        const orderA = a.queueOrder !== undefined ? a.queueOrder : 0;
+        const orderB = b.queueOrder !== undefined ? b.queueOrder : 0;
+        if (orderA !== orderB) return orderA - orderB;
+        const timeA = a.queueAddedAt ? new Date(a.queueAddedAt).getTime() : new Date(a.createdAt).getTime();
+        const timeB = b.queueAddedAt ? new Date(b.queueAddedAt).getTime() : new Date(b.createdAt).getTime();
+        return timeA - timeB;
+      });
+
+    const index = deptQueue.findIndex((a) => a._id === appId);
+    return {
+      department: dept,
+      position: index !== -1 ? index + 1 : 1,
+      totalInDeptQueue: deptQueue.length,
+      isNext: index === 0,
+    };
+  };
+
+  const totalInQueueCount = useMemo(() => {
+    return applications.filter((app) => app.interviewStatus === "in_queue").length;
+  }, [applications]);
+
+  const getDeptQueueCount = (dept) => {
+    return applications.filter(
+      (a) =>
+        a.interviewStatus === "in_queue" &&
+        (a.queueDepartment === dept || a.department === dept)
+    ).length;
+  };
+
+  // Add applicant to department queue (supports being in multiple queues simultaneously)
+  const handleAddToQueue = async (sourceAppId, targetDept) => {
+    if (!selectedForm?._id || !sourceAppId) return;
+
+    setLoadingQueueActionId(sourceAppId);
+    setOpenQueueMenuId(null);
+
+    const addedAt = new Date().toISOString();
+    const chosenDept = targetDept || "Software";
+
+    // Find candidate identity to check if they already have an application for this department
+    const sourceApp = applications.find((a) => a._id === sourceAppId);
+    const candidateEmail = String(sourceApp?.responses?.email || "").trim().toLowerCase();
+    const candidateRoll = String(
+      sourceApp?.responses?.rollno ||
+      sourceApp?.responses?.rollNumber ||
+      sourceApp?.responses?.roll ||
+      ""
+    ).trim().toLowerCase();
+
+    const existingTargetApp = applications.find((a) => {
+      const matchDept = (a.department || "").toLowerCase() === chosenDept.toLowerCase();
+      if (!matchDept) return false;
+      if (a._id === sourceAppId) return true;
+      const e = String(a.responses?.email || "").trim().toLowerCase();
+      const r = String(a.responses?.rollno || a.responses?.rollNumber || a.responses?.roll || "").trim().toLowerCase();
+      return (candidateEmail && e && e === candidateEmail) || (candidateRoll && r && r === candidateRoll);
+    });
+
+    setIsQueueOpen(true);
+
+    if (existingTargetApp) {
+      // Optimistic update of existing department application
+      setApplications((prev) =>
+        prev.map((app) =>
+          app._id === existingTargetApp._id
+            ? {
+                ...app,
+                interviewStatus: "in_queue",
+                queueDepartment: chosenDept,
+                queueAddedAt: addedAt,
+              }
+            : app
+        )
+      );
+
+      try {
+        const res = await fetch(`/api/admin/recruitment/${selectedForm._id}/applications`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            applicationId: existingTargetApp._id,
+            interviewStatus: "in_queue",
+            queueDepartment: chosenDept,
+            queueAddedAt: addedAt,
+          }),
+        });
+        const data = await res.json();
+        if (!data.success) {
+          console.error("Failed to add to queue:", data.message);
+          await fetchApplications(selectedForm._id);
+        }
+      } catch (err) {
+        console.error("Error adding to queue:", err);
+        await fetchApplications(selectedForm._id);
+      } finally {
+        setLoadingQueueActionId(null);
+      }
+    } else {
+      setMessage(`Candidate did not apply for ${chosenDept}. Candidates can only be queued in departments they applied for.`);
+      setLoadingQueueActionId(null);
+    }
+  };
+
+  // Remove applicant from queue (markDone = true => completed, markDone = false => pending/cancelled)
+  const handleRemoveFromQueue = async (applicationId, markDone = true) => {
+    if (!selectedForm?._id || !applicationId) return;
+
+    setLoadingQueueActionId(applicationId);
+    setOpenQueueMenuId(null);
+
+    const completedAt = markDone ? new Date().toISOString() : null;
+    const newStatus = markDone ? "completed" : "pending";
+
+    // Optimistic update
+    setApplications((prev) =>
+      prev.map((app) =>
+        app._id === applicationId
+          ? {
+              ...app,
+              interviewStatus: newStatus,
+              queueDepartment: "",
+              queueAddedAt: null,
+              interviewCompletedAt: completedAt,
+            }
+          : app
+      )
+    );
+
+    try {
+      const res = await fetch(`/api/admin/recruitment/${selectedForm._id}/applications`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId,
+          interviewStatus: newStatus,
+          queueDepartment: "",
+          queueAddedAt: null,
+          interviewCompletedAt: completedAt,
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        console.error("Failed to remove from queue:", data.message);
+        await fetchApplications(selectedForm._id);
+      }
+    } catch (err) {
+      console.error("Error removing from queue:", err);
+      await fetchApplications(selectedForm._id);
+    } finally {
+      setLoadingQueueActionId(null);
+    }
+  };
+
+  // Reorder queue
+  const handleReorderQueue = async (department, reorderedList) => {
+    if (!selectedForm?._id || !Array.isArray(reorderedList)) return;
+
+    const orderMap = new Map();
+    reorderedList.forEach((item, index) => {
+      orderMap.set(item._id, index);
+    });
+
+    setApplications((prev) =>
+      prev.map((app) =>
+        orderMap.has(app._id)
+          ? { ...app, queueOrder: orderMap.get(app._id) }
+          : app
+      )
+    );
+
+    try {
+      const queueUpdates = reorderedList.map((item, index) => ({
+        applicationId: item._id,
+        queueOrder: index,
+      }));
+
+      await fetch(`/api/admin/recruitment/${selectedForm._id}/applications`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ queueUpdates }),
+      });
+    } catch (err) {
+      console.error("Error reordering queue:", err);
+    }
+  };
+
+  // Save evaluation for a single applicant (points, comments, feedback, remarks)
+  const saveEvaluation = async (appId, customOverrides = null) => {
+    const edit = customOverrides ? { ...(inlineEdits[appId] || {}), ...customOverrides } : inlineEdits[appId];
+    if (!selectedForm || !edit) return;
 
     setInlineEdits((prev) => ({
       ...prev,
@@ -460,12 +909,14 @@ export default function RecruitmentAdminPage() {
           feedback: edit.feedback,
           positiveRemarks: edit.positiveRemarks || [],
           negativeRemarks: edit.negativeRemarks || [],
+          interviewSlot: edit.interviewSlot,
+          interviewDate: edit.interviewDate,
         }),
       });
 
       const result = await response.json();
       if (!result.success) {
-        if (!silent) setMessage(result.message || "Failed to save evaluation.");
+        setMessage(result.message || "Failed to save evaluation.");
         setInlineEdits((prev) => ({
           ...prev,
           [appId]: { ...(prev[appId] || {}), isSaving: false },
@@ -484,27 +935,65 @@ export default function RecruitmentAdminPage() {
         },
       }));
 
-      // Update in applications list as well so state matches MongoDB
+      // Helper to match candidate sibling applications across departments
+      const targetApp = applications.find((a) => a._id === appId);
+      const targetEmail = String(targetApp?.responses?.email || "").trim().toLowerCase();
+      const targetRoll = String(
+        targetApp?.responses?.rollno ||
+        targetApp?.responses?.rollNumber ||
+        targetApp?.responses?.roll ||
+        ""
+      ).trim().toLowerCase();
+
+      const isCandidateMatch = (app) => {
+        if (app._id === appId) return true;
+        const e = String(app.responses?.email || "").trim().toLowerCase();
+        const r = String(app.responses?.rollno || app.responses?.rollNumber || app.responses?.roll || "").trim().toLowerCase();
+        return (targetEmail && e && e === targetEmail) || (targetRoll && r && r === targetRoll);
+      };
+
+      // Update in applications list as well (syncing slot & date across all of candidate's applications)
       setApplications((prev) =>
-        prev.map((app) =>
-          app._id === appId
-            ? {
-                ...app,
-                points: edit.points,
-                comments: edit.comments,
-                feedback: edit.feedback,
-                positiveRemarks: edit.positiveRemarks || [],
-                negativeRemarks: edit.negativeRemarks || [],
-                evaluatedBy: result.data?.evaluatedBy || session?.user?.username || "admin",
-                evaluatedAt: result.data?.evaluatedAt || new Date().toISOString(),
-              }
-            : app
-        )
+        prev.map((app) => {
+          if (app._id === appId) {
+            return {
+              ...app,
+              points: edit.points,
+              comments: edit.comments,
+              feedback: edit.feedback,
+              positiveRemarks: edit.positiveRemarks || [],
+              negativeRemarks: edit.negativeRemarks || [],
+              interviewSlot: edit.interviewSlot !== undefined ? edit.interviewSlot : app.interviewSlot,
+              interviewDate: edit.interviewDate !== undefined ? edit.interviewDate : app.interviewDate,
+              evaluatedBy: result.data?.evaluatedBy || session?.user?.username || "admin",
+              evaluatedAt: result.data?.evaluatedAt || new Date().toISOString(),
+            };
+          }
+          if (isCandidateMatch(app)) {
+            const updated = { ...app };
+            if (edit.interviewSlot !== undefined) updated.interviewSlot = edit.interviewSlot;
+            if (edit.interviewDate !== undefined) updated.interviewDate = edit.interviewDate;
+            return updated;
+          }
+          return app;
+        })
       );
 
-      if (!silent) {
-        setMessage("Evaluation saved to MongoDB.");
-        setTimeout(() => setMessage(""), 3000);
+      // Also sync inline edits for sibling applications if slot or date was updated
+      if (edit.interviewSlot !== undefined || edit.interviewDate !== undefined) {
+        setInlineEdits((prev) => {
+          const next = { ...prev };
+          applications.forEach((app) => {
+            if (isCandidateMatch(app) && app._id !== appId) {
+              next[app._id] = {
+                ...(next[app._id] || {}),
+                ...(edit.interviewSlot !== undefined && { interviewSlot: edit.interviewSlot }),
+                ...(edit.interviewDate !== undefined && { interviewDate: edit.interviewDate }),
+              };
+            }
+          });
+          return next;
+        });
       }
 
       setTimeout(() => {
@@ -512,10 +1001,10 @@ export default function RecruitmentAdminPage() {
           ...prev,
           [appId]: { ...(prev[appId] || {}), savedRecently: false },
         }));
-      }, 2500);
+      }, 3000);
     } catch (error) {
       console.error("Save evaluation error:", error);
-      if (!silent) setMessage("Error saving evaluation.");
+      setMessage("Error saving evaluation.");
       setInlineEdits((prev) => ({
         ...prev,
         [appId]: { ...(prev[appId] || {}), isSaving: false },
@@ -523,12 +1012,219 @@ export default function RecruitmentAdminPage() {
     }
   };
 
-  // Live remarks handlers with automatic score calculation (+1 / -1) and direct MongoDB persistence
-  const handleAddPositiveRemark = async (appId) => {
+  // Dedicated interview slot updater (allows quick inline saving from table)
+  const saveInterviewSlot = async (appId, slotValue) => {
+    if (!selectedForm || !appId) return;
+    setSlotSavingId(appId);
+    try {
+      const trimmed = String(slotValue ?? "").trim();
+      const response = await fetch(`/api/admin/recruitment/${selectedForm._id}/applications`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId: appId,
+          interviewSlot: trimmed,
+        }),
+      });
+
+      const result = await response.json();
+      if (!result.success) {
+        setMessage(result.message || "Failed to update interview slot.");
+        return;
+      }
+
+      // Find candidate matching details so sibling applications update in state
+      const targetApp = applications.find((a) => a._id === appId);
+      const targetEmail = String(targetApp?.responses?.email || "").trim().toLowerCase();
+      const targetRoll = String(
+        targetApp?.responses?.rollno ||
+        targetApp?.responses?.rollNumber ||
+        targetApp?.responses?.roll ||
+        ""
+      ).trim().toLowerCase();
+
+      const isCandidateMatch = (app) => {
+        if (app._id === appId) return true;
+        const e = String(app.responses?.email || "").trim().toLowerCase();
+        const r = String(app.responses?.rollno || app.responses?.rollNumber || app.responses?.roll || "").trim().toLowerCase();
+        return (targetEmail && e && e === targetEmail) || (targetRoll && r && r === targetRoll);
+      };
+
+      setApplications((prev) =>
+        prev.map((app) =>
+          isCandidateMatch(app) ? { ...app, interviewSlot: trimmed } : app
+        )
+      );
+
+      setInlineEdits((prev) => {
+        const next = { ...prev };
+        applications.forEach((app) => {
+          if (isCandidateMatch(app)) {
+            next[app._id] = {
+              ...(next[app._id] || {}),
+              interviewSlot: trimmed,
+              isDirty: false,
+            };
+          }
+        });
+        return next;
+      });
+
+      setSlotSavedId(appId);
+      setTimeout(() => {
+        setSlotSavedId((prev) => (prev === appId ? null : prev));
+      }, 2500);
+    } catch (error) {
+      console.error("Save interview slot error:", error);
+      setMessage("Error updating interview slot.");
+    } finally {
+      setSlotSavingId(null);
+    }
+  };
+
+  // Dedicated interview date updater (allows quick inline saving from table)
+  const saveInterviewDate = async (appId, dateValue) => {
+    if (!selectedForm || !appId) return;
+    setDateSavingId(appId);
+    try {
+      const trimmed = String(dateValue ?? "").trim();
+      const response = await fetch(`/api/admin/recruitment/${selectedForm._id}/applications`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId: appId,
+          interviewDate: trimmed,
+        }),
+      });
+
+      const result = await response.json();
+      if (!result.success) {
+        setMessage(result.message || "Failed to update interview date.");
+        return;
+      }
+
+      const targetApp = applications.find((a) => a._id === appId);
+      const targetEmail = String(targetApp?.responses?.email || "").trim().toLowerCase();
+      const targetRoll = String(
+        targetApp?.responses?.rollno ||
+        targetApp?.responses?.rollNumber ||
+        targetApp?.responses?.roll ||
+        ""
+      ).trim().toLowerCase();
+
+      const isCandidateMatch = (app) => {
+        if (app._id === appId) return true;
+        const e = String(app.responses?.email || "").trim().toLowerCase();
+        const r = String(app.responses?.rollno || app.responses?.rollNumber || app.responses?.roll || "").trim().toLowerCase();
+        return (targetEmail && e && e === targetEmail) || (targetRoll && r && r === targetRoll);
+      };
+
+      setApplications((prev) =>
+        prev.map((app) =>
+          isCandidateMatch(app) ? { ...app, interviewDate: trimmed } : app
+        )
+      );
+
+      setInlineEdits((prev) => {
+        const next = { ...prev };
+        applications.forEach((app) => {
+          if (isCandidateMatch(app)) {
+            next[app._id] = {
+              ...(next[app._id] || {}),
+              interviewDate: trimmed,
+              isDirty: false,
+            };
+          }
+        });
+        return next;
+      });
+
+      setDateSavedId(appId);
+      setTimeout(() => {
+        setDateSavedId((prev) => (prev === appId ? null : prev));
+      }, 2500);
+    } catch (error) {
+      console.error("Save interview date error:", error);
+      setMessage("Error updating interview date.");
+    } finally {
+      setDateSavingId(null);
+    }
+  };
+
+  // Dedicated panel updater (allows quick inline saving from table & queue card)
+  const savePanel = async (appId, panelValue) => {
+    if (!selectedForm || !appId) return;
+    setPanelSavingId(appId);
+    try {
+      const trimmed = String(panelValue ?? "").trim();
+      const response = await fetch(`/api/admin/recruitment/${selectedForm._id}/applications`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId: appId,
+          panel: trimmed,
+        }),
+      });
+
+      const result = await response.json();
+      if (!result.success) {
+        setMessage(result.message || "Failed to update panel.");
+        return;
+      }
+
+      // Find candidate matching details so sibling applications update in state
+      const targetApp = applications.find((a) => a._id === appId);
+      const targetEmail = String(targetApp?.responses?.email || "").trim().toLowerCase();
+      const targetRoll = String(
+        targetApp?.responses?.rollno ||
+        targetApp?.responses?.rollNumber ||
+        targetApp?.responses?.roll ||
+        ""
+      ).trim().toLowerCase();
+
+      const isCandidateMatch = (app) => {
+        if (app._id === appId) return true;
+        const e = String(app.responses?.email || "").trim().toLowerCase();
+        const r = String(app.responses?.rollno || app.responses?.rollNumber || app.responses?.roll || "").trim().toLowerCase();
+        return (targetEmail && e && e === targetEmail) || (targetRoll && r && r === targetRoll);
+      };
+
+      setApplications((prev) =>
+        prev.map((app) =>
+          isCandidateMatch(app) ? { ...app, panel: trimmed } : app
+        )
+      );
+
+      setInlineEdits((prev) => {
+        const next = { ...prev };
+        applications.forEach((app) => {
+          if (isCandidateMatch(app)) {
+            next[app._id] = {
+              ...(next[app._id] || {}),
+              panel: trimmed,
+              isDirty: false,
+            };
+          }
+        });
+        return next;
+      });
+
+      setPanelSavedId(appId);
+      setTimeout(() => {
+        setPanelSavedId((prev) => (prev === appId ? null : prev));
+      }, 2500);
+    } catch (error) {
+      console.error("Save panel error:", error);
+      setMessage("Error updating panel.");
+    } finally {
+      setPanelSavingId(null);
+    }
+  };
+
+  // Live remarks handlers with automatic score calculation (+1 / -1)
+  const handleAddPositiveRemark = (appId) => {
     if (!newPositiveInput.trim() || !appId) return;
     const text = newPositiveInput.trim();
-    setNewPositiveInput("");
-
     const currentEdit = inlineEdits[appId] || {};
     const currentApp = applications.find((a) => a._id === appId);
     const currentPos = currentEdit.positiveRemarks !== undefined
@@ -541,46 +1237,22 @@ export default function RecruitmentAdminPage() {
     const nextPos = [...currentPos, text];
     const nextScore = nextPos.length - currentNeg.length;
     const scoreStr = nextScore > 0 ? `+${nextScore}` : `${nextScore}`;
-    const nextFeedback = nextScore > 0 ? "positive" : nextScore < 0 ? "negative" : "waitlist";
-    const commentsVal = currentEdit.comments !== undefined ? currentEdit.comments : (currentApp?.comments || "");
-
-    const newEdit = {
-      ...currentEdit,
-      positiveRemarks: nextPos,
-      negativeRemarks: currentNeg,
-      points: scoreStr,
-      feedback: nextFeedback,
-      comments: commentsVal,
-      isDirty: false,
-      isSaving: true,
-      savedRecently: false,
-    };
 
     setInlineEdits((prev) => ({
       ...prev,
-      [appId]: newEdit,
+      [appId]: {
+        ...(prev[appId] || {}),
+        positiveRemarks: nextPos,
+        negativeRemarks: currentNeg,
+        points: scoreStr,
+        isDirty: true,
+        savedRecently: false,
+      },
     }));
-
-    setApplications((prev) =>
-      prev.map((app) =>
-        app._id === appId
-          ? {
-              ...app,
-              positiveRemarks: nextPos,
-              negativeRemarks: currentNeg,
-              points: scoreStr,
-              feedback: nextFeedback,
-              comments: commentsVal,
-            }
-          : app
-      )
-    );
-
-    // Persist directly to MongoDB
-    await saveEvaluation(appId, newEdit, true);
+    setNewPositiveInput("");
   };
 
-  const handleRemovePositiveRemark = async (appId, index) => {
+  const handleRemovePositiveRemark = (appId, index) => {
     if (!appId) return;
     const currentEdit = inlineEdits[appId] || {};
     const currentApp = applications.find((a) => a._id === appId);
@@ -594,50 +1266,23 @@ export default function RecruitmentAdminPage() {
     const nextPos = currentPos.filter((_, i) => i !== index);
     const nextScore = nextPos.length - currentNeg.length;
     const scoreStr = nextScore > 0 ? `+${nextScore}` : `${nextScore}`;
-    const nextFeedback = nextScore > 0 ? "positive" : nextScore < 0 ? "negative" : "waitlist";
-    const commentsVal = currentEdit.comments !== undefined ? currentEdit.comments : (currentApp?.comments || "");
-
-    const newEdit = {
-      ...currentEdit,
-      positiveRemarks: nextPos,
-      negativeRemarks: currentNeg,
-      points: scoreStr,
-      feedback: nextFeedback,
-      comments: commentsVal,
-      isDirty: false,
-      isSaving: true,
-      savedRecently: false,
-    };
 
     setInlineEdits((prev) => ({
       ...prev,
-      [appId]: newEdit,
+      [appId]: {
+        ...(prev[appId] || {}),
+        positiveRemarks: nextPos,
+        negativeRemarks: currentNeg,
+        points: scoreStr,
+        isDirty: true,
+        savedRecently: false,
+      },
     }));
-
-    setApplications((prev) =>
-      prev.map((app) =>
-        app._id === appId
-          ? {
-              ...app,
-              positiveRemarks: nextPos,
-              negativeRemarks: currentNeg,
-              points: scoreStr,
-              feedback: nextFeedback,
-              comments: commentsVal,
-            }
-          : app
-      )
-    );
-
-    // Persist directly to MongoDB
-    await saveEvaluation(appId, newEdit, true);
   };
 
-  const handleAddNegativeRemark = async (appId) => {
+  const handleAddNegativeRemark = (appId) => {
     if (!newNegativeInput.trim() || !appId) return;
     const text = newNegativeInput.trim();
-    setNewNegativeInput("");
-
     const currentEdit = inlineEdits[appId] || {};
     const currentApp = applications.find((a) => a._id === appId);
     const currentPos = currentEdit.positiveRemarks !== undefined
@@ -650,46 +1295,22 @@ export default function RecruitmentAdminPage() {
     const nextNeg = [...currentNeg, text];
     const nextScore = currentPos.length - nextNeg.length;
     const scoreStr = nextScore > 0 ? `+${nextScore}` : `${nextScore}`;
-    const nextFeedback = nextScore > 0 ? "positive" : nextScore < 0 ? "negative" : "waitlist";
-    const commentsVal = currentEdit.comments !== undefined ? currentEdit.comments : (currentApp?.comments || "");
-
-    const newEdit = {
-      ...currentEdit,
-      positiveRemarks: currentPos,
-      negativeRemarks: nextNeg,
-      points: scoreStr,
-      feedback: nextFeedback,
-      comments: commentsVal,
-      isDirty: false,
-      isSaving: true,
-      savedRecently: false,
-    };
 
     setInlineEdits((prev) => ({
       ...prev,
-      [appId]: newEdit,
+      [appId]: {
+        ...(prev[appId] || {}),
+        positiveRemarks: currentPos,
+        negativeRemarks: nextNeg,
+        points: scoreStr,
+        isDirty: true,
+        savedRecently: false,
+      },
     }));
-
-    setApplications((prev) =>
-      prev.map((app) =>
-        app._id === appId
-          ? {
-              ...app,
-              positiveRemarks: currentPos,
-              negativeRemarks: nextNeg,
-              points: scoreStr,
-              feedback: nextFeedback,
-              comments: commentsVal,
-            }
-          : app
-      )
-    );
-
-    // Persist directly to MongoDB
-    await saveEvaluation(appId, newEdit, true);
+    setNewNegativeInput("");
   };
 
-  const handleRemoveNegativeRemark = async (appId, index) => {
+  const handleRemoveNegativeRemark = (appId, index) => {
     if (!appId) return;
     const currentEdit = inlineEdits[appId] || {};
     const currentApp = applications.find((a) => a._id === appId);
@@ -703,48 +1324,30 @@ export default function RecruitmentAdminPage() {
     const nextNeg = currentNeg.filter((_, i) => i !== index);
     const nextScore = currentPos.length - nextNeg.length;
     const scoreStr = nextScore > 0 ? `+${nextScore}` : `${nextScore}`;
-    const nextFeedback = nextScore > 0 ? "positive" : nextScore < 0 ? "negative" : "waitlist";
-    const commentsVal = currentEdit.comments !== undefined ? currentEdit.comments : (currentApp?.comments || "");
-
-    const newEdit = {
-      ...currentEdit,
-      positiveRemarks: currentPos,
-      negativeRemarks: nextNeg,
-      points: scoreStr,
-      feedback: nextFeedback,
-      comments: commentsVal,
-      isDirty: false,
-      isSaving: true,
-      savedRecently: false,
-    };
 
     setInlineEdits((prev) => ({
       ...prev,
-      [appId]: newEdit,
+      [appId]: {
+        ...(prev[appId] || {}),
+        positiveRemarks: currentPos,
+        negativeRemarks: nextNeg,
+        points: scoreStr,
+        isDirty: true,
+        savedRecently: false,
+      },
     }));
-
-    setApplications((prev) =>
-      prev.map((app) =>
-        app._id === appId
-          ? {
-              ...app,
-              positiveRemarks: currentPos,
-              negativeRemarks: nextNeg,
-              points: scoreStr,
-              feedback: nextFeedback,
-              comments: commentsVal,
-            }
-          : app
-      )
-    );
-
-    // Persist directly to MongoDB
-    await saveEvaluation(appId, newEdit, true);
   };
 
   // Modal navigation
-  const openModal = (index, forceSplit = true) => {
-    setModalAppIndex(index);
+  const openModal = (groupIndex, targetAppId = null, forceSplit = true) => {
+    setModalAppIndex(groupIndex);
+    const targetGroup = groupedApplications[groupIndex];
+    if (targetGroup) {
+      const chosenApp = targetAppId
+        ? targetGroup.deptApplications.find((d) => d._id === targetAppId)
+        : targetGroup.deptApplications[0];
+      setActiveModalAppId(chosenApp ? chosenApp._id : targetGroup.deptApplications[0]?._id || null);
+    }
     setNewPositiveInput("");
     setNewNegativeInput("");
     if (forceSplit) {
@@ -754,27 +1357,19 @@ export default function RecruitmentAdminPage() {
   };
 
   const closeModal = () => {
-    if (currentModalApp && inlineEdits[currentModalApp._id]?.isDirty) {
-      if (debounceTimers.current[currentModalApp._id]) {
-        clearTimeout(debounceTimers.current[currentModalApp._id]);
-      }
-      saveEvaluation(currentModalApp._id, null, true);
-    }
     setModalOpen(false);
     setModalAppIndex(null);
+    setActiveModalAppId(null);
     setNewPositiveInput("");
     setNewNegativeInput("");
   };
 
   const nextModalApp = () => {
-    if (modalAppIndex !== null && modalAppIndex < filteredApplications.length - 1) {
-      if (currentModalApp && inlineEdits[currentModalApp._id]?.isDirty) {
-        if (debounceTimers.current[currentModalApp._id]) {
-          clearTimeout(debounceTimers.current[currentModalApp._id]);
-        }
-        saveEvaluation(currentModalApp._id, null, true);
-      }
-      setModalAppIndex(modalAppIndex + 1);
+    if (modalAppIndex !== null && modalAppIndex < groupedApplications.length - 1) {
+      const nextIdx = modalAppIndex + 1;
+      setModalAppIndex(nextIdx);
+      const nextGroup = groupedApplications[nextIdx];
+      setActiveModalAppId(nextGroup?.deptApplications[0]?._id || null);
       setNewPositiveInput("");
       setNewNegativeInput("");
     }
@@ -782,28 +1377,32 @@ export default function RecruitmentAdminPage() {
 
   const prevModalApp = () => {
     if (modalAppIndex !== null && modalAppIndex > 0) {
-      if (currentModalApp && inlineEdits[currentModalApp._id]?.isDirty) {
-        if (debounceTimers.current[currentModalApp._id]) {
-          clearTimeout(debounceTimers.current[currentModalApp._id]);
-        }
-        saveEvaluation(currentModalApp._id, null, true);
-      }
-      setModalAppIndex(modalAppIndex - 1);
+      const prevIdx = modalAppIndex - 1;
+      setModalAppIndex(prevIdx);
+      const prevGroup = groupedApplications[prevIdx];
+      setActiveModalAppId(prevGroup?.deptApplications[0]?._id || null);
       setNewPositiveInput("");
       setNewNegativeInput("");
     }
   };
 
-  const currentModalApp =
-    modalAppIndex !== null && filteredApplications[modalAppIndex]
-      ? filteredApplications[modalAppIndex]
+  const currentModalGroup =
+    modalAppIndex !== null && groupedApplications[modalAppIndex]
+      ? groupedApplications[modalAppIndex]
       : null;
 
-  const fetchForms = async (isInitial = false) => {
+  const currentModalApp = useMemo(() => {
+    if (!currentModalGroup) return null;
+    if (activeModalAppId) {
+      const found = currentModalGroup.deptApplications.find((d) => d._id === activeModalAppId);
+      if (found) return found;
+    }
+    return currentModalGroup.deptApplications[0] || null;
+  }, [currentModalGroup, activeModalAppId]);
+
+  const fetchForms = async () => {
     try {
-      if (isInitial && !forms.length) {
-        setLoading(true);
-      }
+      setLoading(true);
       const response = await fetch("/api/admin/recruitment", {
         cache: "no-store",
         headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
@@ -863,6 +1462,9 @@ export default function RecruitmentAdminPage() {
           feedback: app.feedback || "",
           positiveRemarks: Array.isArray(app.positiveRemarks) ? [...app.positiveRemarks] : [],
           negativeRemarks: Array.isArray(app.negativeRemarks) ? [...app.negativeRemarks] : [],
+          panel: app.panel || "",
+          interviewSlot: app.interviewSlot || "",
+          interviewDate: app.interviewDate || "",
           isDirty: false,
           isSaving: false,
           savedRecently: false,
@@ -882,10 +1484,73 @@ export default function RecruitmentAdminPage() {
     }
   };
 
-  const openApplicationEditor = (application) => {
+  const fetchApplicationsSilently = async (formId) => {
+    if (!formId) return;
+    try {
+      setIsRefreshingQueue(true);
+      const response = await fetch(`/api/admin/recruitment/${formId}/applications`, {
+        cache: "no-store",
+        headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
+      });
+      const result = await response.json();
+      if (result.success && Array.isArray(result.data?.applications)) {
+        const apps = result.data.applications;
+        setApplications(apps);
+        setInlineEdits((prevEdits) => {
+          const nextEdits = { ...prevEdits };
+          apps.forEach((app) => {
+            if (!prevEdits[app._id]?.isDirty) {
+              nextEdits[app._id] = {
+                points: app.points || "",
+                comments: app.comments || "",
+                feedback: app.feedback || "",
+                positiveRemarks: Array.isArray(app.positiveRemarks) ? [...app.positiveRemarks] : [],
+                negativeRemarks: Array.isArray(app.negativeRemarks) ? [...app.negativeRemarks] : [],
+                panel: app.panel || "",
+                interviewSlot: app.interviewSlot || "",
+                interviewDate: app.interviewDate || "",
+                isDirty: false,
+                isSaving: false,
+                savedRecently: false,
+              };
+            }
+          });
+          return nextEdits;
+        });
+      }
+    } catch (error) {
+      console.error("Silent refresh applications error:", error);
+    } finally {
+      setIsRefreshingQueue(false);
+    }
+  };
+
+  // Auto-sync applications and evaluation scores when Interview Queue is open
+  useEffect(() => {
+    if (!isQueueOpen || !selectedForm?._id) return;
+    const interval = setInterval(() => {
+      fetchApplicationsSilently(selectedForm._id);
+    }, 12000);
+    return () => clearInterval(interval);
+  }, [isQueueOpen, selectedForm?._id]);
+
+  const openApplicationEditor = (application, group = null) => {
+    const targetGroup =
+      group ||
+      groupedApplications.find((g) =>
+        g.deptApplications?.some((d) => String(d._id) === String(application?._id))
+      );
+
+    const initialDepartments = targetGroup
+      ? targetGroup.deptApplications.map((d) => d.department).filter(Boolean)
+      : application?.department
+      ? [application.department]
+      : [];
+
     setEditingApplication(application);
     setApplicationFormValues({
-      department: application.department || selectedForm?.departments?.[0] || "",
+      departments: initialDepartments.length > 0 ? initialDepartments : [selectedForm?.departments?.[0] || "Software"],
+      department: initialDepartments[0] || selectedForm?.departments?.[0] || "",
       year: application.year || application.responses?.year || selectedForm?.years?.[0] || "",
       responses: { ...(application.responses || {}) },
     });
@@ -893,7 +1558,7 @@ export default function RecruitmentAdminPage() {
 
   const closeApplicationEditor = () => {
     setEditingApplication(null);
-    setApplicationFormValues({ department: "", year: "", responses: {} });
+    setApplicationFormValues({ departments: [], department: "", year: "", responses: {} });
   };
 
   const handleApplicationResponseChange = (fieldKey, value) => {
@@ -909,8 +1574,9 @@ export default function RecruitmentAdminPage() {
   const saveApplication = async () => {
     if (!editingApplication || !selectedForm) return;
 
-    if (!applicationFormValues.department) {
-      setMessage("Department is required.");
+    const chosenDepartments = (applicationFormValues.departments || []).filter(Boolean);
+    if (chosenDepartments.length === 0) {
+      setMessage("Please select at least one department.");
       return;
     }
 
@@ -928,7 +1594,8 @@ export default function RecruitmentAdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           applicationId: editingApplication._id,
-          department: applicationFormValues.department,
+          departments: chosenDepartments,
+          department: chosenDepartments[0] || "",
           year: applicationFormValues.year,
           responses: {
             ...applicationFormValues.responses,
@@ -951,6 +1618,32 @@ export default function RecruitmentAdminPage() {
       setMessage("Error updating applicant response.");
     } finally {
       setSavingApplication(false);
+    }
+  };
+
+  const deleteApplicantGroup = async (group) => {
+    if (!selectedForm || !group) return;
+    const count = group.deptApplications.length;
+    const deptNames = group.deptApplications.map((d) => d.department).join(" & ");
+    const confirmed = window.confirm(
+      `Are you sure you want to delete ${group.candidateName}'s application (${count > 1 ? `both ${deptNames}` : deptNames})? This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      for (const app of group.deptApplications) {
+        await fetch(
+          `/api/admin/recruitment/${selectedForm._id}/applications?applicationId=${app._id}`,
+          { method: "DELETE" }
+        );
+      }
+
+      setMessage("Applicant response deleted successfully.");
+      await fetchApplications(selectedForm._id);
+      await fetchForms();
+    } catch (error) {
+      console.error("Delete applicant group error:", error);
+      setMessage("Error deleting applicant response.");
     }
   };
 
@@ -1006,6 +1699,8 @@ export default function RecruitmentAdminPage() {
     }
 
     setEditingId(form._id);
+    const poc1 = (Array.isArray(form?.pocs) && form.pocs[0]) || { name: "", phone: "" };
+    const poc2 = (Array.isArray(form?.pocs) && form.pocs[1]) || { name: "", phone: "" };
     const formFields = ensureDefaultRecruitmentFields(form.fields || [])
       .filter((field) => !["department", "year"].includes(String(field?.name || "").trim().toLowerCase()))
       .map((field) => ({
@@ -1023,6 +1718,11 @@ export default function RecruitmentAdminPage() {
       deadline: form.deadline ? new Date(form.deadline).toISOString().slice(0, 16) : DEFAULT_DEADLINE,
       departments: Array.isArray(form.departments) && form.departments.length ? form.departments : [...DEFAULT_DEPARTMENT_OPTIONS],
       years: Array.isArray(form.years) && form.years.length ? form.years : [...DEFAULT_YEAR_OPTIONS],
+      whatsappLink: form.whatsappLink || "",
+      pocs: [
+        { name: poc1.name || "", phone: poc1.phone || "" },
+        { name: poc2.name || "", phone: poc2.phone || "" },
+      ],
       fields: formFields,
     });
     setShowEditor(true);
@@ -1117,6 +1817,22 @@ export default function RecruitmentAdminPage() {
         fields: finalFields,
         departments,
         years,
+        whatsappLink: String(editor.whatsappLink || "").trim(),
+        pocs: Array.isArray(editor.pocs)
+          ? [
+              {
+                name: String(editor.pocs[0]?.name || "").trim(),
+                phone: String(editor.pocs[0]?.phone || "").trim(),
+              },
+              {
+                name: String(editor.pocs[1]?.name || "").trim(),
+                phone: String(editor.pocs[1]?.phone || "").trim(),
+              },
+            ]
+          : [
+              { name: "", phone: "" },
+              { name: "", phone: "" },
+            ],
       };
 
       const endpoint = editingId ? `/api/admin/recruitment/${editingId}` : "/api/admin/recruitment";
@@ -1242,6 +1958,16 @@ export default function RecruitmentAdminPage() {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await signOut({ redirect: false });
+      router.push("/admin/login");
+      router.refresh();
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
+
   if (status === "loading" || loading) {
     return (
       <div className="relative min-h-screen text-white flex items-center justify-center pt-24">
@@ -1269,7 +1995,7 @@ export default function RecruitmentAdminPage() {
               Manage recruitment forms, deadlines, departments, and applications
             </p>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {!showEditor && (
               <button
                 type="button"
@@ -1279,6 +2005,13 @@ export default function RecruitmentAdminPage() {
                 <FaPlus /> [ + CREATE NEW FORM ]
               </button>
             )}
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-5 py-2.5 border border-white/30 text-gray-300 hover:text-white hover:border-red-500/50 hover:bg-red-600/30 bg-transparent rounded transition-colors font-mono uppercase text-sm tracking-widest cursor-pointer"
+            >
+              <FaSignOutAlt /> [ LOGOUT ]
+            </button>
           </div>
         </div>
 
@@ -1407,6 +2140,151 @@ export default function RecruitmentAdminPage() {
                       <span>{year}</span>
                     </label>
                   ))}
+                </div>
+              </div>
+
+              {/* Official WhatsApp Group Invite Link */}
+              <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/20 p-4 sm:p-5 shadow-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <FaWhatsapp className="text-emerald-400 text-xl shrink-0" />
+                  <label className="font-mono text-sm font-bold text-white uppercase tracking-wider">
+                    Official WhatsApp Group Invite Link
+                  </label>
+                  <span className="text-[10px] font-mono text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-500/40 font-bold">
+                    For Applicants
+                  </span>
+                </div>
+                <input
+                  type="url"
+                  value={editor.whatsappLink || ""}
+                  onChange={(event) => setEditor((prev) => ({ ...prev, whatsappLink: event.target.value }))}
+                  placeholder="e.g. https://chat.whatsapp.com/FoMYMW3X0DnK4EpoeSO9Em..."
+                  className="w-full rounded border border-white/20 bg-black/60 px-3.5 py-2 font-mono text-sm text-white placeholder:text-gray-500 focus:border-emerald-400 focus:outline-none transition-colors"
+                />
+                <p className="font-mono text-xs text-gray-400 mt-1.5 leading-relaxed">
+                  Applicants who submit this recruitment form will receive this link to join the official WhatsApp group for interview slot notifications and drive updates.
+                </p>
+              </div>
+
+              {/* Two Points of Contact (POCs) for this Form */}
+              <div className="rounded-xl border border-cyan-500/40 bg-cyan-950/20 p-4 sm:p-5 space-y-4 shadow-lg">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <FaPhoneAlt className="text-cyan-400 text-base shrink-0" />
+                    <label className="font-mono text-sm font-bold text-white uppercase tracking-wider">
+                      Points of Contact (2 POCs) for this Form
+                    </label>
+                    <span className="text-[10px] font-mono text-cyan-300 bg-cyan-500/20 px-2 py-0.5 rounded border border-cyan-500/40 font-bold">
+                      Contact Persons
+                    </span>
+                  </div>
+                  <p className="font-mono text-xs text-gray-400 leading-relaxed">
+                    Provide names and phone numbers for two club POCs so applicants can contact them directly for queries regarding this recruitment drive.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* POC 1 */}
+                  <div className="rounded-lg border border-white/15 bg-black/60 p-4 space-y-3">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                      <span className="font-mono text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                        <FaUserTie className="text-cyan-400 text-xs" />
+                        Point of Contact 1 (POC 1)
+                      </span>
+                      <span className="text-[10px] font-mono text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-500/30">
+                        Primary POC
+                      </span>
+                    </div>
+                    <div>
+                      <label className="block font-mono text-xs text-gray-400 mb-1">POC 1 Full Name</label>
+                      <input
+                        type="text"
+                        value={editor.pocs?.[0]?.name || ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEditor((prev) => {
+                            const currentPocs = Array.isArray(prev.pocs)
+                              ? [...prev.pocs]
+                              : [{ name: "", phone: "" }, { name: "", phone: "" }];
+                            currentPocs[0] = { ...(currentPocs[0] || {}), name: val };
+                            return { ...prev, pocs: currentPocs };
+                          });
+                        }}
+                        placeholder="e.g. Rishabh Raturi"
+                        className="w-full rounded border border-white/20 bg-black/40 px-3 py-2 font-mono text-sm text-white placeholder:text-gray-500 focus:border-cyan-400 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-mono text-xs text-gray-400 mb-1">POC 1 Contact / Phone Number</label>
+                      <input
+                        type="tel"
+                        value={editor.pocs?.[0]?.phone || ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEditor((prev) => {
+                            const currentPocs = Array.isArray(prev.pocs)
+                              ? [...prev.pocs]
+                              : [{ name: "", phone: "" }, { name: "", phone: "" }];
+                            currentPocs[0] = { ...(currentPocs[0] || {}), phone: val };
+                            return { ...prev, pocs: currentPocs };
+                          });
+                        }}
+                        placeholder="e.g. +91 9876543210"
+                        className="w-full rounded border border-white/20 bg-black/40 px-3 py-2 font-mono text-sm text-white placeholder:text-gray-500 focus:border-cyan-400 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* POC 2 */}
+                  <div className="rounded-lg border border-white/15 bg-black/60 p-4 space-y-3">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                      <span className="font-mono text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                        <FaUserTie className="text-cyan-400 text-xs" />
+                        Point of Contact 2 (POC 2)
+                      </span>
+                      <span className="text-[10px] font-mono text-gray-400 bg-white/5 px-2 py-0.5 rounded border border-white/10">
+                        Secondary POC
+                      </span>
+                    </div>
+                    <div>
+                      <label className="block font-mono text-xs text-gray-400 mb-1">POC 2 Full Name</label>
+                      <input
+                        type="text"
+                        value={editor.pocs?.[1]?.name || ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEditor((prev) => {
+                            const currentPocs = Array.isArray(prev.pocs)
+                              ? [...prev.pocs]
+                              : [{ name: "", phone: "" }, { name: "", phone: "" }];
+                            currentPocs[1] = { ...(currentPocs[1] || {}), name: val };
+                            return { ...prev, pocs: currentPocs };
+                          });
+                        }}
+                        placeholder="e.g. Team Lead / Executive"
+                        className="w-full rounded border border-white/20 bg-black/40 px-3 py-2 font-mono text-sm text-white placeholder:text-gray-500 focus:border-cyan-400 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-mono text-xs text-gray-400 mb-1">POC 2 Contact / Phone Number</label>
+                      <input
+                        type="tel"
+                        value={editor.pocs?.[1]?.phone || ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEditor((prev) => {
+                            const currentPocs = Array.isArray(prev.pocs)
+                              ? [...prev.pocs]
+                              : [{ name: "", phone: "" }, { name: "", phone: "" }];
+                            currentPocs[1] = { ...(currentPocs[1] || {}), phone: val };
+                            return { ...prev, pocs: currentPocs };
+                          });
+                        }}
+                        placeholder="e.g. +91 9123456789"
+                        className="w-full rounded border border-white/20 bg-black/40 px-3 py-2 font-mono text-sm text-white placeholder:text-gray-500 focus:border-cyan-400 focus:outline-none"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1766,11 +2644,31 @@ export default function RecruitmentAdminPage() {
                   </span>
                 </div>
                 <p className="font-mono text-sm text-gray-400 mt-1">
-                  Showing {filteredApplications.length} of {applications.length} submitted applications
+                  Showing {groupedApplications.length} candidates ({applications.length} department entries)
                 </p>
               </div>
 
               <div className="flex flex-wrap gap-3">
+                {/* 4-Department Interview Queue Toggle Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsQueueOpen((prev) => !prev)}
+                  className={`flex items-center gap-2 px-4 py-2 border rounded font-mono text-xs uppercase tracking-widest transition-all cursor-pointer ${
+                    isQueueOpen
+                      ? "bg-cyan-500/20 text-cyan-300 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.35)] ring-1 ring-cyan-400/50"
+                      : "bg-white/5 border-white/30 text-white hover:border-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
+                  }`}
+                  title={isQueueOpen ? "Close Interview Queue panel" : "Open 4 Department Interview Queue"}
+                >
+                  <FaUserClock className={isQueueOpen ? "text-cyan-400 animate-pulse text-sm" : "text-gray-300 text-sm"} />
+                  <span>{isQueueOpen ? "[ Close Queue ]" : "[ Open Queue ]"}</span>
+                  {totalInQueueCount > 0 && (
+                    <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-cyan-400 text-black shadow-sm">
+                      {totalInQueueCount}
+                    </span>
+                  )}
+                </button>
+
                 <button
                   type="button"
                   onClick={exportSelectedForm}
@@ -1787,6 +2685,39 @@ export default function RecruitmentAdminPage() {
                 </button>
               </div>
             </div>
+
+            {/* Configured POCs & WhatsApp Link Quick Bar */}
+            {(Boolean(selectedForm.whatsappLink) || (Array.isArray(selectedForm.pocs) && selectedForm.pocs.some((p) => p?.name || p?.phone))) && (
+              <div className="mb-6 p-3.5 sm:p-4 rounded-xl border border-white/10 bg-white/[0.03] flex flex-wrap items-center justify-between gap-3 font-mono text-xs">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-gray-400 font-bold uppercase tracking-wider text-[11px]">Drive Config:</span>
+                  {selectedForm.whatsappLink && (
+                    <div className="flex items-center gap-1.5 text-emerald-400 bg-emerald-950/40 px-2.5 py-1 rounded border border-emerald-500/30">
+                      <FaWhatsapp className="text-xs shrink-0" />
+                      <span className="text-gray-300">WhatsApp Group:</span>
+                      <a
+                        href={selectedForm.whatsappLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-emerald-300 underline underline-offset-2 hover:text-emerald-200 max-w-[180px] sm:max-w-xs truncate"
+                        title={selectedForm.whatsappLink}
+                      >
+                        {selectedForm.whatsappLink}
+                      </a>
+                    </div>
+                  )}
+                  {Array.isArray(selectedForm.pocs) && selectedForm.pocs.map((poc, idx) => (
+                    (poc?.name || poc?.phone) && (
+                      <div key={idx} className="flex items-center gap-1.5 text-cyan-300 bg-cyan-950/40 px-2.5 py-1 rounded border border-cyan-500/30">
+                        <FaUserTie className="text-xs shrink-0" />
+                        <span className="text-white font-semibold">{poc.name || `POC ${idx + 1}`}:</span>
+                        <span className="text-gray-200">{poc.phone || "—"}</span>
+                      </div>
+                    )
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Quick Stats Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3.5 mb-6">
@@ -1869,146 +2800,276 @@ export default function RecruitmentAdminPage() {
               </div>
             </div>
 
-            {/* Search and Filters Bar */}
-            <div className="glass-panel p-4 rounded-xl border border-white/15 mb-6 space-y-3">
-              <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center">
-                {/* Search Input */}
-                <div className="relative flex-1 min-w-[200px]">
-                  <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search candidate by name, roll no, email, comments, or responses..."
-                    className="w-full pl-9 pr-8 py-2 bg-black/60 border border-white/20 rounded font-mono text-xs text-white placeholder-gray-500 focus:outline-none focus:border-white transition-colors"
-                  />
-                  {searchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchQuery("")}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white cursor-pointer"
-                    >
-                      <FaTimes className="text-xs" />
-                    </button>
+            {/* Sliding Layout: Main Table (Left) + 4-Department Queue Section (Right) */}
+            <div className="relative flex flex-col lg:flex-row gap-4 xl:gap-5 items-start w-full max-w-full overflow-x-hidden transition-all duration-500 ease-in-out">
+              {/* Main Content Area (Slides smoothly left when queue opens, expands right when closed) */}
+              <div
+                className={`transition-all duration-500 ease-in-out min-w-0 overflow-x-hidden ${
+                  isQueueOpen
+                    ? "w-full lg:flex-1 max-w-full"
+                    : "w-full max-w-full"
+                }`}
+              >
+                {/* Search and Filters Bar */}
+                <div className="glass-panel p-4 rounded-xl border border-white/15 mb-6 space-y-3 overflow-hidden">
+                  <div className="flex flex-col gap-3">
+                    {/* Search Input */}
+                    <div className="relative w-full">
+                      <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search candidate by name, roll no, email, comments, or responses..."
+                        className="w-full pl-9 pr-8 py-2 bg-black/60 border border-white/20 rounded font-mono text-xs text-white placeholder-gray-500 focus:outline-none focus:border-white transition-colors"
+                      />
+                      {searchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setSearchQuery("")}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white cursor-pointer"
+                        >
+                          <FaTimes className="text-xs" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Dropdown Filters Grid (Responsive flex-wrap) */}
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      {/* Department Filter */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Dept:</label>
+                        <select
+                          value={selectedDepartment}
+                          onChange={(e) => setSelectedDepartment(e.target.value)}
+                          className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-white"
+                        >
+                          <option value="all">All ({applications.length})</option>
+                          {(selectedForm.departments || []).map((dept) => {
+                            const count = applications.filter((app) => app.department === dept).length;
+                            return (
+                              <option key={dept} value={dept}>
+                                {dept} ({count})
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+
+                      {/* Year Filter */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Year:</label>
+                        <select
+                          value={selectedYear}
+                          onChange={(e) => setSelectedYear(e.target.value)}
+                          className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-white"
+                        >
+                          <option value="all">All Years</option>
+                          {(selectedForm.years || DEFAULT_YEAR_OPTIONS).map((yr) => {
+                            const count = applications.filter((app) => (app.year || app.responses?.year) === yr).length;
+                            return (
+                              <option key={yr} value={yr}>
+                                {yr} ({count})
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+
+                      {/* Evaluation Status Filter */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Status:</label>
+                        <select
+                          value={evaluationFilter}
+                          onChange={(e) => setEvaluationFilter(e.target.value)}
+                          className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-white"
+                        >
+                          <option value="all">All Status</option>
+                          <option value="evaluated">
+                            ✓ Evaluated ({(() => {
+                              const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
+                              return base.filter((a) => getCandidateScoreInfo(a, inlineEdits[a._id]).isEvaluated).length;
+                            })()})
+                          </option>
+                          <option value="pending">
+                            ⚪ Pending ({(() => {
+                              const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
+                              return base.filter((a) => !getCandidateScoreInfo(a, inlineEdits[a._id]).isEvaluated).length;
+                            })()})
+                          </option>
+                        </select>
+                      </div>
+
+                      {/* Score Filter */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Score:</label>
+                        <select
+                          value={scoreFilter}
+                          onChange={(e) => setScoreFilter(e.target.value)}
+                          className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-white"
+                        >
+                          <option value="all">All Scores</option>
+                          <option value="positive">🟢 Positive (&gt; 0)</option>
+                          <option value="zero">🟡 Zero (0)</option>
+                          <option value="negative">🔴 Negative (&lt; 0)</option>
+                          <option value="pending">⚪ Pending</option>
+                        </select>
+                      </div>
+
+                      {/* Filter According to Date */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap flex items-center gap-1">
+                          <FaCalendarAlt className="text-cyan-400 text-xs" />
+                          <span>Date:</span>
+                        </label>
+                        <div className="flex items-center gap-1">
+                          <select
+                            value={selectedDate}
+                            onChange={(e) => setSelectedDate(e.target.value)}
+                            className="bg-black/60 border border-white/20 rounded px-2 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-cyan-400"
+                          >
+                            <option value="all">All Dates</option>
+                            <option value="pending">
+                              ⚪ Date Pending ({(() => {
+                                const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
+                                return base.filter((a) => !(inlineEdits[a._id]?.interviewDate !== undefined ? inlineEdits[a._id].interviewDate : a.interviewDate)).length;
+                              })()})
+                            </option>
+                            <option value="has_date">
+                              📅 Date Assigned ({(() => {
+                                const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
+                                return base.filter((a) => Boolean(inlineEdits[a._id]?.interviewDate !== undefined ? inlineEdits[a._id].interviewDate : a.interviewDate)).length;
+                              })()})
+                            </option>
+                            {availableDates.map((dateStr) => {
+                              const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
+                              const count = base.filter((a) => (inlineEdits[a._id]?.interviewDate !== undefined ? inlineEdits[a._id].interviewDate : a.interviewDate) === dateStr).length;
+                              return (
+                                <option key={dateStr} value={dateStr}>
+                                  📅 {formatInterviewDate(dateStr)} ({count})
+                                </option>
+                              );
+                            })}
+                          </select>
+                          <input
+                            type="date"
+                            value={selectedDate !== "all" && selectedDate !== "pending" && selectedDate !== "has_date" ? selectedDate : ""}
+                            onChange={(e) => setSelectedDate(e.target.value || "all")}
+                            style={{ colorScheme: "dark" }}
+                            className="bg-black/60 border border-white/20 rounded px-1.5 py-1 text-xs font-mono text-cyan-200 focus:outline-none focus:border-cyan-400 cursor-pointer w-28 shrink-0"
+                            title="Pick specific interview date"
+                          />
+                          {selectedDate !== "all" && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedDate("all")}
+                              className="text-gray-400 hover:text-rose-400 text-xs px-1 cursor-pointer shrink-0"
+                              title="Clear date filter"
+                            >
+                              <FaTimes />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Interview Status Filter */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Interview:</label>
+                        <select
+                          value={interviewStatusFilter}
+                          onChange={(e) => setInterviewStatusFilter(e.target.value)}
+                          className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-white"
+                        >
+                          <option value="all">All Status</option>
+                          <option value="pending">
+                            ⚪ Pending ({(() => {
+                              const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
+                              return base.filter((a) => !a.interviewStatus || a.interviewStatus === "pending").length;
+                            })()})
+                          </option>
+                          <option value="completed">
+                            ✓ Completed ({(() => {
+                              const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
+                              return base.filter((a) => a.interviewStatus === "completed").length;
+                            })()})
+                          </option>
+                          <option value="in_queue">
+                            🟢 In Queue ({(() => {
+                              const base = selectedDepartment !== "all" ? applications.filter((a) => a.department === selectedDepartment) : applications;
+                              return base.filter((a) => a.interviewStatus === "in_queue").length;
+                            })()})
+                          </option>
+                        </select>
+                      </div>
+
+                      {/* Slot & Date Filter */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Slot / Date:</label>
+                        <select
+                          value={slotFilter}
+                          onChange={(e) => setSlotFilter(e.target.value)}
+                          className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-white"
+                        >
+                          <option value="all">All Slots & Dates</option>
+                          <option value="slot_given">🕒 Slot Given ({applications.filter((a) => Boolean(a.interviewSlot)).length})</option>
+                          <option value="slot_not_given">⚪ Slot Not Given ({applications.filter((a) => !a.interviewSlot).length})</option>
+                          <option value="date_given">📅 Date Given ({applications.filter((a) => Boolean(a.interviewDate)).length})</option>
+                          <option value="date_not_given">⚪ Date Not Given ({applications.filter((a) => !a.interviewDate).length})</option>
+                          <option value="both_given">✓ Both Slot & Date Given ({applications.filter((a) => Boolean(a.interviewSlot) && Boolean(a.interviewDate)).length})</option>
+                          <option value="neither_given">✕ Neither Slot Nor Date ({applications.filter((a) => !a.interviewSlot && !a.interviewDate).length})</option>
+                          <option value="slot_no_date">⚠️ Slot Given (No Date) ({applications.filter((a) => Boolean(a.interviewSlot) && !a.interviewDate).length})</option>
+                        </select>
+                      </div>
+
+                      {/* Sort Filter */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Sort:</label>
+                        <select
+                          value={sortBy}
+                          onChange={(e) => setSortBy(e.target.value)}
+                          className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-white"
+                        >
+                          <option value="newest">Newest First</option>
+                          <option value="oldest">Oldest First</option>
+                          <option value="slot_asc">Time Slot: Earliest First (Asc)</option>
+                          <option value="slot_desc">Time Slot: Latest First (Desc)</option>
+                          <option value="points_desc">Points: High to Low</option>
+                          <option value="points_asc">Points: Low to High</option>
+                          <option value="name_asc">Name: A to Z</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Active Filter Clear Bar */}
+                  {(searchQuery || selectedDepartment !== "all" || selectedYear !== "all" || evaluationFilter !== "all" || scoreFilter !== "all" || interviewStatusFilter !== "all" || selectedDate !== "all" || slotFilter !== "all" || sortBy !== "newest") && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-gray-400 pt-2 border-t border-white/10">
+                      <span>
+                        Filtered: Showing <strong className="text-white">{groupedApplications.length}</strong> of <strong className="text-white">{new Set(applications.map(getCandidateKey)).size}</strong> candidates
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearchQuery("");
+                          setSelectedDepartment("all");
+                          setSelectedYear("all");
+                          setEvaluationFilter("all");
+                          setScoreFilter("all");
+                          setInterviewStatusFilter("all");
+                          setSelectedDate("all");
+                          setSlotFilter("all");
+                          setSortBy("newest");
+                        }}
+                        className="text-blue-400 hover:underline cursor-pointer"
+                      >
+                        [ Reset Filters ]
+                      </button>
+                    </div>
                   )}
                 </div>
 
-                {/* Dropdown Filters Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 lg:flex lg:items-center gap-2">
-                  {/* Department Filter */}
-                  <div className="flex flex-col xs:flex-row xs:items-center gap-1">
-                    <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Dept:</label>
-                    <select
-                      value={selectedDepartment}
-                      onChange={(e) => setSelectedDepartment(e.target.value)}
-                      className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-white w-full"
-                    >
-                      <option value="all">All ({applications.length})</option>
-                      {(selectedForm.departments || []).map((dept) => {
-                        const count = applications.filter((app) => app.department === dept).length;
-                        return (
-                          <option key={dept} value={dept}>
-                            {dept} ({count})
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
-
-                  {/* Year Filter */}
-                  <div className="flex flex-col xs:flex-row xs:items-center gap-1">
-                    <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Year:</label>
-                    <select
-                      value={selectedYear}
-                      onChange={(e) => setSelectedYear(e.target.value)}
-                      className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-white w-full"
-                    >
-                      <option value="all">All Years</option>
-                      {(selectedForm.years || DEFAULT_YEAR_OPTIONS).map((yr) => {
-                        const count = applications.filter((app) => (app.year || app.responses?.year) === yr).length;
-                        return (
-                          <option key={yr} value={yr}>
-                            {yr} ({count})
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
-
-                  {/* Evaluation Status Filter */}
-                  <div className="flex flex-col xs:flex-row xs:items-center gap-1">
-                    <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Status:</label>
-                    <select
-                      value={evaluationFilter}
-                      onChange={(e) => setEvaluationFilter(e.target.value)}
-                      className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-white w-full"
-                    >
-                      <option value="all">All Status</option>
-                      <option value="evaluated">Evaluated Only</option>
-                      <option value="pending">Pending Only</option>
-                    </select>
-                  </div>
-
-                  {/* Score Filter */}
-                  <div className="flex flex-col xs:flex-row xs:items-center gap-1">
-                    <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Score:</label>
-                    <select
-                      value={scoreFilter}
-                      onChange={(e) => setScoreFilter(e.target.value)}
-                      className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-white w-full"
-                    >
-                      <option value="all">All Scores</option>
-                      <option value="positive">🟢 Positive (&gt; 0)</option>
-                      <option value="zero">🟡 Zero (0)</option>
-                      <option value="negative">🔴 Negative (&lt; 0)</option>
-                      <option value="pending">⚪ Pending</option>
-                    </select>
-                  </div>
-
-                  {/* Sort Filter */}
-                  <div className="flex flex-col xs:flex-row xs:items-center gap-1">
-                    <label className="font-mono text-[11px] text-gray-400 whitespace-nowrap">Sort:</label>
-                    <select
-                      value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value)}
-                      className="bg-black/60 border border-white/20 rounded px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-white w-full"
-                    >
-                      <option value="newest">Newest First</option>
-                      <option value="oldest">Oldest First</option>
-                      <option value="points_desc">Points: High to Low</option>
-                      <option value="points_asc">Points: Low to High</option>
-                      <option value="name_asc">Name: A to Z</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Active Filter Clear Bar */}
-              {(searchQuery || selectedDepartment !== "all" || selectedYear !== "all" || evaluationFilter !== "all" || scoreFilter !== "all" || sortBy !== "newest") && (
-                <div className="flex items-center justify-between text-xs font-mono text-gray-400 pt-2 border-t border-white/10">
-                  <span>
-                    Filtered: Showing <strong className="text-white">{filteredApplications.length}</strong> of <strong className="text-white">{applications.length}</strong> candidates
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearchQuery("");
-                      setSelectedDepartment("all");
-                      setSelectedYear("all");
-                      setEvaluationFilter("all");
-                      setScoreFilter("all");
-                      setSortBy("newest");
-                    }}
-                    className="text-blue-400 hover:underline cursor-pointer"
-                  >
-                    [ Reset Filters ]
-                  </button>
-                </div>
-              )}
-            </div>
-
             {/* Applications Display */}
-            {filteredApplications.length === 0 ? (
+            {groupedApplications.length === 0 ? (
               <div className="glass-panel border border-white/15 p-12 text-center space-y-2 rounded-xl">
                 <p className="font-mono text-gray-300 text-base">No applicants found matching your criteria.</p>
                 <p className="font-mono text-gray-500 text-xs">Try clearing filters or search keywords.</p>
@@ -2017,24 +3078,33 @@ export default function RecruitmentAdminPage() {
               <>
                 {/* 1. Mobile Cards View (visible on < md) */}
                 <div className="block md:hidden space-y-3.5">
-                  {filteredApplications.map((app, index) => {
-                    const edit = inlineEdits[app._id] || {};
-                    const scoreInfo = getCandidateScoreInfo(app, edit);
-                    const candidateName = app.responses?.name || app.responses?.fullName || "Applicant";
-                    const candidateRoll = app.responses?.rollno || app.responses?.rollNumber || "—";
-                    const candidateEmail = app.responses?.email || "—";
-                    const candidateYear = app.year || app.responses?.year || "—";
-                    const appResume = getApplicantResumeInfo(app.responses, selectedForm?.fields);
+                  {groupedApplications.map((group, index) => {
+                    const primaryApp = group.primaryApp;
+                    const candidateName = group.candidateName;
+                    const candidateRoll = group.candidateRoll;
+                    const candidateEmail = group.candidateEmail;
+                    const candidateYear = group.candidateYear;
+                    const appResume = getApplicantResumeInfo(primaryApp.responses, selectedForm?.fields);
+
+                    const allScoreInfos = group.deptApplications.map((d) =>
+                      getCandidateScoreInfo(d, inlineEdits[d._id])
+                    );
+                    const hasPositive = allScoreInfos.some((s) => s.status === "positive");
+                    const hasNegative = allScoreInfos.some((s) => s.status === "negative");
+                    const hasZero = allScoreInfos.some((s) => s.status === "zero" && s.isEvaluated);
+
+                    const queuedDeptApps = group.deptApplications.filter((d) => d.interviewStatus === "in_queue");
+                    const completedDeptApps = group.deptApplications.filter((d) => d.interviewStatus === "completed");
 
                     return (
                       <div
-                        key={app._id}
+                        key={group.key}
                         className={`glass-panel p-4 rounded-xl border transition-all ${
-                          scoreInfo.status === "positive"
+                          hasPositive
                             ? "border-emerald-500/70 bg-emerald-950/25 shadow-[0_0_15px_rgba(16,185,129,0.18)]"
-                            : scoreInfo.status === "zero" && scoreInfo.isEvaluated
+                            : hasZero
                             ? "border-amber-400/80 bg-amber-950/25 shadow-[0_0_15px_rgba(251,191,36,0.18)]"
-                            : scoreInfo.status === "negative"
+                            : hasNegative
                             ? "border-rose-500/70 bg-rose-950/25 shadow-[0_0_15px_rgba(244,63,94,0.18)]"
                             : "border-white/15 bg-white/[0.02]"
                         }`}
@@ -2051,11 +3121,45 @@ export default function RecruitmentAdminPage() {
                             <div className="text-gray-400 font-mono text-[11px] mt-0.5">
                               Roll: <strong className="text-gray-200">{candidateRoll}</strong>
                             </div>
+                            {queuedDeptApps.length > 0 ? (
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {queuedDeptApps.map((qApp) => {
+                                  const qInfo = getQueuePositionInfo(qApp._id);
+                                  return (
+                                    <span
+                                      key={qApp._id}
+                                      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold font-mono border ${
+                                        qInfo?.isNext
+                                          ? "bg-emerald-500/20 text-emerald-300 border-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.3)] animate-pulse"
+                                          : "bg-cyan-500/20 text-cyan-300 border-cyan-400/50"
+                                      }`}
+                                    >
+                                      <span className={`w-1.5 h-1.5 rounded-full ${qInfo?.isNext ? "bg-emerald-400 animate-ping" : "bg-cyan-400"}`} />
+                                      <span>{qInfo?.isNext ? `#1 Next: ${qInfo?.department}` : `Queue: ${qInfo?.department} (#${qInfo?.position})`}</span>
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            ) : completedDeptApps.length > 0 ? (
+                              <div className="mt-1">
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold font-mono bg-emerald-950/40 text-emerald-400 border border-emerald-500/30">
+                                  <FaCheckCircle className="text-[9px]" />
+                                  <span>Done: {completedDeptApps.map((d) => d.department).join(", ")}</span>
+                                </span>
+                              </div>
+                            ) : null}
                           </div>
                           <div className="flex flex-col items-end gap-1">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono border border-white/20 bg-white/10 text-white whitespace-nowrap">
-                              {app.department}
-                            </span>
+                            <div className="flex items-center gap-1 flex-wrap justify-end">
+                              {group.deptApplications.map((deptApp) => (
+                                <span
+                                  key={deptApp._id}
+                                  className="px-2 py-0.5 rounded text-[10px] font-mono border border-white/20 bg-white/10 text-white whitespace-nowrap"
+                                >
+                                  {deptApp.department}
+                                </span>
+                              ))}
+                            </div>
                             <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-white/5 text-gray-300 border border-white/10 whitespace-nowrap">
                               {candidateYear}
                             </span>
@@ -2068,89 +3172,293 @@ export default function RecruitmentAdminPage() {
                             {candidateEmail}
                           </div>
                           <span className="text-[10px] text-gray-500">
-                            {new Date(app.createdAt).toLocaleDateString()}
+                            {new Date(group.createdAt).toLocaleDateString()}
                           </span>
                         </div>
 
-                        {/* Score & Remarks Preview Bar */}
-                        <div className="py-2.5 flex items-center justify-between border-b border-white/10 gap-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider font-semibold">
-                              Score:
-                            </span>
-                            {scoreInfo.isEvaluated ? (
-                              <span
-                                className={`px-2.5 py-0.5 rounded text-xs font-bold font-mono ${
-                                  scoreInfo.status === "positive"
-                                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/60"
-                                    : scoreInfo.status === "negative"
-                                    ? "bg-rose-500/20 text-rose-300 border border-rose-500/60"
-                                    : "bg-amber-400/20 text-amber-300 border border-amber-400/60"
-                                }`}
-                              >
-                                {scoreInfo.scoreFormatted} <span className="text-[10px] opacity-75">pts</span>
-                              </span>
-                            ) : (
-                              <span className="text-gray-500 font-mono text-xs italic">Pending</span>
-                            )}
-                          </div>
+                        {/* Department Scores & Remarks preview */}
+                        <div className="py-2.5 space-y-2 border-b border-white/10">
+                          {group.deptApplications.map((deptApp) => {
+                            const edit = inlineEdits[deptApp._id] || {};
+                            const scoreInfo = getCandidateScoreInfo(deptApp, edit);
+                            return (
+                              <div key={deptApp._id} className="flex items-center justify-between gap-2 text-xs font-mono">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="text-[10px] text-gray-400 font-bold uppercase truncate">
+                                    {deptApp.department}:
+                                  </span>
+                                  {scoreInfo.isEvaluated ? (
+                                    <span
+                                      className={`px-2 py-0.5 rounded text-xs font-bold ${
+                                        scoreInfo.status === "positive"
+                                          ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/60"
+                                          : scoreInfo.status === "negative"
+                                          ? "bg-rose-500/20 text-rose-300 border border-rose-500/60"
+                                          : "bg-amber-400/20 text-amber-300 border border-amber-400/60"
+                                      }`}
+                                    >
+                                      {scoreInfo.scoreFormatted} <span className="text-[10px] opacity-75">pts</span>
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-500 text-xs italic">Pending</span>
+                                  )}
+                                </div>
 
-                          {(scoreInfo.posCount > 0 || scoreInfo.negCount > 0) && (
-                            <div className="flex items-center gap-1.5">
-                              {scoreInfo.posCount > 0 && (
-                                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-500/30">
-                                  +{scoreInfo.posCount} Pos
-                                </span>
-                              )}
-                              {scoreInfo.negCount > 0 && (
-                                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-rose-950/60 text-rose-400 border border-rose-500/30">
-                                  -{scoreInfo.negCount} Neg
-                                </span>
-                              )}
-                            </div>
-                          )}
+                                {(scoreInfo.posCount > 0 || scoreInfo.negCount > 0) && (
+                                  <div className="flex items-center gap-1">
+                                    {scoreInfo.posCount > 0 && (
+                                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-500/30">
+                                        +{scoreInfo.posCount}
+                                      </span>
+                                    )}
+                                    {scoreInfo.negCount > 0 && (
+                                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-950/60 text-rose-400 border border-rose-500/30">
+                                        -{scoreInfo.negCount}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
 
-                        {/* Remarks Snippet */}
-                        {scoreInfo.comments && (
-                          <div className="py-2 text-xs font-mono text-gray-300 line-clamp-2 border-b border-white/5">
-                            {scoreInfo.comments}
-                          </div>
-                        )}
+                        {/* Assigned Panel on Mobile */}
+                        {(() => {
+                          const candidateApp = group.primaryApp;
+                          const candidatePanelApp = group.deptApplications.find(
+                            (d) => (inlineEdits[d._id]?.panel !== undefined ? inlineEdits[d._id].panel : d.panel)
+                          );
+                          const currentPanel = candidatePanelApp
+                            ? (inlineEdits[candidatePanelApp._id]?.panel !== undefined ? inlineEdits[candidatePanelApp._id].panel : candidatePanelApp.panel)
+                            : (inlineEdits[candidateApp._id]?.panel !== undefined ? inlineEdits[candidateApp._id].panel : candidateApp.panel) || "";
+
+                          const isPanelSaving = group.deptApplications.some((d) => panelSavingId === d._id) || panelSavingId === candidateApp._id;
+                          const isPanelSaved = group.deptApplications.some((d) => panelSavedId === d._id) || panelSavedId === candidateApp._id;
+
+                          return (
+                            <div className="py-2 flex items-center justify-between text-xs font-mono border-b border-white/10 gap-2">
+                              <span className="text-[11px] text-gray-400 font-semibold uppercase tracking-wider">
+                                Assigned Panel:
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="text"
+                                  defaultValue={currentPanel}
+                                  key={`m-${candidateApp._id}-${currentPanel}`}
+                                  placeholder="No panel"
+                                  onBlur={(e) => {
+                                    const val = e.target.value.trim();
+                                    if (val !== (currentPanel || "")) {
+                                      handleInlineChange(candidateApp._id, "panel", val);
+                                      savePanel(candidateApp._id, val);
+                                    }
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.currentTarget.blur();
+                                    }
+                                  }}
+                                  className={`w-24 px-2 py-1 text-center rounded text-xs font-mono font-bold transition-all border focus:outline-none ${
+                                    currentPanel
+                                      ? "bg-cyan-950/50 border-cyan-400 text-cyan-200 focus:border-cyan-300"
+                                      : "bg-black/60 border-white/20 text-gray-400 focus:border-cyan-400"
+                                  }`}
+                                  title="Enter panel number (press Enter or tap away to save)"
+                                />
+                                {isPanelSaving ? (
+                                  <span className="text-[10px] font-mono text-cyan-400 animate-pulse">...</span>
+                                ) : isPanelSaved ? (
+                                  <FaCheckCircle className="text-emerald-400 text-xs shrink-0" title="Panel saved" />
+                                ) : null}
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {/* Interview Date & Time Slot on Mobile */}
+                        {(() => {
+                          const candidateApp = group.primaryApp;
+                          const candidateSlotApp = group.deptApplications.find(
+                            (d) => (inlineEdits[d._id]?.interviewSlot !== undefined ? inlineEdits[d._id].interviewSlot : d.interviewSlot)
+                          );
+                          const currentSlot = candidateSlotApp
+                            ? (inlineEdits[candidateSlotApp._id]?.interviewSlot !== undefined ? inlineEdits[candidateSlotApp._id].interviewSlot : candidateSlotApp.interviewSlot)
+                            : (inlineEdits[candidateApp._id]?.interviewSlot !== undefined ? inlineEdits[candidateApp._id].interviewSlot : candidateApp.interviewSlot) || "";
+
+                          const candidateDateApp = group.deptApplications.find(
+                            (d) => (inlineEdits[d._id]?.interviewDate !== undefined ? inlineEdits[d._id].interviewDate : d.interviewDate)
+                          );
+                          const currentDate = candidateDateApp
+                            ? (inlineEdits[candidateDateApp._id]?.interviewDate !== undefined ? inlineEdits[candidateDateApp._id].interviewDate : candidateDateApp.interviewDate)
+                            : (inlineEdits[candidateApp._id]?.interviewDate !== undefined ? inlineEdits[candidateApp._id].interviewDate : candidateApp.interviewDate) || "";
+
+                          const isSlotSaving = group.deptApplications.some((d) => slotSavingId === d._id) || slotSavingId === candidateApp._id;
+                          const isSlotSaved = group.deptApplications.some((d) => slotSavedId === d._id) || slotSavedId === candidateApp._id;
+                          const isDateSaving = group.deptApplications.some((d) => dateSavingId === d._id) || dateSavingId === candidateApp._id;
+                          const isDateSaved = group.deptApplications.some((d) => dateSavedId === d._id) || dateSavedId === candidateApp._id;
+
+                          return (
+                            <div className="py-2.5 space-y-2 border-b border-white/10">
+                              <div className="flex items-center justify-between text-[11px] font-mono text-gray-400 font-semibold uppercase tracking-wider">
+                                <div className="flex items-center gap-1.5">
+                                  <FaCalendarAlt className="text-cyan-400 text-xs" />
+                                  <span>Interview Date & Slot</span>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {/* Date Input */}
+                                <div className="flex items-center gap-1.5">
+                                  <input
+                                    type="date"
+                                    value={currentDate}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      handleInlineChange(candidateApp._id, "interviewDate", val);
+                                      saveInterviewDate(candidateApp._id, val);
+                                    }}
+                                    style={{ colorScheme: "dark" }}
+                                    className={`flex-1 px-2.5 py-1.5 rounded text-xs font-mono transition-all border focus:outline-none cursor-pointer ${
+                                      currentDate
+                                        ? "bg-cyan-950/40 border-cyan-500/50 text-cyan-200 focus:border-cyan-400"
+                                        : "bg-black/60 border-white/15 text-gray-400 focus:border-cyan-500/50"
+                                    }`}
+                                    title="Click to select interview date"
+                                  />
+                                  {currentDate ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        handleInlineChange(candidateApp._id, "interviewDate", "");
+                                        saveInterviewDate(candidateApp._id, "");
+                                      }}
+                                      className="text-gray-500 hover:text-rose-400 text-xs px-1.5 py-1 rounded transition-colors cursor-pointer shrink-0"
+                                      title="Clear date"
+                                    >
+                                      <FaTimes />
+                                    </button>
+                                  ) : null}
+                                  {isDateSaving ? (
+                                    <span className="text-[10px] font-mono text-cyan-400 animate-pulse px-1">...</span>
+                                  ) : isDateSaved ? (
+                                    <FaCheckCircle className="text-emerald-400 text-xs shrink-0" title="Date saved" />
+                                  ) : null}
+                                </div>
+
+                                {/* Time Slot Input */}
+                                <div className="flex items-center gap-1.5">
+                                  <input
+                                    type="time"
+                                    value={normalizeToTimeInputValue(currentSlot)}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      handleInlineChange(candidateApp._id, "interviewSlot", val);
+                                      saveInterviewSlot(candidateApp._id, val);
+                                    }}
+                                    style={{ colorScheme: "dark" }}
+                                    className={`flex-1 px-2.5 py-1.5 rounded text-xs font-mono transition-all border focus:outline-none cursor-pointer ${
+                                      currentSlot
+                                        ? "bg-cyan-950/40 border-cyan-500/50 text-cyan-200 focus:border-cyan-400"
+                                        : "bg-black/60 border-white/15 text-gray-400 focus:border-cyan-500/50"
+                                    }`}
+                                    title="Click to select interview time"
+                                  />
+                                  {currentSlot ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        handleInlineChange(candidateApp._id, "interviewSlot", "");
+                                        saveInterviewSlot(candidateApp._id, "");
+                                      }}
+                                      className="text-gray-500 hover:text-rose-400 text-xs px-1.5 py-1 rounded transition-colors cursor-pointer shrink-0"
+                                      title="Clear time slot"
+                                    >
+                                      <FaTimes />
+                                    </button>
+                                  ) : null}
+                                  {isSlotSaving ? (
+                                    <span className="text-[10px] font-mono text-cyan-400 animate-pulse px-1">...</span>
+                                  ) : isSlotSaved ? (
+                                    <FaCheckCircle className="text-emerald-400 text-xs shrink-0" title="Time slot saved" />
+                                  ) : null}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         {/* Card Actions Footer */}
-                        <div className="pt-2.5 flex items-center justify-between text-xs font-mono mt-1">
-                          <div className="text-[10px] text-gray-500 truncate max-w-[140px]">
-                            {app.evaluatedBy ? `By ${app.evaluatedBy}` : "Not evaluated"}
+                        <div className="pt-2.5 flex items-center justify-between text-xs font-mono mt-1 gap-2 flex-wrap">
+                          <div className="text-[10px] text-gray-500 truncate">
+                            {group.deptApplications.map((d) => d.evaluatedBy).filter(Boolean).length > 0
+                              ? "Evaluated"
+                              : "Not evaluated"}
                           </div>
-                          <div className="flex items-center gap-1.5">
-                            {appResume.hasResume && (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {/* Queue Button for Mobile */}
+                            {queuedDeptApps.length > 0 ? (
                               <button
                                 type="button"
-                                onClick={() => openModal(index, true)}
-                                className="px-2.5 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 rounded text-xs font-mono uppercase tracking-wider flex items-center gap-1 cursor-pointer font-bold"
-                                title="Open resume in parallel view & grade"
+                                onClick={() => setQueueModalCandidate(group)}
+                                className="px-2.5 py-1.5 rounded text-xs font-mono uppercase tracking-wider flex items-center gap-1.5 cursor-pointer font-bold bg-cyan-950/50 text-cyan-300 border border-cyan-500/40"
+                                title="Manage Active Queues"
                               >
-                                <FaFilePdf className="text-xs" /> Resume
+                                <FaUserClock className="text-xs" />
+                                <span className="flex items-center gap-1 flex-wrap">
+                                  {queuedDeptApps.map((qApp) => {
+                                    const qInfo = getQueuePositionInfo(qApp._id);
+                                    const deptShort = (qApp.queueDepartment || qApp.department || "").slice(0, 4);
+                                    return (
+                                      <span
+                                        key={qApp._id}
+                                        className={`px-1 rounded text-[10px] font-bold ${
+                                          qInfo?.isNext ? "bg-emerald-500 text-black shadow-sm" : "bg-cyan-500/30 text-cyan-200"
+                                        }`}
+                                      >
+                                        {deptShort}:{qInfo?.isNext ? "#1" : `#${qInfo?.position || ""}`}
+                                      </span>
+                                    );
+                                  })}
+                                </span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setQueueModalCandidate(group)}
+                                className={`px-2.5 py-1.5 rounded text-xs font-mono uppercase tracking-wider flex items-center gap-1 cursor-pointer font-bold whitespace-nowrap ${
+                                  completedDeptApps.length > 0
+                                    ? "bg-white/5 text-gray-300 border border-white/20 hover:border-cyan-400 hover:text-cyan-300"
+                                    : "bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40"
+                                }`}
+                                title="Add to Interview Queue"
+                              >
+                                <FaPlus className="text-xs" />
+                                <span>Queue</span>
                               </button>
                             )}
+
+                            {group.deptApplications.map((deptApp) => (
+                              <button
+                                key={deptApp._id}
+                                type="button"
+                                onClick={() => openModal(index, deptApp._id)}
+                                className="px-2.5 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 rounded text-xs font-mono uppercase tracking-wider flex items-center gap-1 cursor-pointer font-bold whitespace-nowrap"
+                              >
+                                <FaEye className="text-xs" />
+                                {group.deptApplications.length > 1 ? deptApp.department : "Review"}
+                              </button>
+                            ))}
+
                             <button
                               type="button"
-                              onClick={() => openModal(index)}
-                              className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white border border-white/25 rounded text-xs font-mono uppercase tracking-wider flex items-center gap-1 cursor-pointer font-bold"
-                            >
-                              <FaEye className="text-xs" /> Review
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => openApplicationEditor(app)}
+                              onClick={() => openApplicationEditor(group.primaryApp, group)}
                               className="px-2 py-1.5 bg-white/5 hover:bg-white/15 text-gray-300 border border-white/20 rounded text-xs font-mono uppercase tracking-wider cursor-pointer"
                             >
                               Edit
                             </button>
                             <button
                               type="button"
-                              onClick={() => deleteApplication(app._id)}
+                              onClick={() => deleteApplicantGroup(group)}
                               className="px-2 py-1.5 text-red-400 hover:text-red-300 border border-red-500/30 rounded text-xs font-mono uppercase tracking-wider cursor-pointer"
                             >
                               Delete
@@ -2164,196 +3472,507 @@ export default function RecruitmentAdminPage() {
 
                 {/* 2. Desktop High-Density Data Table (visible on md+) */}
                 <div className="hidden md:block glass-panel border border-white/15 overflow-hidden rounded-xl">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left font-mono text-xs">
-                      <thead className="bg-white/5 border-b border-white/15 text-gray-400 uppercase tracking-wider">
-                        <tr>
-                          <th className="py-3 px-3 w-10 text-center">#</th>
-                          <th className="py-3 px-3 min-w-[190px]">Applicant Info</th>
-                          <th className="py-3 px-2 min-w-[95px]">Department</th>
-                          <th className="py-3 px-2 min-w-[80px]">Year</th>
-                          <th className="py-3 px-3 min-w-[110px]">
-                            <div className="flex items-center gap-1">
-                              <FaStar className="text-amber-400 text-xs" />
-                              <span>Score</span>
-                            </div>
-                          </th>
-                          <th className="py-3 px-3 min-w-[240px]">
-                            <div className="flex items-center gap-1">
-                              <FaRegCommentDots className="text-blue-400 text-xs" />
-                              <span>Positive / Negative Points</span>
-                            </div>
-                          </th>
-                          <th className="py-3 px-3 min-w-[150px] text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/10">
-                        {filteredApplications.map((app, index) => {
-                          const edit = inlineEdits[app._id] || {};
-                          const scoreInfo = getCandidateScoreInfo(app, edit);
-                          const candidateName = app.responses?.name || app.responses?.fullName || "Applicant";
-                          const candidateRoll = app.responses?.rollno || app.responses?.rollNumber || "—";
-                          const candidateEmail = app.responses?.email || "—";
-                          const candidateYear = app.year || app.responses?.year || "—";
-                          const appResume = getApplicantResumeInfo(app.responses, selectedForm?.fields);
+                  <table className="w-full table-fixed text-left font-mono text-xs">
+                    <thead className="bg-white/5 border-b border-white/15 text-gray-400 uppercase tracking-wider text-[11px]">
+                      <tr>
+                        <th className="py-2.5 px-1.5 w-[3%] text-center">#</th>
+                        <th className="py-2.5 px-2 w-[17%]">Applicant Info</th>
+                        <th className="py-2.5 px-1.5 w-[8.5%]">Dept</th>
+                        <th className="py-2.5 px-1 w-[6.5%] text-center">Year</th>
+                        <th className="py-2.5 px-1 w-[8%] text-center">
+                          <span title="Assigned Interview Panel">Panel</span>
+                        </th>
+                        <th className="py-2.5 px-1.5 w-[7.5%] text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <FaStar className="text-amber-400 text-xs" />
+                            <span>Score</span>
+                          </div>
+                        </th>
+                        <th className="py-2.5 px-2 w-[15%]">
+                          <div className="flex items-center gap-1">
+                            <FaRegCommentDots className="text-blue-400 text-xs" />
+                            <span>Remarks</span>
+                          </div>
+                        </th>
+                        <th className="py-2.5 px-2 w-[16.5%]">
+                          <div className="flex items-center gap-1">
+                            <FaCalendarAlt className="text-cyan-400 text-xs" />
+                            <span>Date & Slot</span>
+                          </div>
+                        </th>
+                        <th className="py-2.5 px-2 w-[18%] text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/10">
+                      {groupedApplications.map((group, index) => {
+                        const primaryApp = group.primaryApp;
+                        const candidateName = group.candidateName;
+                        const candidateRoll = group.candidateRoll;
+                        const candidateEmail = group.candidateEmail;
+                        const candidateYear = group.candidateYear;
+                        const appResume = getApplicantResumeInfo(primaryApp.responses, selectedForm?.fields);
 
-                          // Color-code department badges
-                          const deptLower = String(app.department || "").toLowerCase();
-                          const deptBadgeClass = deptLower.includes("soft")
-                            ? "text-blue-400 border-blue-500/40 bg-blue-950/30"
-                            : deptLower.includes("mech")
-                            ? "text-amber-400 border-amber-500/40 bg-amber-950/30"
-                            : deptLower.includes("embed")
-                            ? "text-emerald-400 border-emerald-500/40 bg-emerald-950/30"
-                            : deptLower.includes("pr")
-                            ? "text-purple-400 border-purple-500/40 bg-purple-950/30"
-                            : "text-white border-white/20 bg-white/10";
+                        const allScoreInfos = group.deptApplications.map((d) =>
+                          getCandidateScoreInfo(d, inlineEdits[d._id])
+                        );
+                        const hasPositive = allScoreInfos.some((s) => s.status === "positive");
+                        const hasNegative = allScoreInfos.some((s) => s.status === "negative");
+                        const hasZero = allScoreInfos.some((s) => s.status === "zero" && s.isEvaluated);
 
-                          return (
-                            <tr
-                              key={app._id}
-                              className={`transition-colors group ${
-                                scoreInfo.status === "positive"
-                                  ? "border-l-4 border-l-emerald-500 bg-emerald-950/20 hover:bg-emerald-950/30"
-                                  : scoreInfo.status === "zero" && scoreInfo.isEvaluated
-                                  ? "border-l-4 border-l-amber-400 bg-amber-950/20 hover:bg-amber-950/30"
-                                  : scoreInfo.status === "negative"
-                                  ? "border-l-4 border-l-rose-500 bg-rose-950/20 hover:bg-rose-950/30"
-                                  : "hover:bg-white/[0.03]"
-                              }`}
-                            >
-                              {/* Index */}
-                              <td className="py-3 px-3 text-center text-gray-500">{index + 1}</td>
+                        const queuedDeptApps = group.deptApplications.filter((d) => d.interviewStatus === "in_queue");
+                        const completedDeptApps = group.deptApplications.filter((d) => d.interviewStatus === "completed");
 
-                              {/* Applicant Info */}
-                              <td className="py-3 px-3">
-                                <div className="font-bold text-white text-sm">{candidateName}</div>
-                                <div className="text-gray-400 text-[11px] flex items-center gap-2 mt-0.5">
-                                  <span>Roll: <strong className="text-gray-200">{candidateRoll}</strong></span>
+                        return (
+                          <tr
+                            key={group.key}
+                            className={`transition-colors group ${
+                              hasPositive
+                                ? "border-l-4 border-l-emerald-500 bg-emerald-950/20 hover:bg-emerald-950/30"
+                                : hasZero
+                                ? "border-l-4 border-l-amber-400 bg-amber-950/20 hover:bg-amber-950/30"
+                                : hasNegative
+                                ? "border-l-4 border-l-rose-500 bg-rose-950/20 hover:bg-rose-950/30"
+                                : "hover:bg-white/[0.03]"
+                            }`}
+                          >
+                            {/* Index */}
+                            <td className="py-2.5 px-2 text-center text-gray-500 text-[11px] overflow-hidden">{index + 1}</td>
+
+                            {/* Applicant Info */}
+                            <td className="py-2.5 px-2.5 overflow-hidden">
+                              <div className="font-bold text-white text-xs truncate" title={candidateName}>
+                                {candidateName}
+                              </div>
+                              <div className="text-gray-400 text-[10px] truncate mt-0.5">
+                                Roll: <strong className="text-gray-200">{candidateRoll}</strong>
+                              </div>
+                              <div className="text-gray-500 text-[10px] truncate" title={candidateEmail}>
+                                {candidateEmail}
+                              </div>
+                              <div className="text-gray-500 text-[9px] truncate">
+                                {new Date(group.createdAt).toLocaleDateString()}
+                              </div>
+                              {queuedDeptApps.length > 0 ? (
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                  {queuedDeptApps.map((qApp) => {
+                                    const qInfo = getQueuePositionInfo(qApp._id);
+                                    return (
+                                      <span
+                                        key={qApp._id}
+                                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold font-mono border ${
+                                          qInfo?.isNext
+                                            ? "bg-emerald-500/20 text-emerald-300 border-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.3)] animate-pulse"
+                                            : "bg-cyan-500/20 text-cyan-300 border-cyan-400/50"
+                                        }`}
+                                      >
+                                        <span className={`w-1.5 h-1.5 rounded-full ${qInfo?.isNext ? "bg-emerald-400 animate-ping" : "bg-cyan-400"}`} />
+                                        <span>{qInfo?.isNext ? `#1 Next: ${qInfo?.department}` : `Queue: ${qInfo?.department} (#${qInfo?.position})`}</span>
+                                      </span>
+                                    );
+                                  })}
                                 </div>
-                                <div className="text-gray-500 text-[10px] truncate max-w-[190px]" title={candidateEmail}>
-                                  {candidateEmail}
-                                </div>
-                                <div className="text-gray-500 text-[10px] mt-0.5">
-                                  Submitted: {new Date(app.createdAt).toLocaleDateString()}
-                                </div>
-                              </td>
-
-                              {/* Department */}
-                              <td className="py-3 px-2">
-                                <span className={`px-2 py-0.5 rounded text-[11px] border whitespace-nowrap font-medium ${deptBadgeClass}`}>
-                                  {app.department}
-                                </span>
-                              </td>
-
-                              {/* Year */}
-                              <td className="py-3 px-2">
-                                <span className="px-2 py-0.5 rounded text-[11px] bg-white/10 text-gray-300 border border-white/20 whitespace-nowrap">
-                                  {candidateYear}
-                                </span>
-                              </td>
-
-                              {/* Read-only Score Badge */}
-                              <td className="py-3 px-3">
-                                {scoreInfo.isEvaluated ? (
-                                  <span
-                                    className={`inline-flex items-center px-2.5 py-1 rounded text-xs font-bold font-mono ${
-                                      scoreInfo.status === "positive"
-                                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/60 shadow-[0_0_8px_rgba(16,185,129,0.25)]"
-                                        : scoreInfo.status === "negative"
-                                        ? "bg-rose-500/20 text-rose-300 border border-rose-500/60 shadow-[0_0_8px_rgba(244,63,94,0.25)]"
-                                        : "bg-amber-400/20 text-amber-300 border border-amber-400/60 shadow-[0_0_8px_rgba(251,191,36,0.25)]"
-                                    }`}
-                                  >
-                                    <span>{scoreInfo.scoreFormatted}</span>
-                                    <span className="text-[10px] opacity-75 ml-1">pts</span>
+                              ) : completedDeptApps.length > 0 ? (
+                                <div className="mt-1">
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold font-mono bg-emerald-950/40 text-emerald-400 border border-emerald-500/30">
+                                    <FaCheckCircle className="text-[9px]" />
+                                    <span>Done: {completedDeptApps.map((d) => d.department).join(", ")}</span>
                                   </span>
-                                ) : (
-                                  <span className="text-gray-500 font-mono text-xs">—</span>
-                                )}
-                              </td>
-
-                              {/* Read-only Remarks & Comments Preview (NO TEXTAREA) */}
-                              <td className="py-3 px-3 max-w-[280px]">
-                                <div className="space-y-1">
-                                  {(scoreInfo.posCount > 0 || scoreInfo.negCount > 0) && (
-                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                      {scoreInfo.posCount > 0 && (
-                                        <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-950/70 text-emerald-300 border border-emerald-500/40">
-                                          +{scoreInfo.posCount} Pos
-                                        </span>
-                                      )}
-                                      {scoreInfo.negCount > 0 && (
-                                        <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-rose-950/70 text-rose-300 border border-rose-500/40">
-                                          -{scoreInfo.negCount} Neg
-                                        </span>
-                                      )}
-                                    </div>
-                                  )}
-                                  {scoreInfo.comments ? (
-                                    <div className="text-xs text-gray-300 line-clamp-2 break-words font-mono" title={scoreInfo.comments}>
-                                      {scoreInfo.comments}
-                                    </div>
-                                  ) : !scoreInfo.posCount && !scoreInfo.negCount ? (
-                                    <span className="text-gray-500 text-xs italic">No remarks yet</span>
-                                  ) : null}
-                                  {app.evaluatedBy && (
-                                    <div className="text-[10px] text-gray-500 mt-0.5 font-mono">
-                                      By {app.evaluatedBy} • {app.evaluatedAt ? new Date(app.evaluatedAt).toLocaleDateString() : ""}
-                                    </div>
-                                  )}
                                 </div>
-                              </td>
+                              ) : null}
+                            </td>
 
-                              {/* Actions */}
-                              <td className="py-3 px-3 text-right whitespace-nowrap">
-                                <div className="flex items-center justify-end gap-1.5">
-                                  {appResume.hasResume && (
-                                    <button
-                                      type="button"
-                                      onClick={() => openModal(index, true)}
-                                      className="cursor-pointer font-mono text-[10px] uppercase tracking-wider text-rose-300 hover:text-white border border-rose-500/40 hover:border-rose-400 bg-rose-950/30 rounded px-2.5 py-1 transition-colors font-bold flex items-center gap-1"
-                                      title="Open resume in parallel view & grade"
+                            {/* Department Badges (shows all applied departments) */}
+                            <td className="py-2.5 px-2 overflow-hidden">
+                              <div className="flex flex-wrap gap-1">
+                                {group.deptApplications.map((deptApp) => {
+                                  const deptLower = String(deptApp.department || "").toLowerCase();
+                                  const deptBadgeClass = deptLower.includes("soft")
+                                    ? "text-blue-400 border-blue-500/40 bg-blue-950/30"
+                                    : deptLower.includes("mech")
+                                    ? "text-amber-400 border-amber-500/40 bg-amber-950/30"
+                                    : deptLower.includes("embed")
+                                    ? "text-emerald-400 border-emerald-500/40 bg-emerald-950/30"
+                                    : deptLower.includes("pr")
+                                    ? "text-purple-400 border-purple-500/40 bg-purple-950/30"
+                                    : "text-white border-white/20 bg-white/10";
+
+                                  return (
+                                    <span
+                                      key={deptApp._id}
+                                      className={`px-1.5 py-0.5 rounded text-[10px] border truncate font-medium ${deptBadgeClass}`}
+                                      title={deptApp.department}
                                     >
-                                      <FaFilePdf className="text-[10px]" /> Resume
-                                    </button>
-                                  )}
+                                      {deptApp.department}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            </td>
+
+                            {/* Year */}
+                            <td className="py-2.5 px-1 text-center whitespace-nowrap">
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] bg-white/10 text-gray-300 border border-white/20 whitespace-nowrap">
+                                {candidateYear}
+                              </span>
+                            </td>
+
+                            {/* Panel Input */}
+                            <td className="py-2.5 px-1 text-center overflow-hidden">
+                              {(() => {
+                                const candidateApp = group.primaryApp;
+                                const candidatePanelApp = group.deptApplications.find(
+                                  (d) => (inlineEdits[d._id]?.panel !== undefined ? inlineEdits[d._id].panel : d.panel)
+                                );
+                                const currentPanel = candidatePanelApp
+                                  ? (inlineEdits[candidatePanelApp._id]?.panel !== undefined ? inlineEdits[candidatePanelApp._id].panel : candidatePanelApp.panel)
+                                  : (inlineEdits[candidateApp._id]?.panel !== undefined ? inlineEdits[candidateApp._id].panel : candidateApp.panel) || "";
+
+                                const isPanelSaving = group.deptApplications.some((d) => panelSavingId === d._id) || panelSavingId === candidateApp._id;
+                                const isPanelSaved = group.deptApplications.some((d) => panelSavedId === d._id) || panelSavedId === candidateApp._id;
+
+                                return (
+                                  <div className="flex items-center justify-center gap-1">
+                                    <input
+                                      type="text"
+                                      defaultValue={currentPanel}
+                                      key={`${candidateApp._id}-${currentPanel}`}
+                                      placeholder="—"
+                                      onBlur={(e) => {
+                                        const val = e.target.value.trim();
+                                        if (val !== (currentPanel || "")) {
+                                          handleInlineChange(candidateApp._id, "panel", val);
+                                          savePanel(candidateApp._id, val);
+                                        }
+                                      }}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                          e.currentTarget.blur();
+                                        }
+                                      }}
+                                      className={`w-full max-w-[54px] px-1 py-1 text-center rounded text-[11px] font-mono font-bold transition-all border focus:outline-none ${
+                                        currentPanel
+                                          ? "bg-cyan-950/50 border-cyan-400 text-cyan-200 focus:border-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.2)]"
+                                          : "bg-black/60 border-white/20 text-gray-400 hover:border-white/40 focus:border-cyan-400"
+                                      }`}
+                                      title="Enter panel number (e.g. 1, 2, A). Press Enter or click away to save."
+                                    />
+                                    {isPanelSaving ? (
+                                      <span className="text-[9px] font-mono text-cyan-400 animate-pulse">...</span>
+                                    ) : isPanelSaved ? (
+                                      <span className="text-[10px] text-emerald-400 shrink-0" title="Panel saved!">
+                                        <FaCheckCircle />
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                );
+                              })()}
+                            </td>
+
+                            {/* Read-only Score Badges */}
+                            <td className="py-2.5 px-2 text-center overflow-hidden">
+                              <div className="space-y-1">
+                                {group.deptApplications.map((deptApp) => {
+                                  const edit = inlineEdits[deptApp._id] || {};
+                                  const scoreInfo = getCandidateScoreInfo(deptApp, edit);
+                                  return (
+                                    <div key={deptApp._id} className="flex items-center justify-center gap-1">
+                                      {scoreInfo.isEvaluated ? (
+                                        <span
+                                          className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold font-mono ${
+                                            scoreInfo.status === "positive"
+                                              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/60"
+                                              : scoreInfo.status === "negative"
+                                              ? "bg-rose-500/20 text-rose-300 border border-rose-500/60"
+                                              : "bg-amber-400/20 text-amber-300 border border-amber-400/60"
+                                          }`}
+                                        >
+                                          <span>{scoreInfo.scoreFormatted}</span>
+                                          <span className="text-[8px] opacity-75 ml-0.5">pts</span>
+                                        </span>
+                                      ) : (
+                                        <span className="text-gray-500 font-mono text-[11px]">—</span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </td>
+
+                            {/* Remarks Preview */}
+                            <td className="py-2.5 px-2 overflow-hidden">
+                              <div className="space-y-1">
+                                {group.deptApplications.map((deptApp) => {
+                                  const edit = inlineEdits[deptApp._id] || {};
+                                  const scoreInfo = getCandidateScoreInfo(deptApp, edit);
+                                  return (
+                                    <div key={deptApp._id} className="space-y-0.5">
+                                      {group.deptApplications.length > 1 && (
+                                        <div className="text-[9px] font-bold text-gray-400 font-mono uppercase truncate">
+                                          [{deptApp.department}]
+                                        </div>
+                                      )}
+                                      {(scoreInfo.posCount > 0 || scoreInfo.negCount > 0) && (
+                                        <div className="flex items-center gap-1">
+                                          {scoreInfo.posCount > 0 && (
+                                            <span className="text-[9px] font-mono font-bold px-1 py-0.5 rounded bg-emerald-950/70 text-emerald-300 border border-emerald-500/40">
+                                              +{scoreInfo.posCount}
+                                            </span>
+                                          )}
+                                          {scoreInfo.negCount > 0 && (
+                                            <span className="text-[9px] font-mono font-bold px-1 py-0.5 rounded bg-rose-950/70 text-rose-300 border border-rose-500/40">
+                                              -{scoreInfo.negCount}
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
+                                      {scoreInfo.comments ? (
+                                        <div className="text-[10px] text-gray-300 truncate font-mono" title={scoreInfo.comments}>
+                                          {scoreInfo.comments}
+                                        </div>
+                                      ) : !scoreInfo.posCount && !scoreInfo.negCount ? (
+                                        <span className="text-gray-600 text-[10px] italic">None</span>
+                                      ) : null}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </td>
+
+                            {/* Interview Slot & Date */}
+                            <td className="py-2.5 px-2 overflow-hidden">
+                              {(() => {
+                                const candidateApp = group.primaryApp;
+                                const candidateSlotApp = group.deptApplications.find(
+                                  (d) => (inlineEdits[d._id]?.interviewSlot !== undefined ? inlineEdits[d._id].interviewSlot : d.interviewSlot)
+                                );
+                                const currentSlot = candidateSlotApp
+                                  ? (inlineEdits[candidateSlotApp._id]?.interviewSlot !== undefined ? inlineEdits[candidateSlotApp._id].interviewSlot : candidateSlotApp.interviewSlot)
+                                  : (inlineEdits[candidateApp._id]?.interviewSlot !== undefined ? inlineEdits[candidateApp._id].interviewSlot : candidateApp.interviewSlot) || "";
+
+                                const candidateDateApp = group.deptApplications.find(
+                                  (d) => (inlineEdits[d._id]?.interviewDate !== undefined ? inlineEdits[d._id].interviewDate : d.interviewDate)
+                                );
+                                const currentDate = candidateDateApp
+                                  ? (inlineEdits[candidateDateApp._id]?.interviewDate !== undefined ? inlineEdits[candidateDateApp._id].interviewDate : candidateDateApp.interviewDate)
+                                  : (inlineEdits[candidateApp._id]?.interviewDate !== undefined ? inlineEdits[candidateApp._id].interviewDate : candidateApp.interviewDate) || "";
+
+                                const isSlotSaving = group.deptApplications.some((d) => slotSavingId === d._id) || slotSavingId === candidateApp._id;
+                                const isSlotSaved = group.deptApplications.some((d) => slotSavedId === d._id) || slotSavedId === candidateApp._id;
+                                const isDateSaving = group.deptApplications.some((d) => dateSavingId === d._id) || dateSavingId === candidateApp._id;
+                                const isDateSaved = group.deptApplications.some((d) => dateSavedId === d._id) || dateSavedId === candidateApp._id;
+
+                                return (
+                                  <div className="space-y-1">
+                                    {/* Date input */}
+                                    <div className="flex items-center gap-1">
+                                      <input
+                                        type="date"
+                                        value={currentDate}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          handleInlineChange(candidateApp._id, "interviewDate", val);
+                                          saveInterviewDate(candidateApp._id, val);
+                                        }}
+                                        style={{ colorScheme: "dark" }}
+                                        className={`w-full min-w-0 px-1.5 py-0.5 rounded text-[10px] font-mono transition-all border focus:outline-none cursor-pointer ${
+                                          currentDate
+                                            ? "bg-cyan-950/40 border-cyan-500/50 text-cyan-200 focus:border-cyan-400"
+                                            : "bg-black/60 border-white/15 text-gray-400 focus:border-cyan-500/50"
+                                        }`}
+                                        title="Click to select interview date"
+                                      />
+                                      {currentDate ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            handleInlineChange(candidateApp._id, "interviewDate", "");
+                                            saveInterviewDate(candidateApp._id, "");
+                                          }}
+                                          className="text-gray-500 hover:text-rose-400 text-[10px] px-1 py-0.5 rounded transition-colors cursor-pointer shrink-0"
+                                          title="Clear date"
+                                        >
+                                          <FaTimes />
+                                        </button>
+                                      ) : null}
+                                      {isDateSaving ? (
+                                        <span className="text-[9px] font-mono text-cyan-400 animate-pulse">...</span>
+                                      ) : isDateSaved ? (
+                                        <span className="text-[10px] text-emerald-400 shrink-0" title="Date saved!">
+                                          <FaCheckCircle />
+                                        </span>
+                                      ) : null}
+                                    </div>
+
+                                    {/* Time input */}
+                                    <div className="flex items-center gap-1">
+                                      <input
+                                        type="time"
+                                        value={normalizeToTimeInputValue(currentSlot)}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          handleInlineChange(candidateApp._id, "interviewSlot", val);
+                                          saveInterviewSlot(candidateApp._id, val);
+                                        }}
+                                        style={{ colorScheme: "dark" }}
+                                        className={`w-full min-w-0 px-1.5 py-0.5 rounded text-[10px] font-mono transition-all border focus:outline-none cursor-pointer ${
+                                          currentSlot
+                                            ? "bg-cyan-950/40 border-cyan-500/50 text-cyan-200 focus:border-cyan-400"
+                                            : "bg-black/60 border-white/15 text-gray-400 focus:border-cyan-500/50"
+                                        }`}
+                                        title="Click to select interview time"
+                                      />
+
+                                      {currentSlot ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            handleInlineChange(candidateApp._id, "interviewSlot", "");
+                                            saveInterviewSlot(candidateApp._id, "");
+                                          }}
+                                          className="text-gray-500 hover:text-rose-400 text-[10px] px-1 py-0.5 rounded transition-colors cursor-pointer shrink-0"
+                                          title="Clear time slot"
+                                        >
+                                          <FaTimes />
+                                        </button>
+                                      ) : null}
+
+                                      {isSlotSaving ? (
+                                        <span className="text-[9px] font-mono text-cyan-400 animate-pulse">...</span>
+                                      ) : isSlotSaved ? (
+                                        <span className="text-[10px] text-emerald-400 shrink-0" title="Time slot saved!">
+                                          <FaCheckCircle />
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+                            </td>
+
+                            {/* Actions */}
+                            <td className="py-2.5 px-2.5 text-right">
+                              <div className="flex items-center justify-end gap-1 flex-wrap">
+                                {/* Queue Button for Desktop Table */}
+                                {queuedDeptApps.length > 0 ? (
                                   <button
                                     type="button"
-                                    onClick={() => openModal(index)}
-                                    className="cursor-pointer font-mono text-[10px] uppercase tracking-wider text-blue-400 hover:text-white border border-blue-500/30 hover:border-blue-400 bg-blue-950/20 rounded px-2.5 py-1 transition-colors font-bold"
-                                    title="Review candidate full response & evaluation"
+                                    onClick={() => setQueueModalCandidate(group)}
+                                    className="cursor-pointer font-mono text-[10px] uppercase border rounded px-1.5 py-1 transition-all font-bold flex items-center gap-1.5 bg-cyan-950/40 text-cyan-300 border-cyan-500/40 hover:border-cyan-400"
+                                    title="Manage Active Queues"
                                   >
-                                    Review
+                                    <FaUserClock className="text-[10px]" />
+                                    <span className="flex items-center gap-1">
+                                      {queuedDeptApps.map((qApp) => {
+                                        const qInfo = getQueuePositionInfo(qApp._id);
+                                        const deptShort = (qApp.queueDepartment || qApp.department || "").slice(0, 4);
+                                        return (
+                                          <span
+                                            key={qApp._id}
+                                            className={`px-1 py-0.2 rounded text-[9px] font-bold ${
+                                              qInfo?.isNext
+                                                ? "bg-emerald-500 text-black shadow-sm"
+                                                : "bg-cyan-500/30 text-cyan-200"
+                                            }`}
+                                          >
+                                            {deptShort}:{qInfo?.isNext ? "#1" : `#${qInfo?.position || ""}`}
+                                          </span>
+                                        );
+                                      })}
+                                    </span>
                                   </button>
+                                ) : (
                                   <button
                                     type="button"
-                                    onClick={() => openApplicationEditor(app)}
-                                    className="cursor-pointer font-mono text-[10px] uppercase tracking-wider text-gray-300 hover:text-white border border-white/20 hover:border-white rounded px-2.5 py-1 transition-colors"
-                                    title="Edit raw response fields"
+                                    onClick={() => setQueueModalCandidate(group)}
+                                    className={`cursor-pointer font-mono text-[10px] uppercase border rounded px-1.5 py-1 transition-all font-bold flex items-center gap-1 ${
+                                      completedDeptApps.length > 0
+                                        ? "bg-white/5 text-gray-300 border border-white/20 hover:border-cyan-400 hover:text-cyan-300"
+                                        : "bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 hover:border-cyan-400 hover:bg-cyan-500/20"
+                                    }`}
+                                    title="Add to Interview Queue"
                                   >
-                                    Edit
+                                    <FaPlus className="text-[9px]" />
+                                    <span>Queue</span>
                                   </button>
+                                )}
+
+                                {appResume.hasResume && (
                                   <button
                                     type="button"
-                                    onClick={() => deleteApplication(app._id)}
-                                    className="cursor-pointer font-mono text-[10px] uppercase tracking-wider text-red-400 hover:text-red-300 border border-red-500/30 hover:border-red-400 rounded px-2.5 py-1 transition-colors"
-                                    title="Delete candidate response"
+                                    onClick={() => openModal(index, group.deptApplications[0]._id, true)}
+                                    className="cursor-pointer text-[10px] text-rose-300 hover:text-white border border-rose-500/40 hover:border-rose-400 bg-rose-950/30 rounded px-1.5 py-1 transition-colors font-bold flex items-center gap-0.5"
+                                    title="View Resume"
                                   >
-                                    Delete
+                                    <FaFilePdf className="text-[10px]" />
                                   </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                                )}
+
+                                {group.deptApplications.map((deptApp) => (
+                                  <button
+                                    key={deptApp._id}
+                                    type="button"
+                                    onClick={() => openModal(index, deptApp._id)}
+                                    className="cursor-pointer font-mono text-[10px] uppercase text-blue-400 hover:text-white border border-blue-500/30 hover:border-blue-400 bg-blue-950/20 rounded px-2 py-1 transition-colors font-bold whitespace-nowrap"
+                                    title={`Review ${deptApp.department}`}
+                                  >
+                                    {group.deptApplications.length > 1 ? deptApp.department.slice(0, 4) : "Review"}
+                                  </button>
+                                ))}
+
+                                <button
+                                  type="button"
+                                  onClick={() => openApplicationEditor(group.primaryApp, group)}
+                                  className="cursor-pointer text-gray-400 hover:text-white border border-white/20 hover:border-white rounded p-1 transition-colors"
+                                  title="Edit raw response"
+                                >
+                                  <FaEdit className="text-[10px]" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => deleteApplicantGroup(group)}
+                                  className="cursor-pointer text-red-400 hover:text-red-300 border border-red-500/30 hover:border-red-400 rounded p-1 transition-colors"
+                                  title="Delete applicant"
+                                >
+                                  <FaTrash className="text-[10px]" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </>
             )}
           </div>
+
+          {/* 4-Department Queue Panel on the Right (Slides into view) */}
+          {isQueueOpen && (
+            <div className="w-full lg:w-[22rem] xl:w-[24rem] shrink-0 transition-all duration-500 ease-in-out">
+              <InterviewQueuePanel
+                isOpen={isQueueOpen}
+                onClose={() => setIsQueueOpen(false)}
+                applications={applications}
+                groupedApplications={groupedApplications}
+                inlineEdits={inlineEdits}
+                onRefresh={() => selectedForm?._id && fetchApplicationsSilently(selectedForm._id)}
+                isRefreshing={isRefreshingQueue}
+                onRemoveFromQueue={handleRemoveFromQueue}
+                onReorderQueue={handleReorderQueue}
+                onOpenReviewModal={(grp, deptAppId) => {
+                  const idx = groupedApplications.findIndex((g) => g.key === grp.key);
+                  if (idx !== -1) {
+                    openModal(idx, deptAppId);
+                  }
+                }}
+                onUpdatePanel={savePanel}
+                loadingActionId={loadingQueueActionId}
+              />
+            </div>
+          )}
+        </div>
+      </div>
         ) : (
           <div className="glass-panel p-8 text-center border border-white/20">
             <p className="font-mono text-gray-400 text-sm">
@@ -2363,8 +3982,8 @@ export default function RecruitmentAdminPage() {
         )}
 
         {/* Edit Application Response Modal */}
-        {editingApplication && (
-          <div className="fixed inset-0 z-[100] flex items-start justify-center pt-24 sm:pt-28 pb-8 px-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+        {editingApplication && mounted && typeof document !== "undefined" && createPortal(
+          <div className="fixed inset-0 z-[99999] flex items-start justify-center pt-24 sm:pt-28 pb-8 px-4 bg-black/85 backdrop-blur-md overflow-y-auto">
             <div className="glass-panel w-full max-w-xl p-6 sm:p-8 border border-white/30 max-h-[calc(100vh-7.5rem)] sm:max-h-[calc(100vh-8.5rem)] overflow-y-auto my-auto">
               <div className="flex items-center justify-between gap-4 mb-6 border-b border-white/15 pb-4">
                 <div>
@@ -2385,22 +4004,55 @@ export default function RecruitmentAdminPage() {
               </div>
 
               <div className="space-y-4">
-                {/* Department select */}
+                {/* Department / Domain multi-select */}
                 <div>
-                  <label className="mb-1 block font-mono text-xs font-semibold text-gray-300 uppercase tracking-wider">
-                    Department *
+                  <label className="mb-1.5 block font-mono text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                    Applied Department(s) / Domain(s) *{" "}
+                    <span className="text-gray-400 font-normal normal-case">(Select 1 or more domains)</span>
                   </label>
-                  <select
-                    value={applicationFormValues.department}
-                    onChange={(e) => setApplicationFormValues((prev) => ({ ...prev, department: e.target.value }))}
-                    className="w-full rounded border border-white/20 bg-black/50 px-3 py-2 font-mono text-sm text-white focus:border-white focus:outline-none"
-                  >
-                    {(selectedForm?.departments || DEFAULT_DEPARTMENT_OPTIONS).map((dept) => (
-                      <option key={dept} value={dept} className="bg-black text-white">
-                        {dept}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 rounded border border-white/20 bg-black/40 p-3">
+                    {(selectedForm?.departments || DEFAULT_DEPARTMENT_OPTIONS).map((dept) => {
+                      const isChecked = applicationFormValues.departments?.includes(dept);
+                      return (
+                        <label
+                          key={dept}
+                          className={`flex items-center gap-2.5 px-3 py-2 rounded border cursor-pointer select-none transition-all ${
+                            isChecked
+                              ? "bg-white/15 border-white text-white font-medium shadow-sm"
+                              : "bg-black/25 border-white/10 text-gray-400 hover:border-white/30 hover:text-gray-200"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={Boolean(isChecked)}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setApplicationFormValues((prev) => {
+                                const cur = prev.departments || [];
+                                const next = checked
+                                  ? [...cur, dept]
+                                  : cur.filter((d) => d !== dept);
+                                return {
+                                  ...prev,
+                                  departments: next,
+                                  department: next[0] || "",
+                                };
+                              });
+                            }}
+                            className="h-4 w-4 accent-white rounded cursor-pointer"
+                          />
+                          <span className="font-mono text-xs truncate" title={dept}>
+                            {dept}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {(!applicationFormValues.departments || applicationFormValues.departments.length === 0) && (
+                    <p className="mt-1 font-mono text-xs text-red-400">
+                      Please select at least one department.
+                    </p>
+                  )}
                 </div>
 
                 {/* Year select */}
@@ -2494,22 +4146,348 @@ export default function RecruitmentAdminPage() {
                 </button>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
-        {/* Detailed Candidate Review Modal (matching AddSec dashboard) */}
-        {modalOpen && currentModalApp && (() => {
-          const resumeInfo = getApplicantResumeInfo(currentModalApp.responses, selectedForm?.fields);
-          const hasResume = resumeInfo.hasResume;
-          const isSplit = hasResume && showResumeSplit;
 
-          return (
-            <div className={`fixed inset-0 z-[100] flex ${isSplit ? "items-center justify-center p-2 sm:p-4" : "items-start justify-center pt-20 sm:pt-24 pb-8 px-2.5 sm:px-4 md:px-6 overflow-y-auto"} bg-black/85 backdrop-blur-sm`}>
-              <div className={`glass-panel w-full ${isSplit ? "max-w-[96vw] xl:max-w-7xl h-[92vh] max-h-[92vh]" : "max-w-3xl max-h-[calc(100vh-7.5rem)] sm:max-h-[calc(100vh-8.5rem)] overflow-y-auto"} border border-white/25 shadow-2xl flex flex-col rounded-xl my-auto transition-all duration-300`}>
+        {/* Interview Queue Candidate Modal (Portal) */}
+        {queueModalCandidate && mounted && typeof document !== "undefined" && (() => {
+          const liveGroup = groupedApplications.find((g) => g.key === queueModalCandidate.key) || queueModalCandidate;
+          const candidateName = liveGroup.primaryApp?.responses?.name || liveGroup.primaryApp?.responses?.fullName || "Applicant";
+          const candidateRoll = liveGroup.primaryApp?.responses?.rollno || liveGroup.primaryApp?.responses?.rollNumber || liveGroup.primaryApp?.responses?.roll || "N/A";
+          const candidateEmail = liveGroup.primaryApp?.responses?.email || "";
+          const candidateYear = liveGroup.primaryApp?.responses?.year || "";
+          const queuedDeptApps = (liveGroup.deptApplications || []).filter((d) => d.interviewStatus === "in_queue");
+          const completedDeptApps = (liveGroup.deptApplications || []).filter((d) => d.interviewStatus === "completed");
+
+          // Strictly filter to only the departments the candidate applied for
+          const seenDepts = new Set();
+          const candidateAppliedDepts = (liveGroup.deptApplications || []).filter((d) => {
+            if (!d || !d.department) return false;
+            const key = d.department.trim().toLowerCase();
+            if (seenDepts.has(key)) return false;
+            seenDepts.add(key);
+            return true;
+          });
+
+          return createPortal(
+            <div
+              className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto animate-fadeIn"
+              onClick={() => setQueueModalCandidate(null)}
+            >
+              <div
+                className="glass-panel w-full max-w-lg p-5 sm:p-7 border border-cyan-500/40 shadow-[0_0_50px_rgba(6,182,212,0.2)] my-auto relative"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div className="flex items-start justify-between gap-4 mb-4 border-b border-white/10 pb-4">
+                  <div className="flex items-start gap-3">
+                    <span className="p-2.5 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0 mt-0.5">
+                      <FaUserClock className="text-base" />
+                    </span>
+                    <div>
+                      <h2 className="font-mono text-lg font-bold uppercase tracking-wider text-white">
+                        [ Interview Queue Manager ]
+                      </h2>
+                      <div className="font-mono text-xs text-gray-300 mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        <span className="text-white font-bold">{candidateName}</span>
+                        <span className="text-gray-500">•</span>
+                        <span className="text-cyan-400">Roll: {candidateRoll}</span>
+                        {candidateYear && (
+                          <>
+                            <span className="text-gray-500">•</span>
+                            <span className="text-gray-400">{candidateYear}</span>
+                          </>
+                        )}
+                      </div>
+                      {candidateEmail && (
+                        <p className="font-mono text-[11px] text-gray-500 mt-0.5 truncate max-w-xs sm:max-w-sm">
+                          {candidateEmail}
+                        </p>
+                      )}
+
+                      {/* Explicit Applied Departments Banner */}
+                      <div className="mt-2.5 flex flex-wrap items-center gap-1.5 font-mono text-[11px]">
+                        <span className="text-gray-400 font-semibold uppercase text-[10px]">Applied for:</span>
+                        {candidateAppliedDepts.map((d) => {
+                          const dLower = String(d.department || "").toLowerCase();
+                          const dBadge = dLower.includes("soft")
+                            ? "bg-blue-500/20 text-blue-300 border-blue-500/40"
+                            : dLower.includes("mech")
+                            ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                            : dLower.includes("embed")
+                            ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                            : dLower.includes("pr")
+                            ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
+                            : "bg-white/10 text-white border-white/20";
+                          return (
+                            <span
+                              key={d._id}
+                              className={`px-2 py-0.5 rounded font-bold border ${dBadge}`}
+                            >
+                              {d.department}
+                            </span>
+                          );
+                        })}
+                        <span className="text-gray-500 text-[10px]">
+                          ({candidateAppliedDepts.length} department{candidateAppliedDepts.length > 1 ? "s" : ""})
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setQueueModalCandidate(null)}
+                    className="p-1.5 text-gray-400 hover:text-white border border-white/10 hover:border-white/30 rounded-lg transition-colors cursor-pointer shrink-0"
+                    title="Close"
+                  >
+                    <FaTimes className="text-sm" />
+                  </button>
+                </div>
+
+                {/* Modal Body */}
+                <div className="space-y-4">
+                  {/* Active Queues Summary Banner (if in any queue) */}
+                  {queuedDeptApps.length > 0 ? (
+                    <div className="p-3 rounded-xl bg-cyan-950/40 border border-cyan-500/40 flex items-center justify-between gap-3 flex-wrap">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-2.5 w-2.5 relative">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-400"></span>
+                          </span>
+                          <span className="font-mono text-xs font-bold uppercase text-white tracking-wide">
+                            Active in {queuedDeptApps.length} Queue{queuedDeptApps.length > 1 ? "s" : ""}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                          {queuedDeptApps.map((qApp) => {
+                            const qInfo = getQueuePositionInfo(qApp._id);
+                            return (
+                              <span
+                                key={qApp._id}
+                                className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
+                                  qInfo?.isNext
+                                    ? "bg-emerald-500 text-black border-emerald-400 animate-pulse"
+                                    : "bg-cyan-500/20 text-cyan-200 border-cyan-400/50"
+                                }`}
+                              >
+                                {qApp.queueDepartment || qApp.department}: {qInfo?.isNext ? "#1 NEXT" : `#${qInfo?.position || ""}`}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsQueueOpen(true);
+                          setQueueModalCandidate(null);
+                        }}
+                        className="px-2.5 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 font-mono text-[11px] font-bold uppercase tracking-wider shrink-0 flex items-center gap-1 cursor-pointer transition-colors"
+                      >
+                        <FaEye className="text-xs" />
+                        <span>Open Panel</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-400 font-mono text-[11px]">
+                      Candidate is not currently in any waiting line. Select below to add them to their applied queue.
+                    </div>
+                  )}
+
+                  {/* Applied Department Queue Cards (ONLY allows queuing in applied departments) */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-mono text-xs text-gray-300 uppercase tracking-wider font-bold">
+                        Applied Department Queue{candidateAppliedDepts.length > 1 ? "s" : ""} ({candidateAppliedDepts.length}):
+                      </p>
+                      <span className="text-[10px] text-cyan-400 font-mono font-semibold">
+                        {candidateAppliedDepts.length > 1
+                          ? "Candidate eligible for both applied queues"
+                          : "Candidate eligible for applied queue only"}
+                      </span>
+                    </div>
+
+                    {candidateAppliedDepts.length === 0 ? (
+                      <div className="p-4 rounded-xl bg-white/5 border border-white/10 text-center text-gray-400 text-xs font-mono">
+                        No applied departments found for this applicant.
+                      </div>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {candidateAppliedDepts.map((deptApp) => {
+                          const dept = deptApp.department;
+                          const isQueued = deptApp.interviewStatus === "in_queue";
+                          const isCompleted = deptApp.interviewStatus === "completed";
+                          const count = getDeptQueueCount(dept);
+                          const qInfo = isQueued ? getQueuePositionInfo(deptApp._id) : null;
+                          const targetId = deptApp._id;
+
+                          const deptLower = String(dept || "").toLowerCase();
+                          const deptColorBadge = deptLower.includes("soft")
+                            ? "bg-blue-500/20 text-blue-300 border-blue-500/40"
+                            : deptLower.includes("mech")
+                            ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                            : deptLower.includes("embed")
+                            ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                            : deptLower.includes("pr")
+                            ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
+                            : "bg-white/10 text-white border-white/20";
+
+                          return (
+                            <div
+                              key={deptApp._id}
+                              className={`p-3.5 rounded-xl border font-mono transition-all ${
+                                isQueued
+                                  ? qInfo?.isNext
+                                    ? "bg-emerald-950/30 border-emerald-400/60 shadow-[0_0_15px_rgba(16,185,129,0.15)]"
+                                    : "bg-cyan-950/30 border-cyan-500/50"
+                                  : isCompleted
+                                  ? "bg-white/[0.03] border-emerald-500/30"
+                                  : "bg-white/5 border-white/10"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-bold text-white text-xs uppercase tracking-wide">
+                                      {dept} Queue
+                                    </span>
+                                    <span className={`text-[9px] uppercase px-1.5 py-0.5 rounded font-bold border ${deptColorBadge}`}>
+                                      Applied
+                                    </span>
+                                    {isQueued && (
+                                      <span className={`text-[10px] uppercase px-2 py-0.5 rounded font-bold border ${
+                                        qInfo?.isNext
+                                          ? "bg-emerald-500 text-black border-emerald-400 animate-pulse"
+                                          : "bg-cyan-500/20 text-cyan-300 border-cyan-400/50"
+                                      }`}>
+                                        {qInfo?.isNext ? "⚡ #1 Next Up" : `Position #${qInfo?.position}`}
+                                      </span>
+                                    )}
+                                    {isCompleted && (
+                                      <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
+                                        ✓ Done
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[11px] text-gray-400 mt-1">
+                                    {isQueued
+                                      ? qInfo?.isNext
+                                        ? "Now Interviewing / Next Candidate up for this department."
+                                        : `Position #${qInfo?.position} (${(qInfo?.position || 1) - 1} ahead in line)`
+                                      : isCompleted
+                                      ? "Interview already completed for this department."
+                                      : count === 0
+                                      ? "Queue is empty — adding will be #1 Next Up!"
+                                      : `${count} waiting — adding will be #${count + 1}`}
+                                  </p>
+                                </div>
+
+                                {/* Department Actions */}
+                                <div className="shrink-0 flex items-center gap-1.5">
+                                  {isQueued ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          await handleRemoveFromQueue(deptApp._id, true);
+                                        }}
+                                        disabled={loadingQueueActionId === deptApp._id}
+                                        className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-black font-bold text-xs uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
+                                        title="Mark interview done for this department"
+                                      >
+                                        <FaCheck className="text-[10px]" />
+                                        <span>Done</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          await handleRemoveFromQueue(deptApp._id, false);
+                                        }}
+                                        disabled={loadingQueueActionId === deptApp._id}
+                                        className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs cursor-pointer transition-colors disabled:opacity-50"
+                                        title="Remove from this queue"
+                                      >
+                                        <FaTimes className="text-xs" />
+                                      </button>
+                                    </>
+                                  ) : isCompleted ? (
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        await handleAddToQueue(targetId, dept);
+                                      }}
+                                      disabled={loadingQueueActionId === targetId}
+                                      className="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-gray-300 border border-white/20 text-xs font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
+                                    >
+                                      <FaPlus className="text-[9px]" />
+                                      <span>Re-queue</span>
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        await handleAddToQueue(targetId, dept);
+                                      }}
+                                      disabled={loadingQueueActionId === targetId}
+                                      className="px-3 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500 text-cyan-300 hover:text-black border border-cyan-500/40 text-xs font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-all disabled:opacity-50"
+                                    >
+                                      <FaPlus className="text-[10px]" />
+                                      <span>Add to Queue</span>
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Completed Summary if any */}
+                  {completedDeptApps.length > 0 && (
+                    <div className="p-3 rounded-xl bg-emerald-950/20 border border-emerald-500/30 flex items-center gap-2">
+                      <FaCheckCircle className="text-emerald-400 text-xs shrink-0" />
+                      <span className="font-mono text-[11px] text-emerald-300">
+                        Interview completed for: <strong>{completedDeptApps.map((d) => d.department).join(", ")}</strong>
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer Close */}
+                <div className="flex items-center justify-end mt-4 pt-3 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setQueueModalCandidate(null)}
+                    className="px-4 py-2 border border-white/20 text-gray-300 rounded-lg font-mono text-xs uppercase tracking-wider hover:border-white hover:text-white transition-colors cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body
+          );
+        })()}
+
+        {/* Detailed Candidate Review Modal (matching AddSec dashboard) */}
+        {modalOpen && currentModalApp && mounted && typeof document !== "undefined" && createPortal(
+          (() => {
+            const resumeInfo = getApplicantResumeInfo(currentModalApp.responses, selectedForm?.fields);
+            const hasResume = resumeInfo.hasResume;
+            const isSplit = hasResume && showResumeSplit;
+
+            return (
+              <div className={`fixed inset-0 z-[99999] flex ${isSplit ? "items-center justify-center p-2 sm:p-4" : "items-start justify-center pt-20 sm:pt-24 pb-8 px-2.5 sm:px-4 md:px-6 overflow-y-auto"} bg-black/90 backdrop-blur-md`}>
+                <div className={`glass-panel w-full ${isSplit ? "max-w-[96vw] xl:max-w-7xl h-[92vh] max-h-[92vh]" : "max-w-3xl max-h-[calc(100vh-7.5rem)] sm:max-h-[calc(100vh-8.5rem)] overflow-y-auto"} border border-white/25 shadow-2xl flex flex-col rounded-xl my-auto transition-all duration-300`}>
                 {/* Modal Header */}
                 <div className="p-3.5 sm:p-5 border-b border-white/15 flex items-center justify-between sticky top-0 bg-black/95 backdrop-blur z-20 gap-2">
                   <div className="min-w-0 flex-1 pr-2">
                     <span className="text-[10px] font-mono uppercase tracking-widest text-gray-400 block truncate">
-                      Candidate Review ({modalAppIndex + 1} of {filteredApplications.length})
+                      Candidate Review ({modalAppIndex + 1} of {groupedApplications.length})
                     </span>
                     <h2
                       className="font-mono text-base sm:text-xl md:text-2xl font-bold text-white mt-0.5 truncate"
@@ -2553,6 +4531,16 @@ export default function RecruitmentAdminPage() {
 
                     <button
                       type="button"
+                      onClick={() => openApplicationEditor(currentModalApp, currentModalGroup)}
+                      className="px-2.5 py-1.5 glass-panel border border-white/20 text-gray-300 hover:text-white rounded transition-colors cursor-pointer flex items-center gap-1.5 font-mono text-xs"
+                      title="Edit Applicant Details & Domains"
+                    >
+                      <FaEdit className="text-xs" />
+                      <span className="hidden sm:inline">Edit Details</span>
+                    </button>
+
+                    <button
+                      type="button"
                       onClick={prevModalApp}
                       disabled={modalAppIndex === 0}
                       className="p-2 sm:p-2.5 glass-panel border border-white/20 text-gray-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed rounded cursor-pointer"
@@ -2563,7 +4551,7 @@ export default function RecruitmentAdminPage() {
                     <button
                       type="button"
                       onClick={nextModalApp}
-                      disabled={modalAppIndex === filteredApplications.length - 1}
+                      disabled={modalAppIndex === groupedApplications.length - 1}
                       className="p-2 sm:p-2.5 glass-panel border border-white/20 text-gray-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed rounded cursor-pointer"
                       title="Next Applicant"
                     >
@@ -2637,6 +4625,136 @@ export default function RecruitmentAdminPage() {
                         </button>
                       </div>
                     )}
+
+                {/* Department Switcher Tabs for Multi-Department Applicants */}
+                {currentModalGroup && currentModalGroup.deptApplications.length > 1 && (
+                  <div className="bg-gradient-to-r from-blue-950/50 via-purple-950/40 to-black/70 p-3 sm:p-3.5 rounded-xl border border-blue-500/35 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xl">
+                    <div className="flex items-center gap-2">
+                      <FaStar className="text-amber-400 text-xs flex-shrink-0" />
+                      <span className="text-xs font-mono uppercase tracking-wider text-blue-200 font-bold">
+                        Switch Review / Score Dept:
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {currentModalGroup.deptApplications.map((deptApp, dIdx) => {
+                        const dEdit = inlineEdits[deptApp._id] || {};
+                        const dScore = getCandidateScoreInfo(deptApp, dEdit);
+                        const isActive = deptApp._id === currentModalApp._id;
+
+                        return (
+                          <button
+                            key={deptApp._id}
+                            type="button"
+                            onClick={() => {
+                              setActiveModalAppId(deptApp._id);
+                              setNewPositiveInput("");
+                              setNewNegativeInput("");
+                            }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-2 border transition-all cursor-pointer ${
+                              isActive
+                                ? "bg-blue-600 text-white border-blue-300 shadow-[0_0_12px_rgba(59,130,246,0.6)] ring-1 ring-white/50"
+                                : "bg-black/60 text-gray-300 hover:text-white border-white/20 hover:bg-white/10"
+                            }`}
+                          >
+                            <span>Dept {dIdx + 1}: <strong className="text-white">{deptApp.department}</strong></span>
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
+                                dScore.isEvaluated
+                                  ? dScore.status === "positive"
+                                    ? "bg-emerald-500/25 text-emerald-300 border border-emerald-400/50"
+                                    : dScore.status === "negative"
+                                    ? "bg-rose-500/25 text-rose-300 border border-rose-500/50"
+                                    : "bg-amber-400/25 text-amber-300 border border-amber-400/50"
+                                  : "bg-white/10 text-gray-400"
+                              }`}
+                            >
+                              {dScore.isEvaluated ? `${dScore.scoreFormatted} pts` : "Unscored"}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Interview Queue Status & Quick Controls inside Review Modal */}
+                {(() => {
+                  const modalQueueInfo = getQueuePositionInfo(currentModalApp._id);
+                  const isQueued = currentModalApp.interviewStatus === "in_queue";
+                  const isDone = currentModalApp.interviewStatus === "completed";
+
+                  return (
+                    <div className="p-3 rounded-xl border border-white/15 bg-white/[0.03] flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-mono text-xs">
+                      <div className="flex items-center gap-2.5">
+                        <FaUserClock className="text-cyan-400 text-sm" />
+                        <div>
+                          <div className="text-gray-400 text-[10px] uppercase font-bold">Interview Status:</div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {isQueued ? (
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold border ${
+                                modalQueueInfo?.isNext
+                                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.3)] animate-pulse"
+                                  : "bg-cyan-500/20 text-cyan-300 border-cyan-400/50"
+                              }`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${modalQueueInfo?.isNext ? "bg-emerald-400 animate-ping" : "bg-cyan-400"}`} />
+                                <span>{modalQueueInfo?.isNext ? `#1 Next in Queue (${modalQueueInfo?.department})` : `In Queue: ${modalQueueInfo?.department} (#${modalQueueInfo?.position})`}</span>
+                              </span>
+                            ) : isDone ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-950/40 text-emerald-300 border border-emerald-500/40">
+                                <FaCheckCircle className="text-[10px]" />
+                                <span>Interview Completed</span>
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 text-[11px] italic">Not yet in queue</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {isQueued ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveFromQueue(currentModalApp._id, true)}
+                              className="px-3 py-1.5 rounded bg-emerald-500 hover:bg-emerald-400 text-black font-bold font-mono text-xs flex items-center gap-1.5 shadow-[0_0_12px_rgba(16,185,129,0.4)] cursor-pointer transition-colors"
+                            >
+                              <FaCheck className="text-xs" />
+                              <span>Mark Interview Done</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveFromQueue(currentModalApp._id, false)}
+                              className="px-2.5 py-1.5 rounded bg-white/5 hover:bg-rose-950/30 text-gray-300 hover:text-rose-300 border border-white/20 hover:border-rose-500/40 font-mono text-xs cursor-pointer transition-colors"
+                              title="Remove without marking done"
+                            >
+                              <FaTimes />
+                            </button>
+                          </>
+                        ) : isDone ? (
+                          <button
+                            type="button"
+                            onClick={() => handleAddToQueue(currentModalApp._id, currentModalApp.department)}
+                            className="px-3 py-1.5 rounded bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 font-bold font-mono text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                          >
+                            <FaPlus className="text-xs" />
+                            <span>Re-Queue for Interview</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleAddToQueue(currentModalApp._id, currentModalApp.department)}
+                            className="px-3 py-1.5 rounded bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 font-bold font-mono text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                          >
+                            <FaPlus className="text-xs" />
+                            <span>Add to {currentModalApp.department} Queue</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* Quick Info Grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 font-mono text-xs">
                   <div className="bg-white/5 p-2.5 sm:p-3 rounded border border-white/10">
@@ -2646,9 +4764,14 @@ export default function RecruitmentAdminPage() {
                     </span>
                   </div>
                   <div className="bg-white/5 p-2.5 sm:p-3 rounded border border-white/10">
-                    <span className="text-gray-500 block text-[11px]">Department</span>
+                    <span className="text-gray-500 block text-[11px]">Active Department</span>
                     <span className="text-white font-bold text-xs sm:text-sm mt-0.5 block truncate">
                       {currentModalApp.department}
+                      {currentModalGroup?.deptApplications.length > 1 && (
+                        <span className="text-[10px] text-blue-400 ml-1.5 font-normal">
+                          (of {currentModalGroup.deptApplications.length})
+                        </span>
+                      )}
                     </span>
                   </div>
                   <div className="bg-white/5 p-2.5 sm:p-3 rounded border border-white/10">
@@ -2782,7 +4905,7 @@ export default function RecruitmentAdminPage() {
                                 : "text-rose-300"
                             }`}
                           >
-                            <FaStar /> Evaluation & Scoring
+                            <FaStar /> Evaluation & Scoring — <span className="underline">{currentModalApp.department}</span>
                           </h3>
 
                           {scoreStatus === "positive" && (
@@ -3026,6 +5149,102 @@ export default function RecruitmentAdminPage() {
                         </div>
                       </div>
 
+                      {/* Interview Date & Slot */}
+                      <div className="p-3.5 rounded-lg bg-cyan-950/20 border border-cyan-500/30 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-mono text-cyan-300 uppercase tracking-wider flex items-center gap-1.5 font-bold">
+                            <FaCalendarAlt className="text-cyan-400 text-xs" />
+                            <span>Interview Date & Time</span>
+                          </label>
+                          <div className="flex items-center gap-2">
+                            {dateSavedId === currentModalApp._id && (
+                              <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
+                                <FaCheckCircle /> Date Saved
+                              </span>
+                            )}
+                            {slotSavedId === currentModalApp._id && (
+                              <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
+                                <FaCheckCircle /> Slot Saved
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          {/* Date input */}
+                          <div className="space-y-1">
+                            <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider block">Date</span>
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="date"
+                                value={modalEdit.interviewDate !== undefined ? modalEdit.interviewDate : (currentModalApp.interviewDate || "")}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  handleInlineChange(currentModalApp._id, "interviewDate", val);
+                                  saveInterviewDate(currentModalApp._id, val);
+                                }}
+                                style={{ colorScheme: "dark" }}
+                                className="flex-1 px-3 py-2 bg-black/80 rounded text-xs font-mono text-cyan-200 border border-cyan-500/30 focus:border-cyan-400 focus:outline-none cursor-pointer"
+                                title="Click to select interview date"
+                              />
+                              {(modalEdit.interviewDate !== undefined ? modalEdit.interviewDate : currentModalApp.interviewDate) ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleInlineChange(currentModalApp._id, "interviewDate", "");
+                                    saveInterviewDate(currentModalApp._id, "");
+                                  }}
+                                  className="px-2 py-2 border border-rose-500/30 hover:border-rose-500 text-rose-400 font-mono text-xs rounded transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                                  title="Clear date"
+                                >
+                                  <FaTimes className="text-[10px]" />
+                                </button>
+                              ) : null}
+                              {dateSavingId === currentModalApp._id ? (
+                                <span className="text-[10px] font-mono text-cyan-400 animate-pulse">...</span>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          {/* Time input */}
+                          <div className="space-y-1">
+                            <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider block">Time Slot</span>
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="time"
+                                value={normalizeToTimeInputValue(modalEdit.interviewSlot !== undefined ? modalEdit.interviewSlot : (currentModalApp.interviewSlot || ""))}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  handleInlineChange(currentModalApp._id, "interviewSlot", val);
+                                  saveInterviewSlot(currentModalApp._id, val);
+                                }}
+                                style={{ colorScheme: "dark" }}
+                                className="flex-1 px-3 py-2 bg-black/80 rounded text-xs font-mono text-cyan-200 border border-cyan-500/30 focus:border-cyan-400 focus:outline-none cursor-pointer"
+                                title="Click to select interview time"
+                              />
+                              {(modalEdit.interviewSlot !== undefined ? modalEdit.interviewSlot : currentModalApp.interviewSlot) ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleInlineChange(currentModalApp._id, "interviewSlot", "");
+                                    saveInterviewSlot(currentModalApp._id, "");
+                                  }}
+                                  className="px-2 py-2 border border-rose-500/30 hover:border-rose-500 text-rose-400 font-mono text-xs rounded transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                                  title="Clear time slot"
+                                >
+                                  <FaTimes className="text-[10px]" />
+                                </button>
+                              ) : null}
+                              {slotSavingId === currentModalApp._id ? (
+                                <span className="text-[10px] font-mono text-cyan-400 animate-pulse">...</span>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                        <p className="text-[10px] font-mono text-gray-400 mt-1">
+                          Set the interview date and time slot. Any changes automatically save and reflect in all department views.
+                        </p>
+                      </div>
+
                       {/* Optional Overall Comments / Notes */}
                       <div>
                         <label className="block text-xs font-mono text-gray-300 mb-1 uppercase tracking-wider">
@@ -3062,6 +5281,14 @@ export default function RecruitmentAdminPage() {
                               points: displayScore || autoScoreFormatted,
                               positiveRemarks: currentPos,
                               negativeRemarks: currentNeg,
+                              interviewSlot:
+                                modalEdit.interviewSlot !== undefined
+                                  ? modalEdit.interviewSlot
+                                  : currentModalApp.interviewSlot,
+                              interviewDate:
+                                modalEdit.interviewDate !== undefined
+                                  ? modalEdit.interviewDate
+                                  : currentModalApp.interviewDate,
                             });
                           }}
                           disabled={modalEdit.isSaving}
@@ -3099,7 +5326,9 @@ export default function RecruitmentAdminPage() {
               </div>
             </div>
           );
-        })()}
+        })(),
+        document.body
+      )}
       </div>
     </div>
   );
