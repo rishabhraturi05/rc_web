@@ -34,11 +34,15 @@ const CompeteTab = () => {
            animate={{ opacity: 1, y: 0 }}
            transition={{ duration: 0.8 }}
         >
+          <div className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-cyan-400 mb-3 px-3.5 py-1 rounded-full border border-cyan-500/30 bg-cyan-950/20">
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+            <span>NATIONAL ARENAS</span>
+          </div>
           <h1 className="mb-4 text-5xl md:text-7xl font-black text-white title-glow tracking-tighter uppercase" style={{ fontFamily: 'var(--font-orbitron)' }}>
             Competitions
           </h1>
-          <p className="text-cyan-400 font-mono text-lg max-w-2xl mx-auto bg-black/40 backdrop-blur-sm p-4 rounded-lg shadow-xl border border-white/10">
-            Explore our journey through various robotics competitions and achievements.
+          <p className="text-gray-300 font-mono text-sm sm:text-base max-w-2xl mx-auto">
+            Our journey and achievements across India&apos;s premier robotics platforms: DD-Robocon and IIT Bombay e-Yantra.
           </p>
         </motion.div>
       </div>
@@ -52,7 +56,7 @@ const CompeteTab = () => {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
             onClick={() => setCurrtab('Robocon')}
-            className={`group cursor-pointer w-full max-w-[320px] aspect-square rounded-2xl flex flex-col justify-end p-8 relative overflow-hidden transition-all duration-500 border-2 ${
+            className={`group cursor-pointer w-full max-w-[320px] aspect-square rounded-2xl flex flex-col justify-end p-8 relative overflow-hidden transition-all duration-300 border-2 ${
               currtab === 'Robocon' 
                 ? 'border-cyan-400 shadow-[0_0_30px_rgba(34,211,238,0.4)] scale-105' 
                 : 'border-white/20 hover:border-cyan-400/50 hover:scale-105'
@@ -70,8 +74,8 @@ const CompeteTab = () => {
             <h3 className="relative z-10 text-3xl font-bold text-white tracking-widest uppercase transition-all duration-300 group-hover:text-cyan-300 drop-shadow-[0_0_10px_rgba(0,0,0,0.8)]" style={{ fontFamily: 'var(--font-orbitron)' }}>
               Robocon
             </h3>
-            <p className="relative z-10 font-mono text-sm text-cyan-50 mt-2 opacity-0 transform translate-y-4 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0">
-              {'>'} INITIALIZE DATABASE
+            <p className="relative z-10 font-mono text-xs text-cyan-300 mt-2 opacity-0 transform translate-y-3 transition-all duration-200 group-hover:opacity-100 group-hover:translate-y-0">
+              View Timeline →
             </p>
           </motion.div>
 
@@ -80,7 +84,7 @@ const CompeteTab = () => {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6, delay: 0.4 }}
             onClick={() => setCurrtab('EYantra')}
-            className={`group cursor-pointer w-full max-w-[320px] aspect-square rounded-2xl flex flex-col justify-end p-8 relative overflow-hidden transition-all duration-500 border-2 ${
+            className={`group cursor-pointer w-full max-w-[320px] aspect-square rounded-2xl flex flex-col justify-end p-8 relative overflow-hidden transition-all duration-300 border-2 ${
               currtab === 'EYantra' 
                 ? 'border-cyan-400 shadow-[0_0_30px_rgba(34,211,238,0.4)] scale-105' 
                 : 'border-white/20 hover:border-cyan-400/50 hover:scale-105'
@@ -98,8 +102,8 @@ const CompeteTab = () => {
             <h3 className="relative z-10 text-3xl font-bold text-white tracking-widest uppercase transition-all duration-300 group-hover:text-cyan-300 drop-shadow-[0_0_10px_rgba(0,0,0,0.8)]" style={{ fontFamily: 'var(--font-orbitron)' }}>
               E-Yantra
             </h3>
-            <p className="relative z-10 font-mono text-sm text-cyan-50 mt-2 opacity-0 transform translate-y-4 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0">
-              {'>'} INITIALIZE DATABASE
+            <p className="relative z-10 font-mono text-xs text-cyan-300 mt-2 opacity-0 transform translate-y-3 transition-all duration-200 group-hover:opacity-100 group-hover:translate-y-0">
+              View Timeline →
             </p>
           </motion.div>
 

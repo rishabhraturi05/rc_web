@@ -1,70 +1,57 @@
-"use client"
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { FaLinkedin, FaInstagram, FaEnvelope } from 'react-icons/fa';
-import Link from 'next/link';
-import Image from 'next/image';
+"use client";
 
-const alumniData = [
+import React, { useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  FaLinkedin,
+  FaInstagram,
+  FaEnvelope,
+  FaGraduationCap,
+  FaUsers,
+  FaQuoteLeft,
+  FaTimes
+} from 'react-icons/fa';
+import Link from 'next/link';
+
+const defaultAlumni = [
+  // Class of 2026
   {
-    name: 'Raj Kumar Darshanala',
-    description: 'Currently a software engineer. I was part of club from its start to 2022. Will be happy to collaborate for robotics advancements.',
-    imageUrl: '/alumini/KumarDarshanala.jpeg',
-    linkedin: 'http://linkedin.com/in/rajkumar-darshanala',
-    instagram: 'https://www.instagram.com/raj.kumar.darshanala',
-    email: 'rkdarshanala@gmail.com'
+    name: 'G. Sai Sasivardhan',
+    role: 'Former General Secretary (2023–2024)',
+    year: '2026',
+    description: "Spearheaded foundational club governance, technical workshops, competition prep, and team mentorship for Robotics Club NITW.",
+    imageUrl: '/members/2026/gampa_sai_sasivardhan.jpg',
+    linkedin: 'https://in.linkedin.com/in/sai-sasivardhan-gampa-59559a254',
+    instagram: 'https://www.instagram.com/sasivardhansai',
+    email: ''
   },
   {
-    name: 'Shaik Abdullah',
-    description: "Overhauled the robotics club through 2020-2023 by establishing streamlined structure and training programmes. Defined robotics career pathway. Initiated research teams. Authored multiple robotics research papers and now lead a startup's robotics department. Interested in MAVs.",
-    imageUrl: '/alumini/ShaikAbdullah.jpg',
-    linkedin: 'https://www.linkedin.com/in/shaik-abdullah-6ab62219b?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app',
-    instagram: 'https://www.instagram.com/milkshaik203?igsh=MXZ3bzYzNWNqcHZncw==',
-    email: 'abdullah.sk203@gmail.com'
+    name: 'Sudhakar',
+    role: 'Former General Secretary (2023–2024)',
+    year: '2026',
+    description: "Former General Secretary and senior mentor guiding autonomous robotics research, embedded microcontrollers, and hardware projects.",
+    imageUrl: '/members/2026/sudhakar_kumar.jpg',
+    linkedin: 'https://www.linkedin.com/in/sudhakar-kumar-38a9a4282/',
+    instagram: 'https://www.instagram.com/_sudhakar.08',
+    email: 'krsudhakar1103@gmail.com'
   },
   {
-    name: 'Aaditya Prakash Kattekola',
-    description: 'I am a Ph.D student in the Mostofi Lab at University of California, Santa Barbara. I am interested in creating robust communication frameworks for robots as well as utilizing robots in enhancing communication networks. I obtained my Bachelor of Technology from the National Institute of Technology, Warangal (NITW) in the Department of Electronics & Communication Engineering.',
-    imageUrl: '/alumini/Aaditya.jpeg',
-    linkedin: 'https://www.linkedin.com/in/kapi2910/',
-    instagram: '@aham.kapi',
-    email: 'aadityapra2910@gmail.com'
+    name: 'Anand A.L',
+    role: 'Mechanical Systems Lead',
+    year: '2026',
+    description: "Senior mechanical design contributor focused on rover chassis dynamics, CAD simulations, and planetary transmission fabrication.",
+    imageUrl: '/members/2026/anand_a_l.jpg',
+    linkedin: 'https://www.linkedin.com/in/anand-al',
+    instagram: 'https://www.instagram.com/anandd_alx',
+    email: ''
   },
-  {
-    name: 'VSK Kumar',
-    description: 'Hi team! This is VSK, I served as the General Secretary of the Robotics Club from 2023-2024. I am currently working as a Data Scientist at AT&T. My rule in life is to always do what you like!',
-    imageUrl: '/alumini/KaushikVempati.jpg',
-    linkedin: 'https://www.linkedin.com/in/kaushik-vempati/',
-    instagram: '@vsk.kumar_',
-    email: 'kaushik.vempati@gmail.com'
-  },
-  {
-    name: 'Varun Gupta Tallam',
-    description: 'I am currently doing a masters in Chemical Engineering at TU Delft. I am a former Joint secretary at RC 2023-24. I was a member of the club for 4 years starting in 2020. I have seen the club grow from very humble beginnings and wish success to all the ones who come after me.',
-    imageUrl: '/alumini/VarunTallam.jpg',
-    linkedin: 'https://www.linkedin.com/in/varun-tallam/',
-    instagram: 'https://instagram.com/varun_tallam',
-    email: 'varungupta.tallam@gmail.com'
-  },
-  {
-    name: 'SK Munawwar Ali',
-    description: 'I’m fortunate to follow my passion as an R&D Mechanical Engineer at ideaForge, India’s leading drone manufacturer. I started my journey in 2022 with the robotics club and went on to serve as Joint Secretary for the 2024 batch. It makes me truly happy to see the club reach new heights each year.',
-    imageUrl: '/alumini/SKMunawwarAli.jpg',
-    linkedin: 'https://www.linkedin.com/in/sk-munawwar-ali',
-    instagram: 'https://www.instagram.com/skmunawwarali',
-    email: 'munawwarali2402@gmail.com'
-  },
-  {
-    name: 'Aryan Panhale',
-    description: "Started my journey as a ROS enthusiast driven by a passion for problem-solving, I leveraged my skills and deep understanding of data flow to pivot into an analyst role, where I help drive data-informed decisions.",
-    imageUrl: '/alumini/Aryan_Rajan.jpg',
-    linkedin: 'https://www.linkedin.com/in/aryan-panhale-a49bb11b9',
-    instagram: '/',
-    email: 'aryanrajan24@gmail.com'
-  },
+
+  // Class of 2025
   {
     name: 'Kevin Amal Darren',
-    description: "Hey guys, I was the General Secretary in the year 2024-2025. Currently working as a Robot Software Engineer at Clutterbot. I specialise in ROS, Motion planning and Manipulation for Multi-DOF systems.",
+    role: 'Former General Secretary (2024–2025)',
+    year: '2025',
+    description: "Robot Software Engineer at Clutterbot. Specialises in ROS, Motion planning, and Manipulation for Multi-DOF robotic systems.",
     imageUrl: '/alumini/Kevin.jpg',
     linkedin: 'https://www.linkedin.com/in/kevin-amal-darren-794707209',
     instagram: 'https://www.instagram.com/kiwikev23',
@@ -72,23 +59,29 @@ const alumniData = [
   },
   {
     name: 'Potnuri Sri Anjali Pravallika',
-    description: "I’m Anjali Pravallika, an Electronics Engineer who enjoys working on practical, hands-on projects. I’ve explored areas like PCB design, antenna design, and I’m interested in pursuing VLSI research. I like learning new things, solving problems, and building designs that help to make life easier.",
+    role: 'Electronics & Hardware Lead',
+    year: '2025',
+    description: "Electronics Engineer specializing in PCB design, antenna design, and VLSI research. Focused on practical hands-on robotic hardware.",
     imageUrl: '/alumini/ANJALI.jpg',
     linkedin: 'https://www.linkedin.com/in/potnuri-sri-anjali-pravallika-451979237',
-    instagram: '/',
+    instagram: '',
     email: 'potnuripravallika2504@gmail.com'
   },
   {
     name: 'Sarvepalli Mahathi',
-    description: "I am a graduate of ECE'25 batch. Interested in analog electronics, RF and wireless comm. systems. Also a waste management enthusiast!",
+    role: 'Analog & RF Systems Lead',
+    year: '2025',
+    description: "ECE'25 graduate interested in analog electronics, RF/wireless communication systems, and sustainable hardware engineering.",
     imageUrl: '/alumini/S.Mahathi.jpg',
     linkedin: 'https://in.linkedin.com/in/mahathi-sarvepalli',
-    instagram: '/',
+    instagram: '',
     email: 's.mahathi1319@gmail.com'
   },
   {
     name: 'Vattam Sai Sharanya',
-    description: "I’m an electronics enthusiast who loves diving deep into how things work—even if my patience doesn’t always keep up with my curiosity. I enjoy experimenting, trying new tools, and breaking down tech until it actually makes sense. I’m always chasing that “aha!” moment in whatever I work on.",
+    role: 'Embedded Systems Lead',
+    year: '2025',
+    description: "Electronics enthusiast passionate about embedded architectures, sensor integration, and diving deep into how robotic systems tick.",
     imageUrl: '/alumini/SAISHARANYA.jpeg',
     linkedin: 'https://www.linkedin.com/in/sai-sharanya-vattam-5b342130a',
     instagram: 'https://www.instagram.com/_saisharanya_vattam_',
@@ -96,152 +89,467 @@ const alumniData = [
   },
   {
     name: 'Mydam Umamaheshwar',
-    description: 'A passionate enthusiast in business analysis, data analytics. Passionate about ML in robotics solving problems through data-driven solutions and strategic thinking. ',
+    role: 'Data Analytics & ML Lead',
+    year: '2025',
+    description: "Passionate about data analytics and applying machine learning to robotics to solve engineering problems through data-driven insight.",
     imageUrl: '/alumini/UMAMAHESHWAR_MYDAM.jpg',
     linkedin: 'https://www.linkedin.com/in/mydam-umamaheshwar-605726227/',
     instagram: 'https://www.instagram.com/umamaheshwarchintu_20',
     email: 'mu21btb0a44@student.nitw.ac.in'
   },
+
+  // Class of 2024
   {
-    name: 'G. Sai Sasivardhan',
-    description: 'Former member of the Robotics Club.',
-    imageUrl: '/members/gensecs/Gampa Sai Sasivardhan.jpg',
-    linkedin: 'https://in.linkedin.com/in/sai-sasivardhan-gampa-59559a254',
-    instagram: 'https://www.instagram.com/sasivardhansai',
-    email: '/'
+    name: 'VSK Kumar (Kaushik Vempati)',
+    role: 'Former General Secretary (2023–2024)',
+    year: '2024',
+    description: "Served as General Secretary of the Robotics Club from 2023–2024. Currently working as a Data Scientist at AT&T. Always do what you like!",
+    imageUrl: '/alumini/KaushikVempati.jpg',
+    linkedin: 'https://www.linkedin.com/in/kaushik-vempati/',
+    instagram: 'https://www.instagram.com/vsk.kumar_',
+    email: 'kaushik.vempati@gmail.com'
   },
   {
-    name: 'Sudhakar',
-    description: 'Former member of the Robotics Club.',
-    imageUrl: '/members/gensecs/_Sudhakar_photo - Sudhakar Kumar.jpg',
-    linkedin: 'https://www.linkedin.com/in/sudhakar-kumar-38a9a4282/',
-    instagram: 'https://www.instagram.com/_sudhakar.08?igsh=MWcxeTJrb2J5OWI2bA==',
-    email: 'krsudhakar1103@gmail.com'
+    name: 'Varun Gupta Tallam',
+    role: 'Former Joint Secretary (2023–2024)',
+    year: '2024',
+    description: "Member of the club for 4 years (2020–2024). Currently pursuing a Master's degree in Chemical Engineering at TU Delft.",
+    imageUrl: '/alumini/VarunTallam.jpg',
+    linkedin: 'https://www.linkedin.com/in/varun-tallam/',
+    instagram: 'https://instagram.com/varun_tallam',
+    email: 'varungupta.tallam@gmail.com'
   },
   {
-    name: 'Anand A.L',
-    description: 'Former member of the Robotics Club.',
-    imageUrl: '/members/mech/Anand A L.jpg',
-    linkedin: 'https://www.linkedin.com/in/anand-al',
-    instagram: 'https://www.instagram.com/anandd_alx?igsh=MTd1ZXMxemh2Y2dxNg==',
-    email: '/'
+    name: 'SK Munawwar Ali',
+    role: 'Former Joint Secretary (2023–2024)',
+    year: '2024',
+    description: "R&D Mechanical Engineer at ideaForge (India's leading drone manufacturer). Led mechanical design and fabrication for the 2024 batch.",
+    imageUrl: '/alumini/SKMunawwarAli.jpg',
+    linkedin: 'https://www.linkedin.com/in/sk-munawwar-ali',
+    instagram: 'https://www.instagram.com/skmunawwarali',
+    email: 'munawwarali2402@gmail.com'
+  },
+  {
+    name: 'Aryan Panhale',
+    role: 'Autonomous Systems & Analytics',
+    year: '2024',
+    description: "ROS enthusiast and problem solver who leveraged deep understanding of telemetry and data flow to drive data-informed decisions.",
+    imageUrl: '/alumini/Aryan_Rajan.jpg',
+    linkedin: 'https://www.linkedin.com/in/aryan-panhale-a49bb11b9',
+    instagram: '',
+    email: 'aryanrajan24@gmail.com'
+  },
+
+  // Class of 2023
+  {
+    name: 'Shaik Abdullah',
+    role: 'Robotics Lead & Research Head',
+    year: '2023',
+    description: "Overhauled the club through 2020–2023 by establishing research pathways and training programmes. Authored multiple papers; now leads a startup robotics department.",
+    imageUrl: '/alumini/ShaikAbdullah.jpg',
+    linkedin: 'https://www.linkedin.com/in/shaik-abdullah-6ab62219b',
+    instagram: 'https://www.instagram.com/milkshaik203',
+    email: 'abdullah.sk203@gmail.com'
+  },
+  {
+    name: 'Aaditya Prakash Kattekola',
+    role: 'Co-Founder & Communications Researcher',
+    year: '2023',
+    description: "PhD student in the Mostofi Lab at UC Santa Barbara. Researching robotic communication frameworks and network-enhanced multi-robot coordination.",
+    imageUrl: '/alumini/Aaditya.jpeg',
+    linkedin: 'https://www.linkedin.com/in/kapi2910/',
+    instagram: '',
+    email: 'aadityapra2910@gmail.com'
+  },
+
+  // Class of 2022
+  {
+    name: 'Raj Kumar Darshanala',
+    role: 'Founding Member & Software Engineer',
+    year: '2022',
+    description: "Founding generation member who served from the club's inception to 2022. Currently working as a Software Engineer.",
+    imageUrl: '/alumini/KumarDarshanala.jpeg',
+    linkedin: 'http://linkedin.com/in/rajkumar-darshanala',
+    instagram: 'https://www.instagram.com/raj.kumar.darshanala',
+    email: 'rkdarshanala@gmail.com'
   }
 ];
 
-const Alumni = () => {
-  const [copiedField, setCopiedField] = useState(null);
+const tabs = [
+  { id: 'all', label: 'All Batches', icon: <FaUsers /> },
+  { id: '2026', label: 'Class of 2026', icon: <FaGraduationCap /> },
+  { id: '2025', label: 'Class of 2025', icon: <FaGraduationCap /> },
+  { id: '2024', label: 'Class of 2024', icon: <FaGraduationCap /> },
+  { id: '2023', label: 'Class of 2023', icon: <FaGraduationCap /> },
+  { id: '2022', label: 'Class of 2022', icon: <FaGraduationCap /> },
+];
 
-  const handleCopy = async (text, fieldId) => {
+const cardVariants = {
+  hidden: { opacity: 0, y: 20, scale: 0.95 },
+  visible: { opacity: 1, y: 0, scale: 1 }
+};
+
+const AlumniCard = ({ person, index = 0, onSelectBio }) => {
+  const [copied, setCopied] = useState(false);
+
+  const copyToClipboard = async (text) => {
     try {
       await navigator.clipboard.writeText(text);
-      setCopiedField(fieldId);
-      setTimeout(() => setCopiedField(null), 2000);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error('Failed to copy:', err);
+      console.error('Failed to copy: ', err);
     }
   };
 
   return (
-    <main className="relative min-h-screen bg-transparent text-white overflow-x-hidden pb-24">
+    <motion.div
+      variants={cardVariants}
+      initial="hidden"
+      animate="visible"
+      transition={{ duration: 0.4, delay: index * 0.05 }}
+      className="group relative overflow-hidden glass-panel glass-panel-hover flex flex-col rounded-2xl border border-white/10 hover:border-cyan-400/50 bg-black/60 backdrop-blur-md hover:-translate-y-1 transition-all duration-300 shadow-xl"
+    >
+      {/* Photo Area */}
+      <div className="relative h-72 w-full overflow-hidden bg-cyan-950/20">
+        <img
+          src={person.imageUrl || person.img || "/favicon.ico"}
+          alt={person.name}
+          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-90 group-hover:opacity-100"
+          onError={(e) => {
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = "/favicon.ico";
+          }}
+        />
 
-      <div className="relative z-10 pt-32 pb-16 text-center">
+        {/* Graduating Batch Pill */}
+        <div className="absolute top-3.5 right-3.5 z-10">
+          <span className="px-3 py-1 rounded-full font-mono text-[11px] font-bold uppercase tracking-wider bg-black/80 border border-cyan-400/50 text-cyan-300 shadow-md backdrop-blur-md">
+            Class of {person.year}
+          </span>
+        </div>
+
+        {/* Gradient Overlay */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-80 group-hover:opacity-90 transition-opacity duration-300" />
+      </div>
+
+      {/* Info Block */}
+      <div className="p-5 flex-1 flex flex-col justify-between">
+        <div>
+          <h3
+            className="text-lg font-bold font-mono tracking-tight text-white group-hover:text-cyan-300 transition-colors leading-snug"
+          >
+            {person.name}
+          </h3>
+          <p className="text-xs font-mono text-cyan-400/90 mt-1 mb-3">
+            {person.role || `Robotics Club Alumnus`}
+          </p>
+
+          {/* Bio Snippet */}
+          {person.description && (
+            <p className="text-xs font-mono text-gray-300 leading-relaxed line-clamp-3 italic">
+              &quot;{person.description}&quot;
+            </p>
+          )}
+
+          {person.description && person.description.length > 120 && (
+            <button
+              onClick={() => onSelectBio(person)}
+              className="text-[11px] font-mono text-cyan-400 hover:text-white mt-1 cursor-pointer underline underline-offset-2 flex items-center gap-1"
+            >
+              Read full note →
+            </button>
+          )}
+        </div>
+
+        {/* Social Connectors */}
+        <div className="flex items-center gap-3 mt-5 pt-3.5 border-t border-white/10">
+          {person.email && person.email !== '/' && (
+            <button
+              onClick={() => copyToClipboard(person.email)}
+              className="text-gray-400 hover:text-cyan-400 transition-colors cursor-pointer p-1.5 rounded-lg hover:bg-cyan-950/30"
+              title="Copy email address"
+            >
+              <FaEnvelope size={15} />
+            </button>
+          )}
+
+          {person.linkedin && person.linkedin !== '#' && person.linkedin !== '/' && (
+            <Link
+              href={person.linkedin.startsWith("http") ? person.linkedin : `https://${person.linkedin}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-gray-400 hover:text-blue-400 transition-colors p-1.5 rounded-lg hover:bg-cyan-950/30"
+              title="LinkedIn profile"
+            >
+              <FaLinkedin size={15} />
+            </Link>
+          )}
+
+          {person.instagram && person.instagram !== '#' && person.instagram !== '/' && (
+            <Link
+              href={person.instagram.startsWith("http") ? person.instagram : `https://www.instagram.com/${person.instagram.replace('@', '')}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-gray-400 hover:text-pink-400 transition-colors p-1.5 rounded-lg hover:bg-cyan-950/30"
+              title="Instagram profile"
+            >
+              <FaInstagram size={15} />
+            </Link>
+          )}
+        </div>
+      </div>
+
+      {/* Copy Notification Toast */}
+      {copied && (
+        <div className="absolute top-3.5 left-3.5 bg-black/95 backdrop-blur border border-cyan-400 text-cyan-300 px-3 py-1 rounded-full text-xs font-mono font-medium shadow-xl">
+          Email copied!
+        </div>
+      )}
+    </motion.div>
+  );
+};
+
+const Section = ({ title, people = [], onSelectBio }) => (
+  <div className="mb-16">
+    <div className="flex items-center gap-4 mb-8">
+      <span className="w-12 h-[2px] bg-cyan-400"></span>
+      <h2
+        className="text-2xl md:text-3xl font-bold text-white uppercase tracking-widest"
+        style={{ fontFamily: 'var(--font-orbitron)' }}
+      >
+        {title}
+      </h2>
+      <span className="text-xs font-mono text-cyan-400/80 px-2.5 py-0.5 rounded-full border border-cyan-500/30 bg-cyan-950/30">
+        {people.length} {people.length === 1 ? 'Alumnus' : 'Alumni'}
+      </span>
+    </div>
+
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      {people.map((person, idx) => (
+        <AlumniCard
+          key={`${person.name}-${idx}`}
+          person={person}
+          index={idx % 8}
+          onSelectBio={onSelectBio}
+        />
+      ))}
+    </div>
+  </div>
+);
+
+export default function AlumniPage() {
+  const [activeTab, setActiveTab] = useState('all');
+  const [alumniList, setAlumniList] = useState(defaultAlumni);
+  const [selectedBioPerson, setSelectedBioPerson] = useState(null);
+
+  // Optional: Merge dynamically registered alumni from database
+  useEffect(() => {
+    fetch('/api/members', { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((res) => {
+        if (res.success && Array.isArray(res.data?.alumni) && res.data.alumni.length > 0) {
+          const apiAlumni = res.data.alumni.map((m) => {
+            let yr = '2024';
+            if (m.year) {
+              const match = String(m.year).match(/\d{4}/);
+              if (match) yr = match[0];
+            }
+            return {
+              name: m.name,
+              role: m.role || 'Alumnus',
+              year: yr,
+              description: m.bio || m.description || 'Former member of the Robotics Club.',
+              imageUrl: m.img || m.imageUrl || '/favicon.ico',
+              linkedin: m.linkedin || '',
+              instagram: m.instagram || '',
+              email: m.email || '',
+            };
+          });
+
+          // Merge without duplicate names
+          const existingNames = new Set(defaultAlumni.map((a) => a.name.toLowerCase()));
+          const extra = apiAlumni.filter((a) => !existingNames.has(a.name.toLowerCase()));
+          if (extra.length > 0) {
+            setAlumniList([...defaultAlumni, ...extra]);
+          }
+        }
+      })
+      .catch((err) => {
+        console.error("Alumni live sync notice:", err);
+      });
+  }, []);
+
+  // Group alumni by graduating year
+  const groupedByYear = useMemo(() => {
+    const map = {
+      '2026': [],
+      '2025': [],
+      '2024': [],
+      '2023': [],
+      '2022': [],
+    };
+
+    alumniList.forEach((person) => {
+      const y = String(person.year);
+      if (!map[y]) map[y] = [];
+      map[y].push(person);
+    });
+
+    return map;
+  }, [alumniList]);
+
+  return (
+    <main className="relative min-h-screen bg-transparent text-white overflow-x-hidden pb-24">
+      {/* Hero Header */}
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pt-32 pb-12 text-center">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
         >
-          <h1 className="mb-4 text-5xl md:text-7xl font-black text-white title-glow tracking-tighter uppercase" style={{ fontFamily: 'var(--font-orbitron)' }}>
-            Our Alumni
+          <div className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-cyan-400 mb-3 px-3.5 py-1 rounded-full border border-cyan-500/30 bg-cyan-950/20">
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+            <span>ALUMNI NETWORK</span>
+          </div>
+          <h1
+            className="mb-4 text-5xl md:text-7xl font-black text-white title-glow tracking-tighter uppercase"
+            style={{ fontFamily: 'var(--font-orbitron)' }}
+          >
+            OUR ALUMNI
           </h1>
-          <p className="text-cyan-400 font-mono text-lg max-w-2xl mx-auto bg-black/40 backdrop-blur-sm p-4 rounded-lg shadow-xl border border-white/10">
-            Meet the brilliant minds who shaped our journey.
+          <p className="text-gray-300 font-mono text-sm sm:text-base max-w-2xl mx-auto">
+            Meet the engineers, researchers, and mentors who shaped the foundations and engineering legacy of Robotics Club NIT Warangal.
           </p>
         </motion.div>
       </div>
 
-      <div className="relative z-10 px-4 sm:px-6 lg:px-8 pb-20">
-        <div className="flex flex-col gap-6 sm:gap-10 max-w-5xl mx-auto">
-          {alumniData.map((alumnus, index) => (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-50px" }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-              className="group"
+      {/* Year Filter Tabs */}
+      <div className="relative z-20 mx-auto max-w-5xl px-4 mb-14">
+        <div className="flex flex-wrap justify-center gap-2.5 md:gap-3.5">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-mono text-xs md:text-sm uppercase tracking-wider transition-all duration-200 cursor-pointer active:scale-95 ${
+                activeTab === tab.id
+                  ? 'bg-cyan-400 text-black font-bold shadow-[0_0_20px_rgba(34,211,238,0.4)]'
+                  : 'bg-black/60 border border-white/10 text-gray-400 hover:border-cyan-400/50 hover:text-white hover:bg-black/80'
+              } backdrop-blur-md`}
             >
-              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 sm:gap-8 p-6 sm:p-8 glass-panel glass-panel-hover transition-all duration-500">
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
-                {/* Profile Image & Socials */}
-                <div className="flex flex-col items-center gap-4 shrink-0">
-                  <div className="relative w-32 h-32 sm:w-40 sm:h-40 rounded-lg overflow-hidden border-2 border-cyan-500/50 group-hover:border-cyan-400 transition-colors duration-500 shadow-[0_0_15px_rgba(34,211,238,0.2)] group-hover:shadow-[0_0_25px_rgba(34,211,238,0.6)]">
-                    <Image
-                      src={alumnus.imageUrl}
-                      alt={alumnus.name}
-                      width={160}
-                      height={160}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 opacity-90 group-hover:opacity-100"
-                    />
-                    <div className="absolute inset-0 bg-cyan-900/20 mix-blend-overlay group-hover:bg-transparent transition-colors duration-500"></div>
-                  </div>
-
-                  {/* Glowing Social Connectors */}
-                  <div className="flex gap-3 mt-2">
-                    {alumnus.linkedin && alumnus.linkedin !== '/' && (
-                      <Link
-                        href={alumnus.linkedin}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-10 h-10 flex items-center justify-center bg-cyan-950/50 border border-cyan-500/30 text-cyan-500 hover:text-cyan-300 hover:border-cyan-400 hover:bg-cyan-900/80 rounded-md transition-all duration-300 shadow-[0_0_10px_rgba(34,211,238,0.1)] hover:shadow-[0_0_15px_rgba(34,211,238,0.5)]"
-                        title="LinkedIn"
-                      >
-                        <FaLinkedin className="w-5 h-5" />
-                      </Link>
-                    )}
-                    {alumnus.instagram && alumnus.instagram !== '/' && (
-                      <div
-                        className="w-10 h-10 flex items-center justify-center bg-pink-950/50 border border-pink-500/30 text-pink-500 hover:text-pink-300 hover:border-pink-400 hover:bg-pink-900/80 rounded-md transition-all duration-300 shadow-[0_0_10px_rgba(236,72,153,0.1)] hover:shadow-[0_0_15px_rgba(236,72,153,0.5)] cursor-pointer"
-                        title="Copy Instagram Handle"
-                        onClick={() => handleCopy(alumnus.instagram, `ig-${index}`)}
-                      >
-                        <FaInstagram className="w-5 h-5" />
-                      </div>
-                    )}
-                    {alumnus.email && alumnus.email !== '/' && (
-                      <div
-                        className="w-10 h-10 flex items-center justify-center bg-green-950/50 border border-green-500/30 text-green-500 hover:text-green-300 hover:border-green-400 hover:bg-green-900/80 rounded-md transition-all duration-300 shadow-[0_0_10px_rgba(34,197,94,0.1)] hover:shadow-[0_0_15px_rgba(34,197,94,0.5)] cursor-pointer"
-                        title="Copy Email Address"
-                        onClick={() => handleCopy(alumnus.email, `email-${index}`)}
-                      >
-                        <FaEnvelope className="w-5 h-5" />
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Content */}
-                <div className="text-center sm:text-left flex-1 flex flex-col justify-center">
-                  <h3 className="text-2xl sm:text-3xl font-bold text-white mb-3 tracking-widest uppercase group-hover:text-cyan-300 transition-colors" style={{ fontFamily: 'var(--font-orbitron)' }}>
-                    {alumnus.name}
-                  </h3>
-                  <p className="text-gray-300 font-mono text-sm sm:text-base leading-relaxed pl-0 sm:pl-4 sm:border-l-2 sm:border-cyan-500/30 group-hover:border-cyan-400 transition-colors duration-500">
-                    {alumnus.description}
-                  </p>
-                </div>
-              </div>
-
-              {/* Terminal style copy notification */}
-              {(copiedField === `ig-${index}` || copiedField === `email-${index}`) && (
-                <div className="absolute top-4 right-4 bg-cyan-900/80 backdrop-blur border border-cyan-400 text-cyan-100 px-3 py-1 rounded-md text-xs font-mono font-medium animate-pulse z-10">
-                  {'>'} COPIED
-                </div>
+      {/* Alumni Grid Render */}
+      <div className="relative z-10 mx-auto max-w-6xl px-4 min-h-[50vh]">
+        <AnimatePresence mode="wait">
+          {activeTab === 'all' ? (
+            <motion.div
+              key="all"
+              initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
+              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, y: -20, filter: 'blur(10px)' }}
+              transition={{ duration: 0.3 }}
+            >
+              {groupedByYear['2026']?.length > 0 && (
+                <Section
+                  title="Class of 2026"
+                  people={groupedByYear['2026']}
+                  onSelectBio={setSelectedBioPerson}
+                />
+              )}
+              {groupedByYear['2025']?.length > 0 && (
+                <Section
+                  title="Class of 2025"
+                  people={groupedByYear['2025']}
+                  onSelectBio={setSelectedBioPerson}
+                />
+              )}
+              {groupedByYear['2024']?.length > 0 && (
+                <Section
+                  title="Class of 2024"
+                  people={groupedByYear['2024']}
+                  onSelectBio={setSelectedBioPerson}
+                />
+              )}
+              {groupedByYear['2023']?.length > 0 && (
+                <Section
+                  title="Class of 2023"
+                  people={groupedByYear['2023']}
+                  onSelectBio={setSelectedBioPerson}
+                />
+              )}
+              {groupedByYear['2022']?.length > 0 && (
+                <Section
+                  title="Class of 2022"
+                  people={groupedByYear['2022']}
+                  onSelectBio={setSelectedBioPerson}
+                />
               )}
             </motion.div>
-          ))}
+          ) : (
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
+              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, y: -20, filter: 'blur(10px)' }}
+              transition={{ duration: 0.3 }}
+            >
+              <Section
+                title={`Class of ${activeTab}`}
+                people={groupedByYear[activeTab] || []}
+                onSelectBio={setSelectedBioPerson}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-    </div>
-    </main >
-  );
-};
 
-export default Alumni;
+      {/* Full Bio Modal */}
+      {selectedBioPerson && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="glass-panel p-6 sm:p-8 rounded-2xl max-w-lg w-full border border-cyan-400/50 bg-black/90 shadow-[0_0_40px_rgba(34,211,238,0.25)] relative"
+          >
+            <button
+              onClick={() => setSelectedBioPerson(null)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white p-2 rounded-lg cursor-pointer"
+            >
+              <FaTimes size={18} />
+            </button>
+
+            <div className="flex items-center gap-4 mb-4">
+              <img
+                src={selectedBioPerson.imageUrl || selectedBioPerson.img || "/favicon.ico"}
+                alt={selectedBioPerson.name}
+                className="w-14 h-14 rounded-full object-cover border border-cyan-400"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = "/favicon.ico";
+                }}
+              />
+              <div>
+                <h3 className="font-mono text-lg font-bold text-white">{selectedBioPerson.name}</h3>
+                <p className="font-mono text-xs text-cyan-400">Class of {selectedBioPerson.year} • {selectedBioPerson.role}</p>
+              </div>
+            </div>
+
+            <div className="border-t border-white/10 pt-4">
+              <FaQuoteLeft className="text-cyan-400/40 text-xl mb-2" />
+              <p className="font-mono text-sm text-gray-200 leading-relaxed italic">
+                {selectedBioPerson.description}
+              </p>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </main>
+  );
+}
