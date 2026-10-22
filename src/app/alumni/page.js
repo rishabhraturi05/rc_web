@@ -20,7 +20,7 @@ const defaultAlumni = [
     role: 'Former General Secretary (2025–2026)',
     year: '2026',
     description: "Former General Secretary (2025–2026) who spearheaded club governance, high-impact technical initiatives, competition prep, and team mentorship for Robotics Club NITW.",
-    imageUrl: '/members/2026/gampa_sai_sasivardhan.jpg',
+    imageUrl: '/alumini/sasi.jpeg',
     linkedin: 'https://in.linkedin.com/in/sai-sasivardhan-gampa-59559a254',
     instagram: 'https://www.instagram.com/sasivardhansai',
     email: ''
@@ -30,7 +30,7 @@ const defaultAlumni = [
     role: 'Former General Secretary (2025–2026)',
     year: '2026',
     description: "Former General Secretary (2025–2026) and senior mentor guiding autonomous robotics research, embedded microcontrollers, and flagship hardware projects.",
-    imageUrl: '/members/2026/sudhakar_kumar.jpg',
+    imageUrl: '/alumini/sudhakar.jpeg',
     linkedin: 'https://www.linkedin.com/in/sudhakar-kumar-38a9a4282/',
     instagram: 'https://www.instagram.com/_sudhakar.08',
     email: 'krsudhakar1103@gmail.com'
@@ -342,15 +342,67 @@ export default function AlumniPage() {
   const [activeTab, setActiveTab] = useState('all');
   const [alumniList, setAlumniList] = useState(defaultAlumni);
   const [selectedBioPerson, setSelectedBioPerson] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Optional: Merge dynamically registered alumni from database
+  function getAlumniKey(name) {
+    if (!name) return "";
+    const rawClean = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (rawClean.includes("vsk") || rawClean.includes("kaushik") || rawClean.includes("vempati")) {
+      return "vskkumar";
+    }
+    if (rawClean.includes("sasivardhan") || (rawClean.includes("sasi") && rawClean.includes("gampa"))) {
+      return "sasivardhan";
+    }
+    if (rawClean.includes("sudhakar")) {
+      return "sudhakar";
+    }
+    if (rawClean.includes("anand")) {
+      return "anandal";
+    }
+    if (rawClean.includes("kevin")) {
+      return "kevinamal";
+    }
+    if (rawClean.includes("anjali") || rawClean.includes("pravallika")) {
+      return "anjalipravallika";
+    }
+    if (rawClean.includes("mahathi")) {
+      return "mahathi";
+    }
+    if (rawClean.includes("sharanya")) {
+      return "saisharanya";
+    }
+    if (rawClean.includes("umamaheshwar") || rawClean.includes("mydam")) {
+      return "umamaheshwar";
+    }
+    if (rawClean.includes("tallam") || rawClean.includes("varungupta")) {
+      return "varuntallam";
+    }
+    if (rawClean.includes("munawwar")) {
+      return "munawwarali";
+    }
+    if (rawClean.includes("panhale") || rawClean.includes("aryanrajan")) {
+      return "aryanpanhale";
+    }
+    if (rawClean.includes("abdullah")) {
+      return "shaikabdullah";
+    }
+    if (rawClean.includes("aaditya") || rawClean.includes("kattekola")) {
+      return "aadityaprakash";
+    }
+    if (rawClean.includes("darshanala") || rawClean.includes("rajkumar")) {
+      return "rajkumardarshanala";
+    }
+    return rawClean;
+  }
+
+  // Fetch live alumni from MongoDB with strict deduplication
   useEffect(() => {
     fetch('/api/members', { cache: 'no-store' })
       .then((res) => res.json())
       .then((res) => {
         if (res.success && Array.isArray(res.data?.alumni) && res.data.alumni.length > 0) {
           const apiAlumni = res.data.alumni.map((m) => {
-            let yr = '2024';
+            let yr = null;
             if (m.year) {
               const match = String(m.year).match(/\d{4}/);
               if (match) yr = match[0];
@@ -359,7 +411,7 @@ export default function AlumniPage() {
               name: m.name,
               role: m.role || 'Alumnus',
               year: yr,
-              description: m.bio || m.description || 'Former member of the Robotics Club.',
+              description: (m.bio && m.bio.trim()) ? m.bio.trim() : (m.description || ''),
               imageUrl: m.img || m.imageUrl || '/favicon.ico',
               linkedin: m.linkedin || '',
               instagram: m.instagram || '',
@@ -367,16 +419,57 @@ export default function AlumniPage() {
             };
           });
 
-          // Merge without duplicate names
-          const existingNames = new Set(defaultAlumni.map((a) => a.name.toLowerCase()));
-          const extra = apiAlumni.filter((a) => !existingNames.has(a.name.toLowerCase()));
-          if (extra.length > 0) {
-            setAlumniList([...defaultAlumni, ...extra]);
+          // Index live Mongo records by normalized key
+          const apiMap = new Map();
+          apiAlumni.forEach((a) => {
+            const key = getAlumniKey(a.name);
+            if (key) apiMap.set(key, a);
+          });
+
+          // Merge live updates over defaults
+          const updatedDefaults = defaultAlumni.map((def) => {
+            const key = getAlumniKey(def.name);
+            if (apiMap.has(key)) {
+              const live = apiMap.get(key);
+              apiMap.delete(key);
+              return {
+                ...def,
+                ...live,
+                name: live.name || def.name,
+                year: live.year || def.year || '2026',
+                role: (live.role && live.role !== "Member" && live.role !== "Alumnus") ? live.role : def.role,
+                description: (live.description && !live.description.includes("Former member of the Robotics Club")) ? live.description : def.description,
+                imageUrl: live.imageUrl || def.imageUrl,
+              };
+            }
+            return def;
+          });
+
+          // Add any new alumni registered directly in MongoDB
+          const extra = Array.from(apiMap.values()).map((a) => ({
+            ...a,
+            year: a.year || '2024',
+            description: a.description || 'Former member of the Robotics Club.',
+          }));
+
+          // Strict global deduplication: ensures NO duplicate cards exist
+          const seenKeys = new Set();
+          const deduped = [];
+          for (const item of [...updatedDefaults, ...extra]) {
+            const key = getAlumniKey(item.name);
+            if (!seenKeys.has(key)) {
+              seenKeys.add(key);
+              deduped.push(item);
+            }
           }
+          setAlumniList(deduped);
         }
       })
       .catch((err) => {
         console.error("Alumni live sync notice:", err);
+      })
+      .finally(() => {
+        setLoading(false);
       });
   }, []);
 
@@ -391,7 +484,11 @@ export default function AlumniPage() {
     };
 
     alumniList.forEach((person) => {
-      const y = String(person.year);
+      let y = '2026';
+      if (person.year) {
+        const match = String(person.year).match(/\d{4}/);
+        if (match) y = match[0];
+      }
       if (!map[y]) map[y] = [];
       map[y].push(person);
     });
@@ -446,7 +543,24 @@ export default function AlumniPage() {
 
       {/* Alumni Grid Render */}
       <div className="relative z-10 mx-auto max-w-6xl px-4 min-h-[50vh]">
-        <AnimatePresence mode="wait">
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {[...Array(8)].map((_, i) => (
+              <div
+                key={i}
+                className="relative h-96 rounded-2xl border border-white/10 bg-black/60 overflow-hidden animate-pulse flex flex-col justify-between p-5"
+              >
+                <div className="w-full h-56 bg-white/5 rounded-xl mb-4" />
+                <div className="space-y-2">
+                  <div className="w-3/4 h-4 bg-white/10 rounded" />
+                  <div className="w-1/2 h-3 bg-cyan-400/20 rounded" />
+                  <div className="w-full h-2 bg-white/5 rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <AnimatePresence mode="wait">
           {activeTab === 'all' ? (
             <motion.div
               key="all"
@@ -507,6 +621,7 @@ export default function AlumniPage() {
             </motion.div>
           )}
         </AnimatePresence>
+        )}
       </div>
 
       {/* Full Bio Modal */}

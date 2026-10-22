@@ -178,7 +178,7 @@ const DEFAULT_ALUMNI = [
     category: "alumni",
     isAlumni: true,
     bio: "Former General Secretary (2025–2026) and senior mentor guiding autonomous robotics research and hardware development.",
-    img: "/members/2026/sudhakar_kumar.jpg",
+    img: "/alumini/sudhakar.jpeg",
     linkedin: "https://www.linkedin.com/in/sudhakar-kumar-38a9a4282/",
     instagram: "https://www.instagram.com/_sudhakar.08",
     email: "krsudhakar1103@gmail.com",

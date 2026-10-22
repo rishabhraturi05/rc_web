@@ -132,6 +132,7 @@ const Section = ({ title, people = [], cols = 'grid-cols-1 sm:grid-cols-2 md:gri
 
 const Page = () => {
   const [activeTab, setActiveTab] = useState('core');
+  const [loading, setLoading] = useState(true);
 
   const [profiles, setProfiles] = useState({
     professor: allmembers.facad,
@@ -169,6 +170,9 @@ const Page = () => {
       })
       .catch((err) => {
         console.error("Live members load notice:", err);
+      })
+      .finally(() => {
+        setLoading(false);
       });
   }, []);
 
@@ -216,7 +220,25 @@ const Page = () => {
 
       {/* Dynamic Data Grid Render */}
       <div className="relative z-10 mx-auto max-w-6xl px-4 min-h-[50vh]">
-        <AnimatePresence mode="wait">
+        {loading ? (
+          <div className="space-y-12">
+            <div>
+              <div className="w-48 h-6 bg-white/10 rounded mb-8 animate-pulse" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="h-80 rounded-2xl border border-white/10 bg-black/60 overflow-hidden animate-pulse p-4 flex flex-col justify-between">
+                    <div className="w-full h-52 bg-white/5 rounded-xl mb-4" />
+                    <div className="space-y-2">
+                      <div className="w-3/4 h-4 bg-white/10 rounded" />
+                      <div className="w-1/2 h-3 bg-cyan-400/20 rounded" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <AnimatePresence mode="wait">
           {activeTab === 'core' && (
             <motion.div
               key="core"
@@ -279,6 +301,7 @@ const Page = () => {
             </motion.div>
           )}
         </AnimatePresence>
+        )}
       </div>
 
     </main>
