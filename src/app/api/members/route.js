@@ -119,8 +119,9 @@ export async function GET() {
         return;
       }
 
-      // 2. Alumni (excluded from public members page)
+      // 2. Alumni (populated for alumni page, excluded from active members tabs)
       if (isAlumni) {
+        grouped.alumni.push(m);
         return;
       }
 

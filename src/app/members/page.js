@@ -15,9 +15,9 @@ import {
 import { allmembers } from '../components/Membersarray';
 
 const tabs = [
-  { id: 'core', label: 'Core Command', icon: <FaNetworkWired /> },
+  { id: 'core', label: 'Leadership', icon: <FaNetworkWired /> },
   { id: 'software', label: 'Software', icon: <FaCode /> },
-  { id: 'embedded', label: 'Embedded', icon: <FaMicrochip /> },
+  { id: 'embedded', label: 'Embedded Systems', icon: <FaMicrochip /> },
   { id: 'mechanical', label: 'Mechanical', icon: <FaCogs /> },
   { id: 'pr', label: 'Public Relations', icon: <FaBullhorn /> }
 ];
@@ -61,7 +61,7 @@ const ProfileCard = ({ person, size = 'md', index = 0 }) => {
         />
       </div>
 
-      {/* Cyberpunk gradient overlay */}
+      {/* Subtle dark gradient overlay */}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent opacity-80 transition-opacity duration-300 group-hover:opacity-90"></div>
 
       {/* Border glow on hover */}
@@ -106,10 +106,10 @@ const ProfileCard = ({ person, size = 'md', index = 0 }) => {
         </div>
       </div>
 
-      {/* Terminal style copy notification */}
+      {/* Copy notification */}
       {copied && (
-        <div className="absolute top-4 right-4 bg-cyan-900/80 backdrop-blur border border-cyan-400 text-cyan-100 px-3 py-1 rounded-md text-xs font-mono font-medium animate-pulse">
-          {'>'} COPIED
+        <div className="absolute top-4 right-4 bg-black/90 backdrop-blur border border-cyan-400 text-cyan-300 px-2.5 py-1 rounded text-[11px] font-mono font-medium shadow-lg">
+          Copied
         </div>
       )}
     </motion.div>
@@ -132,6 +132,7 @@ const Section = ({ title, people = [], cols = 'grid-cols-1 sm:grid-cols-2 md:gri
 
 const Page = () => {
   const [activeTab, setActiveTab] = useState('core');
+  const [loading, setLoading] = useState(true);
 
   const [profiles, setProfiles] = useState({
     professor: allmembers.facad,
@@ -169,36 +170,45 @@ const Page = () => {
       })
       .catch((err) => {
         console.error("Live members load notice:", err);
+      })
+      .finally(() => {
+        setLoading(false);
       });
   }, []);
 
   return (
     <main className="relative min-h-screen bg-transparent text-white overflow-x-hidden pb-24">
 
-      {/* Hero Section */}
+      {/* Header Section */}
       <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pt-32 pb-12 text-center">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
         >
-          <h1 className="mb-4 text-5xl md:text-7xl font-black text-white title-glow tracking-tighter" style={{ fontFamily: 'var(--font-orbitron)' }}>TEAM DATABASE</h1>
-          <p className="text-cyan-400 font-mono text-lg max-w-2xl mx-auto bg-black/40 backdrop-blur-sm p-4 rounded-lg shadow-xl border border-white/10">
-            Select a network node to access personnel files.
+          <div className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-cyan-400 mb-3 px-3.5 py-1 rounded-full border border-cyan-500/30 bg-cyan-950/20">
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+            <span>PEOPLE OF RC NITW</span>
+          </div>
+          <h1 className="mb-4 text-5xl md:text-7xl font-black text-white title-glow tracking-tighter uppercase" style={{ fontFamily: 'var(--font-orbitron)' }}>
+            OUR TEAM
+          </h1>
+          <p className="text-gray-300 font-mono text-sm sm:text-base max-w-2xl mx-auto">
+            Meet the student innovators, technical leads, and mentors driving robotics and automation at NIT Warangal.
           </p>
         </motion.div>
       </div>
 
-      {/* Cyber-Node Selector Hub */}
+      {/* Domain Category Selector */}
       <div className="relative z-20 mx-auto max-w-5xl px-4 mb-16">
-        <div className="flex flex-wrap justify-center gap-3 md:gap-4">
+        <div className="flex flex-wrap justify-center gap-2.5 md:gap-3.5">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-5 py-3 rounded-md font-mono text-xs md:text-sm uppercase tracking-widest transition-all duration-300 border-2 cursor-pointer ${activeTab === tab.id
-                  ? 'bg-cyan-500/20 border-cyan-400 text-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.4)] scale-105'
-                  : 'bg-black/60 border-white/10 text-gray-400 hover:border-white/30 hover:text-white hover:bg-black/80'
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-mono text-xs md:text-sm uppercase tracking-wider transition-all duration-200 cursor-pointer active:scale-95 ${activeTab === tab.id
+                  ? 'bg-cyan-400 text-black font-bold shadow-[0_0_20px_rgba(34,211,238,0.4)]'
+                  : 'bg-black/60 border border-white/10 text-gray-400 hover:border-cyan-400/50 hover:text-white hover:bg-black/80'
                 } backdrop-blur-md`}
             >
               {tab.icon}
@@ -210,7 +220,25 @@ const Page = () => {
 
       {/* Dynamic Data Grid Render */}
       <div className="relative z-10 mx-auto max-w-6xl px-4 min-h-[50vh]">
-        <AnimatePresence mode="wait">
+        {loading ? (
+          <div className="space-y-12">
+            <div>
+              <div className="w-48 h-6 bg-white/10 rounded mb-8 animate-pulse" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="h-80 rounded-2xl border border-white/10 bg-black/60 overflow-hidden animate-pulse p-4 flex flex-col justify-between">
+                    <div className="w-full h-52 bg-white/5 rounded-xl mb-4" />
+                    <div className="space-y-2">
+                      <div className="w-3/4 h-4 bg-white/10 rounded" />
+                      <div className="w-1/2 h-3 bg-cyan-400/20 rounded" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <AnimatePresence mode="wait">
           {activeTab === 'core' && (
             <motion.div
               key="core"
@@ -273,6 +301,7 @@ const Page = () => {
             </motion.div>
           )}
         </AnimatePresence>
+        )}
       </div>
 
     </main>

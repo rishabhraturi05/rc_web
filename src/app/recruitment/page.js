@@ -482,7 +482,7 @@ export default function RecruitmentPage() {
     return (
       <div className="min-h-screen bg-black text-white px-6 py-32 flex items-center justify-center">
         <div className="glass-panel max-w-2xl w-full p-8 text-center border border-white/20">
-          <p className="font-mono text-xs uppercase tracking-widest text-gray-400 mb-3">[ RECRUITMENT STATUS ]</p>
+          <p className="font-mono text-xs uppercase tracking-widest text-cyan-400 mb-3">RECRUITMENT STATUS</p>
           <h1
             className="text-3xl md:text-5xl font-black mb-4 uppercase text-white title-glow tracking-tighter"
             style={{ fontFamily: 'var(--font-orbitron)' }}
@@ -559,7 +559,7 @@ export default function RecruitmentPage() {
                 style={{ userSelect: "none", WebkitUserSelect: "none" }}
               >
                 <FaWhatsapp className="text-xl text-black shrink-0" />
-                <span>[ JOIN WHATSAPP GROUP ]</span>
+                <span>Join WhatsApp Group</span>
                 <FaArrowRight className="text-xs shrink-0" />
               </button>
             </div>
@@ -684,9 +684,10 @@ export default function RecruitmentPage() {
       <div className="max-w-6xl mx-auto">
         {/* Header Section */}
         <div className="relative z-40 mb-12 text-center">
-          <p className="font-mono text-xs uppercase tracking-[0.3em] text-gray-400 mb-2">
-            [ ROBOTICS CLUB NITW ]
-          </p>
+          <div className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-cyan-400 mb-3 px-3.5 py-1 rounded-full border border-cyan-500/30 bg-cyan-950/20">
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+            <span>ROBOTICS CLUB NITW</span>
+          </div>
           <h1
             className="text-5xl md:text-7xl font-black text-white title-glow tracking-tighter uppercase mb-4"
             style={{ fontFamily: 'var(--font-orbitron)' }}
@@ -882,8 +883,8 @@ export default function RecruitmentPage() {
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between border-b border-white/10 pb-5">
                   <div>
-                    <span className="font-mono text-xs uppercase tracking-widest text-gray-400">
-                      [ APPLICATION FORM ]
+                    <span className="font-mono text-xs uppercase tracking-widest text-cyan-400">
+                      APPLICATION FORM
                     </span>
                     <h2
                       className="mt-2 text-2xl md:text-3xl font-black text-white uppercase tracking-wider"
@@ -1044,9 +1045,9 @@ export default function RecruitmentPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="w-full rounded-lg border border-white bg-white text-black px-6 py-3.5 font-mono text-sm font-bold uppercase tracking-widest transition-all hover:bg-transparent hover:text-white cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-full rounded-lg border border-cyan-400 bg-cyan-400 text-black px-6 py-3.5 font-mono text-sm font-bold uppercase tracking-widest transition-all hover:bg-cyan-300 active:scale-[0.98] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 shadow-[0_0_20px_rgba(34,211,238,0.3)]"
                 >
-                  {submitting ? "Submitting..." : "[ SUBMIT APPLICATION ]"}
+                  {submitting ? "Submitting..." : "Submit Application"}
                 </button>
               </form>
             ) : null}

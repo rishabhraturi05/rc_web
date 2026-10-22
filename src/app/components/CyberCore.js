@@ -13,8 +13,9 @@ export default function CyberCore() {
   const engineBL = useRef();
   const engineBR = useRef();
 
-  // Cache scroll offset and viewport width in refs to avoid DOM reads at 60fps
+  // Cache scroll offset, mouse pointer, and viewport width in refs to avoid DOM reads at 60fps
   const scrollRef = useRef(0);
+  const mouseRef = useRef({ x: 0, y: 0 });
   const isMobileRef = useRef(false);
 
   useEffect(() => {
@@ -28,13 +29,20 @@ export default function CyberCore() {
     const onResize = () => {
       isMobileRef.current = window.innerWidth < 768;
     };
+    const onPointerMove = (e) => {
+      // Normalize client coordinates to [-1, 1] matching Three.js / R3F pointer standard
+      mouseRef.current.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouseRef.current.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    };
     
     onScroll(); // set initial scroll
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onResize);
+    window.addEventListener('pointermove', onPointerMove, { passive: true });
     return () => {
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onResize);
+      window.removeEventListener('pointermove', onPointerMove);
     };
   }, []);
 
@@ -98,9 +106,10 @@ export default function CyberCore() {
     groupRef.current.rotation.z = THREE.MathUtils.lerp(groupRef.current.rotation.z, targetRoll, 0.05);
     
     // Interactive Mouse Tracking: Ship pitches and yaws to aim exactly at your cursor
-    const mouseWorldX = state.pointer.x * (state.viewport.width / 2);
-    const mouseWorldY = state.pointer.x * (state.viewport.height / 2); // BUG FIX: this was using .x before? No it was using .y
-    const actualMouseWorldY = state.pointer.y * (state.viewport.height / 2);
+    const mouseX = mouseRef.current.x;
+    const mouseY = mouseRef.current.y;
+    const mouseWorldX = mouseX * (state.viewport.width / 2);
+    const actualMouseWorldY = mouseY * (state.viewport.height / 2);
     
     const dx = mouseWorldX - currentX;
     const dy = actualMouseWorldY - groupRef.current.position.y;

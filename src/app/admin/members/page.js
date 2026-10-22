@@ -764,6 +764,7 @@ export default function ManageMembersPage() {
           img: editingMember.img?.trim() || "",
           linkedin: editingMember.linkedin?.trim() || "",
           instagram: editingMember.instagram?.trim() || "",
+          bio: editingMember.bio !== undefined ? editingMember.bio.trim() : "",
         }),
       });
 
@@ -1792,6 +1793,21 @@ export default function ManageMembersPage() {
                     setEditingMember({ ...editingMember, img: e.target.value })
                   }
                   className="w-full bg-black border border-white/20 rounded px-3 py-2 font-mono text-sm text-white focus:outline-none focus:border-white"
+                />
+              </div>
+
+              <div>
+                <label className="block font-mono text-xs text-cyan-300 mb-1">
+                  Alumni Message / Note / Bio (displayed on Alumni page)
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Enter message, quote, or note from the alumnus..."
+                  value={editingMember.bio || ""}
+                  onChange={(e) =>
+                    setEditingMember({ ...editingMember, bio: e.target.value })
+                  }
+                  className="w-full bg-black border border-white/20 rounded px-3 py-2 font-mono text-sm text-white focus:outline-none focus:border-cyan-400 resize-y"
                 />
               </div>
 
