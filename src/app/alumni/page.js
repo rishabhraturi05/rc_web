@@ -17,9 +17,9 @@ const defaultAlumni = [
   // Class of 2026
   {
     name: 'G. Sai Sasivardhan',
-    role: 'Former General Secretary (2023–2024)',
+    role: 'Former General Secretary (2025–2026)',
     year: '2026',
-    description: "Spearheaded foundational club governance, technical workshops, competition prep, and team mentorship for Robotics Club NITW.",
+    description: "Former General Secretary (2025–2026) who spearheaded club governance, high-impact technical initiatives, competition prep, and team mentorship for Robotics Club NITW.",
     imageUrl: '/members/2026/gampa_sai_sasivardhan.jpg',
     linkedin: 'https://in.linkedin.com/in/sai-sasivardhan-gampa-59559a254',
     instagram: 'https://www.instagram.com/sasivardhansai',
@@ -27,9 +27,9 @@ const defaultAlumni = [
   },
   {
     name: 'Sudhakar',
-    role: 'Former General Secretary (2023–2024)',
+    role: 'Former General Secretary (2025–2026)',
     year: '2026',
-    description: "Former General Secretary and senior mentor guiding autonomous robotics research, embedded microcontrollers, and hardware projects.",
+    description: "Former General Secretary (2025–2026) and senior mentor guiding autonomous robotics research, embedded microcontrollers, and flagship hardware projects.",
     imageUrl: '/members/2026/sudhakar_kumar.jpg',
     linkedin: 'https://www.linkedin.com/in/sudhakar-kumar-38a9a4282/',
     instagram: 'https://www.instagram.com/_sudhakar.08',
@@ -37,9 +37,9 @@ const defaultAlumni = [
   },
   {
     name: 'Anand A.L',
-    role: 'Mechanical Systems Lead',
+    role: 'Former General Secretary (2025–2026)',
     year: '2026',
-    description: "Senior mechanical design contributor focused on rover chassis dynamics, CAD simulations, and planetary transmission fabrication.",
+    description: "Former General Secretary (2025–2026) and mechanical systems lead directing rover chassis dynamics, CAD kinematics, and precision hardware fabrication.",
     imageUrl: '/members/2026/anand_a_l.jpg',
     linkedin: 'https://www.linkedin.com/in/anand-al',
     instagram: 'https://www.instagram.com/anandd_alx',

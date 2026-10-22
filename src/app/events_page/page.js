@@ -491,16 +491,16 @@ export default function EventsPage() {
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: idx * 0.15 }}
-                className={`group relative rounded-3xl overflow-hidden glass-panel border border-white/15 ${event.borderGlow} transition-all duration-500 bg-gradient-to-b from-[#0c121d] to-[#06080e] shadow-2xl flex flex-col justify-between`}
+                className={`group relative rounded-3xl overflow-hidden glass-panel border border-white/15 ${event.borderGlow} transition-all duration-500 bg-gradient-to-b from-[#0c121d]/75 via-black/60 to-[#06080e]/80 backdrop-blur-sm shadow-2xl flex flex-col justify-between`}
               >
                 {/* Poster Image with Gradient Fade */}
-                <div className="relative h-72 sm:h-80 w-full overflow-hidden bg-black">
+                <div className="relative h-72 sm:h-80 w-full overflow-hidden bg-black/30">
                   <img
                     src={event.image}
                     alt={event.title}
                     className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 opacity-90 group-hover:opacity-100"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#06080e] via-[#06080e]/40 to-transparent"></div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
 
                   {/* Top Floating Badges */}
                   <div className="absolute top-4 left-4 right-4 flex items-center justify-between gap-2">

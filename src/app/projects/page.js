@@ -131,7 +131,7 @@ export default function ProjectsPage() {
   const activeProject = activeProjectIndex !== null ? filteredProjects[activeProjectIndex] : null;
 
   return (
-    <main className="relative min-h-screen bg-[#020202] text-[#f5f1ea] overflow-x-hidden pt-32 pb-24">
+    <main className="relative min-h-screen bg-transparent text-[#f5f1ea] overflow-x-hidden pt-32 pb-24">
       {/* Background ambient lighting */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-cyan-500/5 rounded-full blur-[150px] pointer-events-none"></div>
 
@@ -194,10 +194,10 @@ export default function ProjectsPage() {
               >
                 <button
                   onClick={() => setActiveProjectIndex(idx)}
-                  className="group relative w-full h-full text-left glass-panel rounded-2xl overflow-hidden border border-white/10 hover:border-cyan-400/50 transition-all duration-300 flex flex-col justify-start focus:outline-none focus:ring-2 focus:ring-cyan-400 cursor-pointer hover:-translate-y-1.5 shadow-xl bg-black/60 backdrop-blur-md"
+                  className="group relative w-full h-full text-left glass-panel rounded-2xl overflow-hidden border border-white/10 hover:border-cyan-400/50 transition-all duration-300 flex flex-col justify-start focus:outline-none focus:ring-2 focus:ring-cyan-400 cursor-pointer hover:-translate-y-1.5 shadow-xl bg-black/40 backdrop-blur-sm"
                 >
                   {/* Image Container with smooth hover zoom */}
-                  <div className="relative h-60 w-full overflow-hidden bg-slate-950">
+                  <div className="relative h-60 w-full overflow-hidden bg-black/40">
                     <img
                       src={p.image}
                       alt={p.title}
