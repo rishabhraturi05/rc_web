@@ -40,7 +40,7 @@ const defaultAlumni = [
     role: 'Former General Secretary (2025–2026)',
     year: '2026',
     description: "Former General Secretary (2025–2026) and mechanical systems lead directing rover chassis dynamics, CAD kinematics, and precision hardware fabrication.",
-    imageUrl: '/members/2026/anand_a_l.jpg',
+    imageUrl: '/alumini/Anand_A_L.jpg',
     linkedin: 'https://www.linkedin.com/in/anand-al',
     instagram: 'https://www.instagram.com/anandd_alx',
     email: ''

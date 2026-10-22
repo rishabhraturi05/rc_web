@@ -165,7 +165,7 @@ const DEFAULT_ALUMNI = [
     category: "alumni",
     isAlumni: true,
     bio: "Former General Secretary (2025–2026) who spearheaded foundational club governance, technical initiatives, and mentorship.",
-    img: "/members/2026/gampa_sai_sasivardhan.jpg",
+    img: "/alumini/sasi.jpeg",
     linkedin: "https://in.linkedin.com/in/sai-sasivardhan-gampa-59559a254",
     instagram: "https://www.instagram.com/sasivardhansai",
     email: "",
@@ -191,7 +191,7 @@ const DEFAULT_ALUMNI = [
     category: "alumni",
     isAlumni: true,
     bio: "Former General Secretary (2025–2026) and mechanical systems lead directing rover kinematics, CAD modeling, and fabrication.",
-    img: "/members/2026/anand_a_l.jpg",
+    img: "/alumini/Anand_A_L.jpg",
     linkedin: "https://www.linkedin.com/in/anand-al",
     instagram: "https://www.instagram.com/anandd_alx",
     email: "",
@@ -287,6 +287,50 @@ export async function ensureDefaultMembers() {
         }
       );
       await Member.deleteMany({ name: { $regex: /eesh\s*tripathi/i } });
+
+      // Guarantee 2026 Alumni are properly flagged as alumni and use /alumini/ folder
+      await Member.updateMany(
+        { name: { $regex: /sudhakar/i } },
+        {
+          $set: {
+            img: "/alumini/sudhakar.jpeg",
+            category: "alumni",
+            department: "Alumni",
+            isAlumni: true,
+            isCore: false,
+            isGenSec: false,
+            isAddlSec: false,
+          },
+        }
+      );
+      await Member.updateMany(
+        { name: { $regex: /anand/i } },
+        {
+          $set: {
+            img: "/alumini/Anand_A_L.jpg",
+            category: "alumni",
+            department: "Alumni",
+            isAlumni: true,
+            isCore: false,
+            isGenSec: false,
+            isAddlSec: false,
+          },
+        }
+      );
+      await Member.updateMany(
+        { name: { $regex: /sasivardhan|sasi/i } },
+        {
+          $set: {
+            img: "/alumini/sasi.jpeg",
+            category: "alumni",
+            department: "Alumni",
+            isAlumni: true,
+            isCore: false,
+            isGenSec: false,
+            isAddlSec: false,
+          },
+        }
+      );
 
       // Ensure all 4 Additional Secretaries and 2 General Secretaries exist and have proper flags
       const coreMembers = [
