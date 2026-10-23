@@ -10,7 +10,7 @@
 
 When the website is hosted at `https://rc-nitw.org`:
 1. **You do NOT need to change any code on the website.**
-2. When you open `/admin/technozian` on the live site, the modal will **automatically show your live URL**:
+2. When you open `/addsecs/smashkarts` on the live site, the modal will **automatically show your live URL**:
    ```
    https://rc-nitw.org/api/technozian/scan
    ```

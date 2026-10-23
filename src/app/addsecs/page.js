@@ -38,6 +38,7 @@ import {
   FaKey,
   FaCalendarAlt,
   FaSyncAlt,
+  FaCarSide,
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import { getRecruitmentFormTitle, getApplicantResumeInfo, normalizeToTimeInputValue, formatTimeSlot, formatInterviewDate, parseTimeSlotToMinutes } from "@/app/lib/recruitment";
@@ -1665,6 +1666,14 @@ export default function AddSecDashboard() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
+                <Link
+                  href="/addsecs/smashkarts"
+                  className="px-4 py-2 bg-white/10 hover:bg-white text-white hover:text-black border border-white/30 rounded font-mono text-xs uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer"
+                  title="Smash Karts RFID & Attendance Management"
+                >
+                  <FaCarSide className="text-xs text-amber-400" />
+                  [ SMASH KARTS ]
+                </Link>
                 <button
                   onClick={() => setCredsModalOpen(true)}
                   className="px-4 py-2 bg-white/5 hover:bg-white/15 text-gray-200 hover:text-white border border-white/20 hover:border-cyan-400 rounded font-mono text-xs uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer"

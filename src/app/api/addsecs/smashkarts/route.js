@@ -4,13 +4,16 @@ import { authOptions } from "@/app/lib/auth";
 import { connectDB } from "@/app/lib/db";
 import TechnozianRegistration from "@/app/models/TechnozianRegistration";
 
-async function validateAdmin() {
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+async function validateAuth() {
   const session = await getServerSession(authOptions);
 
-  if (!session || session.user?.role !== "admin") {
+  if (!session || (session.user?.role !== "addsec" && session.user?.role !== "admin")) {
     return {
       response: NextResponse.json(
-        { success: false, message: "Unauthorized" },
+        { success: false, message: "Unauthorized. Additional Secretary or Admin access required." },
         { status: 401 }
       ),
     };
@@ -21,7 +24,7 @@ async function validateAdmin() {
 
 export async function GET() {
   try {
-    const authResult = await validateAdmin();
+    const authResult = await validateAuth();
     if (authResult.response) return authResult.response;
 
     await connectDB();
@@ -43,18 +46,22 @@ export async function GET() {
       totalRegistrations: active.length,
       scannedToday,
       totalAttended: active.filter((r) => r.attended).length,
+      pendingAttendance: active.filter((r) => !r.attended).length,
       rfidScans: active.filter((r) => !r.isManual).length,
       manualEntries: active.filter((r) => r.isManual).length,
       recycleBinCount: registrations.filter((r) => r.isDeleted).length,
     };
 
-    return NextResponse.json({
-      success: true,
-      data: registrations,
-      stats,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        data: registrations,
+        stats,
+      },
+      { headers: { "Cache-Control": "no-store, max-age=0" } }
+    );
   } catch (err) {
-    console.error("GET ADMIN TECHNOZIAN ERROR:", err);
+    console.error("GET ADDSEC SMASHKARTS ERROR:", err);
     return NextResponse.json(
       { success: false, message: "Server error fetching registrations" },
       { status: 500 }
@@ -64,54 +71,64 @@ export async function GET() {
 
 export async function POST(req) {
   try {
-    const authResult = await validateAdmin();
+    const authResult = await validateAuth();
     if (authResult.response) return authResult.response;
 
     const body = await req.json();
-    const { rollNo, rfidUid, name, branch, year, contactNo, email, notes } = body;
+    const { name, collegeName, rollNo, notes } = body;
 
-    const cleanRollNo = typeof rollNo === "string" ? rollNo.trim().toUpperCase() : "";
+    const cleanName = typeof name === "string" ? name.trim() : "";
+    const cleanCollege = typeof collegeName === "string" ? collegeName.trim() : "";
 
-    if (!cleanRollNo) {
+    if (!cleanName) {
       return NextResponse.json(
-        { success: false, message: "Roll number is required" },
+        { success: false, message: "Participant name is required" },
+        { status: 400 }
+      );
+    }
+
+    if (!cleanCollege) {
+      return NextResponse.json(
+        { success: false, message: "College name is required" },
         { status: 400 }
       );
     }
 
     await connectDB();
 
-    // Check if rollNo already exists
-    const existing = await TechnozianRegistration.findOne({
-      rollNo: cleanRollNo,
+    // Auto-generate or sanitize Roll/Walkin ID
+    let finalRollNo = typeof rollNo === "string" && rollNo.trim()
+      ? rollNo.trim().toUpperCase()
+      : `WALKIN-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    // Ensure uniqueness for generated walk-in ID
+    let existing = await TechnozianRegistration.findOne({
+      rollNo: finalRollNo,
       isDeleted: false,
     });
 
-    if (existing) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: `Roll number ${cleanRollNo} is already registered!`,
-        },
-        { status: 409 }
-      );
+    while (existing) {
+      finalRollNo = `WALKIN-${Math.floor(1000 + Math.random() * 9000)}`;
+      existing = await TechnozianRegistration.findOne({
+        rollNo: finalRollNo,
+        isDeleted: false,
+      });
     }
 
     const registration = await TechnozianRegistration.create({
-      rollNo: cleanRollNo,
-      rfidUid: (rfidUid || "").trim().toUpperCase(),
-      name: (name || "").trim(),
-      branch: (branch || "").trim(),
-      year: (year || "").trim(),
-      contactNo: (contactNo || "").trim(),
-      email: (email || "").trim(),
-      notes: (notes || "").trim(),
-      deviceId: "ADMIN_MANUAL",
+      rollNo: finalRollNo,
+      name: cleanName,
+      collegeName: cleanCollege,
+      branch: cleanCollege,
+      year: "Walk-in",
+      rfidUid: "",
+      notes: (notes || "").trim() || `Walk-in from ${cleanCollege}`,
+      deviceId: "WALKIN",
       scanCount: 1,
       lastScannedAt: new Date(),
       attended: true,
       isManual: true,
-      eventName: "Technozian",
+      eventName: "Smash Karts",
     });
 
     return NextResponse.json(
@@ -119,7 +136,7 @@ export async function POST(req) {
       { status: 201 }
     );
   } catch (err) {
-    console.error("POST ADMIN TECHNOZIAN ERROR:", err);
+    console.error("POST ADDSEC SMASHKARTS ERROR:", err);
     return NextResponse.json(
       { success: false, message: "Server error creating registration" },
       { status: 500 }

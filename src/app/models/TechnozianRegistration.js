@@ -21,6 +21,11 @@ const TechnozianRegistrationSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    collegeName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     branch: {
       type: String,
       trim: true,

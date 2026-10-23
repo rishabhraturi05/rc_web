@@ -4,13 +4,13 @@ import { authOptions } from "@/app/lib/auth";
 import { connectDB } from "@/app/lib/db";
 import TechnozianRegistration from "@/app/models/TechnozianRegistration";
 
-async function validateAdmin() {
+async function validateAuth() {
   const session = await getServerSession(authOptions);
 
-  if (!session || session.user?.role !== "admin") {
+  if (!session || (session.user?.role !== "addsec" && session.user?.role !== "admin")) {
     return {
       response: NextResponse.json(
-        { success: false, message: "Unauthorized" },
+        { success: false, message: "Unauthorized. Additional Secretary or Admin access required." },
         { status: 401 }
       ),
     };
@@ -21,7 +21,7 @@ async function validateAdmin() {
 
 export async function PUT(req, { params }) {
   try {
-    const authResult = await validateAdmin();
+    const authResult = await validateAuth();
     if (authResult.response) return authResult.response;
 
     await connectDB();
@@ -32,6 +32,7 @@ export async function PUT(req, { params }) {
       "attended",
       "isDeleted",
       "name",
+      "collegeName",
       "rollNo",
       "branch",
       "year",
@@ -66,9 +67,9 @@ export async function PUT(req, { params }) {
 
     return NextResponse.json({ success: true, data: updated });
   } catch (err) {
-    console.error("UPDATE TECHNOZIAN ERROR:", err);
+    console.error("UPDATE SMASHKARTS ERROR:", err);
     return NextResponse.json(
-      { success: false, message: "Server error" },
+      { success: false, message: "Server error updating registration" },
       { status: 500 }
     );
   }
@@ -76,7 +77,7 @@ export async function PUT(req, { params }) {
 
 export async function DELETE(req, { params }) {
   try {
-    const authResult = await validateAdmin();
+    const authResult = await validateAuth();
     if (authResult.response) return authResult.response;
 
     await connectDB();
@@ -108,9 +109,9 @@ export async function DELETE(req, { params }) {
       message: permanent === "true" ? "Permanently deleted" : "Moved to recycle bin",
     });
   } catch (err) {
-    console.error("DELETE TECHNOZIAN ERROR:", err);
+    console.error("DELETE SMASHKARTS ERROR:", err);
     return NextResponse.json(
-      { success: false, message: "Server error" },
+      { success: false, message: "Server error deleting registration" },
       { status: 500 }
     );
   }

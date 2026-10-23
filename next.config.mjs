@@ -16,6 +16,22 @@ const nextConfig = {
   turbopack: {
     root: __dirname,
   },
+  async rewrites() {
+    return [
+      {
+        source: '/adsecs/:path*',
+        destination: '/addsecs/:path*',
+      },
+      {
+        source: '/adsecs',
+        destination: '/addsecs',
+      },
+      {
+        source: '/api/adsecs/:path*',
+        destination: '/api/addsecs/:path*',
+      },
+    ];
+  },
 };
 
 export default nextConfig;
