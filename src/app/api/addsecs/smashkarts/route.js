@@ -96,10 +96,32 @@ export async function POST(req) {
 
     await connectDB();
 
+    const cleanUserRoll = typeof rollNo === "string" ? rollNo.trim().toUpperCase() : "";
+
+    // If an explicit roll number was provided, check if already registered
+    if (cleanUserRoll) {
+      const existingUser = await TechnozianRegistration.findOne({
+        rollNo: cleanUserRoll,
+        isDeleted: false,
+      });
+
+      if (existingUser) {
+        return NextResponse.json(
+          {
+            success: true,
+            status: "already_registered",
+            name: existingUser.name || "Student",
+            rollNo: existingUser.rollNo,
+            message: `Already registered! Student ${existingUser.name || "Student"} (${existingUser.rollNo}) is already registered.`,
+            data: existingUser,
+          },
+          { status: 200 }
+        );
+      }
+    }
+
     // Auto-generate or sanitize Roll/Walkin ID
-    let finalRollNo = typeof rollNo === "string" && rollNo.trim()
-      ? rollNo.trim().toUpperCase()
-      : `WALKIN-${Math.floor(1000 + Math.random() * 9000)}`;
+    let finalRollNo = cleanUserRoll || `WALKIN-${Math.floor(1000 + Math.random() * 9000)}`;
 
     // Ensure uniqueness for generated walk-in ID
     let existing = await TechnozianRegistration.findOne({
@@ -132,7 +154,14 @@ export async function POST(req) {
     });
 
     return NextResponse.json(
-      { success: true, data: registration },
+      {
+        success: true,
+        status: "success",
+        name: registration.name,
+        rollNo: registration.rollNo,
+        message: `Registered successfully: ${registration.name} (${registration.rollNo})`,
+        data: registration,
+      },
       { status: 201 }
     );
   } catch (err) {

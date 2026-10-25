@@ -67,10 +67,11 @@ The ESP code should read the HTTP response code to trigger LEDs and buzzers:
 
 | HTTP Status Code | Meaning | Server Response Body | Recommended Hardware Feedback |
 | :--- | :--- | :--- | :--- |
-| **`201 Created`** | First-time registration successfully saved! | `{"success": true, "isRepeat": false, "message": "Registered successfully: 23BCS042"}` | **Green LED** ON for 1 sec + **1 short beep** |
-| **`200 OK`** | Student was already registered! Repeat tap verified. | `{"success": true, "isRepeat": true, "message": "Already registered! Attendance confirmed for 23BCS042"}` | **Blue / Yellow LED** ON + **2 short beeps** |
-| **`400 Bad Request`** | Missing both `rollNo` and `rfidUid`. | `{"success": false, "message": "Missing roll number or RFID UID"}` | **Red LED** 3 fast blinks |
-| **`401 Unauthorized`** | Missing or incorrect `x-api-key`. | `{"success": false, "message": "Unauthorized: Invalid or missing API key"}` | **Red LED** ON for 2 sec + **long error beep** |
+| **`201 Created`** | **Registered Successfully!** First-time attendance confirmed for student in database. | `{"success": true, "status": "success", "name": "Jane Doe", "rollNo": "23BCS042", "isRepeat": false}` | **Green LED** ON for 1 sec + **1 short beep** |
+| **`200 OK`** | **Already Registered!** Student previously tapped / marked attended. | `{"success": true, "status": "already_registered", "name": "Jane Doe", "rollNo": "23BCS042", "isRepeat": true}` | **Blue / Yellow LED** ON + **2 short beeps** |
+| **`404 Not Found`** | **Didn't Find in Database!** Student roll number or RFID not in roster. | `{"success": false, "status": "not_found", "name": null, "rollNo": "23BCS099"}` | **Red LED** 2 long beeps |
+| **`400 Bad Request`** | Missing both `rollNo` and `rfidUid`. | `{"success": false, "status": "missing_fields", "message": "Missing roll number or RFID UID"}` | **Red LED** 3 fast blinks |
+| **`401 Unauthorized`** | Missing or incorrect `x-api-key`. | `{"success": false, "status": "unauthorized", "message": "Unauthorized"}` | **Red LED** ON for 2 sec + **long error beep** |
 | **`500 Server Error`** | Database or server problem. | `{"success": false, "message": "Internal server error saving scan"}` | **Red LED** flashing |
 
 ---

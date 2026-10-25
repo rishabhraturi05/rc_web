@@ -172,56 +172,106 @@ export default function SmashKartsPage() {
       (r) => !r.isDeleted && r.rollNo && r.rollNo.toUpperCase() === targetRoll
     );
 
-    if (!student) {
-      setQuickCheckInMessage({
-        text: `Roll number ${targetRoll} not found in database!`,
-        type: "error",
-      });
-      return;
-    }
-
-    if (student.attended) {
-      setQuickCheckInMessage({
-        text: `[ALREADY ATTENDED] ${student.rollNo} (${student.name || "Student"}) was already marked attended!`,
-        type: "info",
-      });
-      setQuickRollInput("");
-      return;
-    }
-
-    try {
-      setUpdatingId(student._id);
-      const res = await fetch(`/api/addsecs/smashkarts/${student._id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ attended: true }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setRegistrations((prev) =>
-          prev.map((r) =>
-            r._id === student._id ? { ...r, attended: true, lastScannedAt: new Date() } : r
-          )
-        );
-        setStats((prev) => ({
-          ...prev,
-          totalAttended: prev.totalAttended + 1,
-          pendingAttendance: Math.max(0, prev.pendingAttendance - 1),
-        }));
+    if (student) {
+      if (student.attended) {
         setQuickCheckInMessage({
-          text: `✓ Confirmed Attendance for ${student.rollNo} — ${student.name || "Student"}!`,
+          status: "already_registered",
+          name: student.name || "Student",
+          rollNo: student.rollNo,
+          text: `Participant ${student.name || "Student"} (${student.rollNo}) has already registered and checked in!`,
+          type: "info",
+        });
+        setQuickRollInput("");
+        return;
+      }
+
+      try {
+        setUpdatingId(student._id);
+        const res = await fetch(`/api/addsecs/smashkarts/${student._id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ attended: true }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          setRegistrations((prev) =>
+            prev.map((r) =>
+              r._id === student._id ? { ...r, attended: true, lastScannedAt: new Date() } : r
+            )
+          );
+          setStats((prev) => ({
+            ...prev,
+            totalAttended: prev.totalAttended + 1,
+            pendingAttendance: Math.max(0, prev.pendingAttendance - 1),
+          }));
+          setQuickCheckInMessage({
+            status: "success",
+            name: data.name || student.name || "Student",
+            rollNo: data.rollNo || student.rollNo,
+            text: `Confirmed attendance for ${data.name || student.name || "Student"} (${data.rollNo || student.rollNo})!`,
+            type: "success",
+          });
+          setQuickRollInput("");
+        } else {
+          setQuickCheckInMessage({
+            status: "error",
+            text: data.message || "Failed to mark attendance",
+            type: "error",
+          });
+        }
+      } catch {
+        setQuickCheckInMessage({
+          status: "error",
+          text: "Network error updating attendance",
+          type: "error",
+        });
+      } finally {
+        setUpdatingId(null);
+      }
+      return;
+    }
+
+    // If not found in local state, query the server scan API
+    try {
+      setUpdatingId("search");
+      const scanRes = await fetch("/api/technozian/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rollNo: targetRoll }),
+      });
+      const scanData = await scanRes.json();
+
+      if (scanData.status === "already_registered") {
+        setQuickCheckInMessage({
+          status: "already_registered",
+          name: scanData.name || "Student",
+          rollNo: scanData.rollNo || targetRoll,
+          text: `Participant ${scanData.name || "Student"} (${scanData.rollNo || targetRoll}) has already registered!`,
+          type: "info",
+        });
+        setQuickRollInput("");
+        fetchRegistrations(true);
+      } else if (scanData.status === "success" || scanData.success) {
+        setQuickCheckInMessage({
+          status: "success",
+          name: scanData.name || "Student",
+          rollNo: scanData.rollNo || targetRoll,
+          text: `Confirmed attendance for ${scanData.name || "Student"} (${scanData.rollNo || targetRoll})!`,
           type: "success",
         });
         setQuickRollInput("");
+        fetchRegistrations(true);
       } else {
         setQuickCheckInMessage({
-          text: data.message || "Failed to mark attendance",
+          status: "error",
+          text: scanData.message || `Roll number ${targetRoll} not found in database!`,
           type: "error",
         });
       }
     } catch {
       setQuickCheckInMessage({
-        text: "Network error updating attendance",
+        status: "error",
+        text: "Error contacting scanner endpoint",
         type: "error",
       });
     } finally {
@@ -364,6 +414,14 @@ export default function SmashKartsPage() {
         body: JSON.stringify(walkInData),
       });
       const data = await res.json();
+      if (data.status === "already_registered") {
+        showToast(
+          `Already registered: ${data.name || "Student"} (${data.rollNo})!`,
+          "info"
+        );
+        setShowWalkInForm(false);
+        return;
+      }
       if (data.success) {
         setRegistrations((prev) => [data.data, ...prev]);
         setStats((prev) => ({
@@ -375,7 +433,7 @@ export default function SmashKartsPage() {
         }));
         setWalkInData(emptyWalkIn);
         setShowWalkInForm(false);
-        showToast(`Walk-in added: ${data.data.name} (${data.data.collegeName})!`);
+        showToast(`✓ Registered: ${data.name || data.data?.name} (${data.rollNo || data.data?.rollNo})!`, "success");
       } else {
         alert(data.message || "Failed to add walk-in");
       }
@@ -607,15 +665,33 @@ export default function SmashKartsPage() {
             </form>
             {quickCheckInMessage && (
               <div
-                className={`mt-2 font-mono text-xs px-3 py-1.5 rounded border ${
-                  quickCheckInMessage.type === "success"
+                className={`mt-2 font-mono text-xs px-3.5 py-2 rounded border flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
+                  quickCheckInMessage.status === "already_registered" || quickCheckInMessage.type === "info"
+                    ? "bg-amber-950/80 border-amber-500 text-amber-200"
+                    : quickCheckInMessage.status === "success" || quickCheckInMessage.type === "success"
                     ? "bg-emerald-950/80 border-emerald-500 text-emerald-200"
-                    : quickCheckInMessage.type === "info"
-                    ? "bg-blue-950/80 border-blue-500 text-blue-200"
                     : "bg-red-950/80 border-red-500 text-red-200"
                 }`}
               >
-                {quickCheckInMessage.text}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 ${
+                      quickCheckInMessage.status === "already_registered" || quickCheckInMessage.type === "info"
+                        ? "bg-amber-500 text-black"
+                        : quickCheckInMessage.status === "success" || quickCheckInMessage.type === "success"
+                        ? "bg-emerald-500 text-black"
+                        : "bg-red-500 text-white"
+                    }`}
+                  >
+                    STATUS: {quickCheckInMessage.status || quickCheckInMessage.type}
+                  </span>
+                  <span>{quickCheckInMessage.text}</span>
+                </div>
+                {quickCheckInMessage.name && (
+                  <div className="text-[11px] font-semibold text-white/90 bg-black/40 px-2 py-1 rounded border border-white/10 shrink-0">
+                    NAME: <span className="text-white">{quickCheckInMessage.name}</span> | ROLL: <span className="text-amber-300">{quickCheckInMessage.rollNo}</span>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1107,6 +1183,53 @@ export default function SmashKartsPage() {
   "deviceId": "BOX_1"
 }`}
                 </pre>
+              </div>
+
+              <div>
+                <label className="text-gray-400 block mb-1 uppercase text-xs">
+                  Hardware API Response Codes & Statuses
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                  <div className="p-2.5 bg-emerald-950/30 border border-emerald-500/40 rounded">
+                    <span className="text-emerald-400 font-bold block mb-1">
+                      1. Success (HTTP 201)
+                    </span>
+                    <pre className="text-gray-300 text-[10px] overflow-x-auto">
+{`{
+  "success": true,
+  "status": "success",
+  "name": "Jane Doe",
+  "rollNo": "23BCS042"
+}`}
+                    </pre>
+                  </div>
+                  <div className="p-2.5 bg-amber-950/30 border border-amber-500/40 rounded">
+                    <span className="text-amber-400 font-bold block mb-1">
+                      2. Repeat (HTTP 200)
+                    </span>
+                    <pre className="text-gray-300 text-[10px] overflow-x-auto">
+{`{
+  "success": true,
+  "status": "already_registered",
+  "name": "Jane Doe",
+  "rollNo": "23BCS042"
+}`}
+                    </pre>
+                  </div>
+                  <div className="p-2.5 bg-red-950/30 border border-red-500/40 rounded">
+                    <span className="text-red-400 font-bold block mb-1">
+                      3. Not Found (HTTP 404)
+                    </span>
+                    <pre className="text-gray-300 text-[10px] overflow-x-auto">
+{`{
+  "success": false,
+  "status": "not_found",
+  "name": null,
+  "rollNo": "23BCS099"
+}`}
+                    </pre>
+                  </div>
+                </div>
               </div>
             </div>
 

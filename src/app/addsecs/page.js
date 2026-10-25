@@ -1666,14 +1666,6 @@ export default function AddSecDashboard() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <Link
-                  href="/addsecs/smashkarts"
-                  className="px-4 py-2 bg-white/10 hover:bg-white text-white hover:text-black border border-white/30 rounded font-mono text-xs uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer"
-                  title="Smash Karts RFID & Attendance Management"
-                >
-                  <FaCarSide className="text-xs text-amber-400" />
-                  [ SMASH KARTS ]
-                </Link>
                 <button
                   onClick={() => setCredsModalOpen(true)}
                   className="px-4 py-2 bg-white/5 hover:bg-white/15 text-gray-200 hover:text-white border border-white/20 hover:border-cyan-400 rounded font-mono text-xs uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer"
@@ -1690,6 +1682,37 @@ export default function AddSecDashboard() {
                   [ Logout ]
                 </button>
               </div>
+            </div>
+
+            {/* Smash Karts Portal Card / Button (Moved above Recruitment) */}
+            <div className="glass-panel p-4 sm:p-5 border border-amber-500/40 bg-gradient-to-r from-amber-500/10 via-black/40 to-transparent rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
+                  <FaCarSide className="text-lg" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold">
+                      EVENT_PORTAL
+                    </span>
+                    <span className="text-xs font-mono text-gray-400">Smash Karts • Technozian</span>
+                  </div>
+                  <h3 className="font-mono text-base sm:text-lg font-bold text-white mt-0.5">
+                    Smash Karts RFID & Attendance Management
+                  </h3>
+                  <p className="font-mono text-gray-400 text-xs mt-0.5">
+                    Manage student check-ins, verify RFID card taps, track attendance, and register walk-ins.
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/addsecs/smashkarts"
+                className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-mono text-xs uppercase tracking-wider font-bold rounded flex items-center gap-2 transition-all shadow-lg shadow-amber-500/20 whitespace-nowrap cursor-pointer hover:scale-105"
+              >
+                <FaCarSide className="text-xs" />
+                <span>[ OPEN SMASH KARTS ]</span>
+                <FaArrowRight className="text-xs" />
+              </Link>
             </div>
 
             {/* Recruitment Selection Section */}

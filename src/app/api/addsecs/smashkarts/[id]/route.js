@@ -65,7 +65,13 @@ export async function PUT(req, { params }) {
       );
     }
 
-    return NextResponse.json({ success: true, data: updated });
+    return NextResponse.json({
+      success: true,
+      status: "success",
+      name: updated.name || "Student",
+      rollNo: updated.rollNo,
+      data: updated,
+    });
   } catch (err) {
     console.error("UPDATE SMASHKARTS ERROR:", err);
     return NextResponse.json(
