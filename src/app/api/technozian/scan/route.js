@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/lib/auth";
 import { connectDB } from "@/app/lib/db";
 import TechnozianRegistration from "@/app/models/TechnozianRegistration";
+import { forwardRfidScan, getForwardingStatus } from "@/app/lib/rfidForwarder";
 
 // Default fallback key if RFID_API_KEY is not defined in .env
 const DEFAULT_API_KEY = "rc_technozian_rfid_2025";
@@ -38,6 +39,7 @@ export async function GET(req) {
     message: "Smash Karts / Technozian RFID Scanner API is online and accepting POST requests",
     authorized: isAuthorized,
     timestamp: new Date().toISOString(),
+    forwardingTargets: getForwardingStatus(),
   });
 }
 
@@ -103,6 +105,30 @@ export async function POST(req) {
           message: "Missing roll number or RFID UID",
         },
         { status: 400 }
+      );
+    }
+
+    // Trigger background relay to configured external websites without delaying response to ESP
+    const scanEventData = {
+      rollNo: cleanRollNo,
+      rfidUid: cleanRfidUid,
+      deviceId: cleanDeviceId,
+      name: (name || "").trim(),
+      branch: (branch || "").trim(),
+      year: (year || "").trim(),
+      contactNo: (contactNo || "").trim(),
+      email: (email || "").trim(),
+      notes: (notes || "").trim(),
+      rawBody: body,
+    };
+
+    if (typeof after === "function") {
+      after(async () => {
+        await forwardRfidScan(scanEventData);
+      });
+    } else {
+      forwardRfidScan(scanEventData).catch((err) =>
+        console.error("[RFID_FORWARD_BACKGROUND_ERROR]", err)
       );
     }
 

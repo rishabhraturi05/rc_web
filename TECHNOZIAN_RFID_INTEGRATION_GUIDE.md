@@ -166,3 +166,23 @@ void sendScanToWebsite(String rollNo, String rfidUid) {
    Students hold cards against the scanner for ~1-2 seconds. Without a delay (`delay(2000)`), the RFID reader might trigger 5-10 requests in a fraction of a second.
 3. **Hotspot Compatibility:**  
    If college Wi-Fi has a captive portal (login page), use a phone mobile hotspot for the ESP box during the event.
+
+
+---
+
+## 7. Multi-Website Fan-Out / Forwarding (Relay to 3 Other Websites)
+
+To avoid burdening the ESP with 4 separate HTTPS requests, our server acts as a **relay**:
+1. **ESP sends 1 request** to `https://rc-nitw.org/api/technozian/scan`.
+2. Our server responds immediately to the ESP (triggering Green/Red LED and buzzer with zero latency).
+3. In the background (`Next.js 15 after()` hook), our server dispatches the exact same scan payload to up to **3 external websites**.
+
+### Where to Configure the 3 Websites:
+* **Option A (File edit):** Open [`src/app/lib/rfidForwarder.js`](file:///c:/Users/risha/OneDrive/Desktop/RC_WEB/rc_web/src/app/lib/rfidForwarder.js). Update `enabled: true`, set `url`, and add any `headers` / `x-api-key`.
+* **Option B (Environment variables):** Set the following in `.env.local` or on your hosting provider (e.g. Vercel):
+  * `RFID_FORWARD_URL_1`, `RFID_FORWARD_API_KEY_1`
+  * `RFID_FORWARD_URL_2`, `RFID_FORWARD_API_KEY_2`
+  * `RFID_FORWARD_URL_3`, `RFID_FORWARD_API_KEY_3`
+
+### Check Forwarding Status:
+Visiting `GET https://rc-nitw.org/api/technozian/scan` in a browser or Postman will return the real-time status of all 3 forwarding targets.
