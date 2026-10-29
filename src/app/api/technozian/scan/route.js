@@ -39,7 +39,7 @@ export async function GET(req) {
     message: "Smash Karts / Technozian RFID Scanner API is online and accepting POST requests",
     authorized: isAuthorized,
     timestamp: new Date().toISOString(),
-    forwardingTargets: getForwardingStatus(),
+    forwardingTargets: getForwardingStatus(isAuthorized),
   });
 }
 
