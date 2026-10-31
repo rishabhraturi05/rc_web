@@ -148,7 +148,10 @@ export async function forwardRfidScan(scanData) {
 
       clearTimeout(timeoutId);
 
-      if (!response.ok) {
+      // Both 2xx (Success) and 409 (Already in queue / active) indicate valid delivery
+      const isDelivered = response.ok || response.status === 409;
+
+      if (!isDelivered) {
         console.warn(
           `[RFID_FORWARD] ${target.name} responded with HTTP ${response.status} ${response.statusText}`
         );
@@ -160,7 +163,8 @@ export async function forwardRfidScan(scanData) {
         };
       }
 
-      console.log(`[RFID_FORWARD] Successfully delivered scan to ${target.name}`);
+      const note = response.status === 409 ? " (already in queue)" : "";
+      console.log(`[RFID_FORWARD] Successfully delivered scan to ${target.name}${note}`);
       return {
         id: target.id,
         name: target.name,
@@ -181,6 +185,7 @@ export async function forwardRfidScan(scanData) {
         error: isTimeout ? "Timeout" : err.message,
       };
     }
+
   });
 
   return await Promise.allSettled(forwardPromises);

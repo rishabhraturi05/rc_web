@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/lib/auth";
 import { connectDB } from "@/app/lib/db";
 import TechnozianRegistration from "@/app/models/TechnozianRegistration";
+import { forwardRfidScan } from "@/app/lib/rfidForwarder";
 
 async function validateAuth() {
   const session = await getServerSession(authOptions);
@@ -52,6 +53,10 @@ export async function PUT(req, { params }) {
       }
     }
 
+    if (updateData.attended === true) {
+      updateData.lastScannedAt = new Date();
+    }
+
     const updated = await TechnozianRegistration.findByIdAndUpdate(
       id,
       updateData,
@@ -63,6 +68,32 @@ export async function PUT(req, { params }) {
         { success: false, message: "Registration not found" },
         { status: 404 }
       );
+    }
+
+    // If marked attended manually, forward to other 3 websites in the background
+    if (updateData.attended === true) {
+      const scanEventData = {
+        rollNo: updated.rollNo,
+        rfidUid: updated.rfidUid || "",
+        deviceId: updated.deviceId || "MANUAL",
+        name: updated.name || "",
+        branch: updated.branch || updated.collegeName || "",
+        rawBody: {
+          rollNo: updated.rollNo,
+          name: updated.name,
+          collegeName: updated.collegeName,
+        },
+      };
+
+      if (typeof after === "function") {
+        after(async () => {
+          await forwardRfidScan(scanEventData);
+        });
+      } else {
+        forwardRfidScan(scanEventData).catch((err) =>
+          console.error("[MANUAL_ATTENDANCE_FORWARD_ERROR]", err)
+        );
+      }
     }
 
     return NextResponse.json({

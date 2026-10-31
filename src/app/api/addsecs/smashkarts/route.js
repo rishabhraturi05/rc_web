@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/lib/auth";
 import { connectDB } from "@/app/lib/db";
 import TechnozianRegistration from "@/app/models/TechnozianRegistration";
+import { forwardRfidScan } from "@/app/lib/rfidForwarder";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -106,13 +107,44 @@ export async function POST(req) {
       });
 
       if (existingUser) {
+        // Mark attendance if not already marked
+        if (!existingUser.attended) {
+          existingUser.attended = true;
+          existingUser.lastScannedAt = new Date();
+          await existingUser.save();
+        }
+
+        // Forward to other 3 websites in the background
+        const scanEventData = {
+          rollNo: existingUser.rollNo,
+          rfidUid: existingUser.rfidUid || "",
+          deviceId: existingUser.deviceId || "WALKIN",
+          name: existingUser.name || cleanName,
+          branch: existingUser.branch || cleanCollege,
+          rawBody: {
+            rollNo: existingUser.rollNo,
+            name: existingUser.name || cleanName,
+            collegeName: existingUser.collegeName || cleanCollege,
+          },
+        };
+
+        if (typeof after === "function") {
+          after(async () => {
+            await forwardRfidScan(scanEventData);
+          });
+        } else {
+          forwardRfidScan(scanEventData).catch((err) =>
+            console.error("[WALKIN_FORWARD_BACKGROUND_ERROR]", err)
+          );
+        }
+
         return NextResponse.json(
           {
             success: true,
             status: "already_registered",
             name: existingUser.name || "Student",
             rollNo: existingUser.rollNo,
-            message: `Already registered! Student ${existingUser.name || "Student"} (${existingUser.rollNo}) is already registered.`,
+            message: `Already registered! Student ${existingUser.name || "Student"} (${existingUser.rollNo}) is registered and marked attended.`,
             data: existingUser,
           },
           { status: 200 }
@@ -152,6 +184,30 @@ export async function POST(req) {
       isManual: true,
       eventName: "Smash Karts",
     });
+
+    // Forward manual walk-in to all 3 external websites in background
+    const scanEventData = {
+      rollNo: registration.rollNo,
+      rfidUid: registration.rfidUid || "",
+      deviceId: "WALKIN",
+      name: registration.name || "",
+      branch: registration.branch || registration.collegeName || "",
+      rawBody: {
+        rollNo: registration.rollNo,
+        name: registration.name,
+        collegeName: registration.collegeName,
+      },
+    };
+
+    if (typeof after === "function") {
+      after(async () => {
+        await forwardRfidScan(scanEventData);
+      });
+    } else {
+      forwardRfidScan(scanEventData).catch((err) =>
+        console.error("[WALKIN_FORWARD_BACKGROUND_ERROR]", err)
+      );
+    }
 
     return NextResponse.json(
       {
