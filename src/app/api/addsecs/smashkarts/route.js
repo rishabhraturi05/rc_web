@@ -123,6 +123,7 @@ export async function POST(req) {
           branch: existingUser.branch || cleanCollege,
           rawBody: {
             rollNo: existingUser.rollNo,
+            rollNumber: existingUser.rollNo,
             name: existingUser.name || cleanName,
             collegeName: existingUser.collegeName || cleanCollege,
           },
@@ -152,17 +153,20 @@ export async function POST(req) {
       }
     }
 
-    // Auto-generate or sanitize Roll/Walkin ID
-    let finalRollNo = cleanUserRoll || `WALKIN-${Math.floor(1000 + Math.random() * 9000)}`;
+    // If no roll number is provided for the walk-in, use the Name as the Roll Number
+    let finalRollNo = cleanUserRoll || cleanName.toUpperCase();
 
-    // Ensure uniqueness for generated walk-in ID
+    // Ensure uniqueness if another participant has this exact roll number / name
     let existing = await TechnozianRegistration.findOne({
       rollNo: finalRollNo,
       isDeleted: false,
     });
 
+    let counter = 1;
+    const baseRoll = finalRollNo;
     while (existing) {
-      finalRollNo = `WALKIN-${Math.floor(1000 + Math.random() * 9000)}`;
+      counter++;
+      finalRollNo = `${baseRoll}_${counter}`;
       existing = await TechnozianRegistration.findOne({
         rollNo: finalRollNo,
         isDeleted: false,
@@ -194,6 +198,7 @@ export async function POST(req) {
       branch: registration.branch || registration.collegeName || "",
       rawBody: {
         rollNo: registration.rollNo,
+        rollNumber: registration.rollNo,
         name: registration.name,
         collegeName: registration.collegeName,
       },
