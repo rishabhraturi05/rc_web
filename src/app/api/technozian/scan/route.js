@@ -33,11 +33,9 @@ function verifyApiKey(req, bodyKey = null) {
 /**
  * Checks if a string looks like a NITW roll number.
  * NITW roll numbers follow patterns like: 23BCS042, 21BCE101, 24MCS005, 20PHD002, etc.
- * Pattern: 2 digits (year) + 2-3 letters (branch code) + 3 digits (student number)
  */
 function isNitwRollNo(value) {
   if (!value || typeof value !== "string") return false;
-  // Matches: 2-digit year + 2-4 uppercase letters + 2-4 digits (e.g., 23BCS042, 21ME01, 24MTECH001)
   return /^\d{2}[A-Z]{2,4}\d{2,4}$/.test(value.trim().toUpperCase());
 }
 
@@ -119,39 +117,56 @@ export async function POST(req) {
       );
     }
 
-    // Determine if this is a NITW student (roll number) or non-NITW (name sent in rollNo field)
-    const isNitwStudent = isNitwRollNo(rawRollNo);
-    let cleanRollNo;
-    let participantName;
+    await connectDB();
 
-    if (isNitwStudent) {
-      // NITW student: rollNo is an actual roll number
-      cleanRollNo = rawRollNo.toUpperCase();
-      participantName = (name || "").trim();
-    } else if (rawRollNo) {
-      // Non-NITW student: rollNo field contains their name
-      // Store a generated ID as rollNo, and use the value as their name
-      cleanRollNo = `EXT_${rawRollNo.replace(/\s+/g, "_").toUpperCase()}`;
-      participantName = rawRollNo; // The original value IS their name
-    } else {
-      // Only RFID UID provided, no roll number
-      cleanRollNo = "";
-      participantName = (name || "").trim();
+    const isNitw = isNitwRollNo(rawRollNo);
+
+    // 3. Search for existing registration in our database
+    const query = {
+      isDeleted: false,
+      $or: [],
+    };
+    if (rawRollNo) {
+      query.$or.push({ rollNo: rawRollNo.toUpperCase() });
+      query.$or.push({ rollNo: rawRollNo });
+    }
+    if (cleanRfidUid) {
+      query.$or.push({ rfidUid: cleanRfidUid });
     }
 
-    // Trigger background relay to configured external websites without delaying response to ESP
+    let existing = await TechnozianRegistration.findOne(query);
+
+    // 4. Resolve Name:
+    // If FOUND in our database -> use their registered Name from database
+    // If NOT FOUND in our database -> use whatever rollNo string we received!
+    let resolvedName = "";
+    let resolvedRollNo = "";
+
+    if (existing) {
+      resolvedName = (existing.name || "").trim() || (name || "").trim() || existing.rollNo;
+      resolvedRollNo = existing.rollNo;
+    } else {
+      resolvedName = (name || "").trim() || rawRollNo || (cleanRfidUid ? `RFID_${cleanRfidUid}` : "Participant");
+      resolvedRollNo = rawRollNo.toUpperCase() || (cleanRfidUid ? `RFID_${cleanRfidUid}` : "PARTICIPANT");
+    }
+
+    // 5. Trigger background forward to the 3 external websites
     const scanEventData = {
-      rollNo: cleanRollNo || rawRollNo.toUpperCase(),
+      rollNo: resolvedRollNo,
       rfidUid: cleanRfidUid,
       deviceId: cleanDeviceId,
-      name: participantName,
-      branch: (branch || "").trim(),
-      year: (year || "").trim(),
-      contactNo: (contactNo || "").trim(),
-      email: (email || "").trim(),
-      notes: (notes || "").trim(),
-      isNitwStudent,
-      rawBody: body,
+      name: resolvedName,
+      branch: (branch || existing?.branch || existing?.collegeName || "").trim(),
+      year: (year || existing?.year || "").trim(),
+      contactNo: (contactNo || existing?.contactNo || "").trim(),
+      email: (email || existing?.email || "").trim(),
+      notes: (notes || existing?.notes || "").trim(),
+      isNitwStudent: isNitw,
+      rawBody: {
+        rollNo: resolvedRollNo,
+        rollNumber: resolvedRollNo,
+        name: resolvedName,
+      },
     };
 
     if (typeof after === "function") {
@@ -164,18 +179,6 @@ export async function POST(req) {
       );
     }
 
-    await connectDB();
-
-    // 3. Search for existing registration by rollNo or rfidUid
-    const query = {
-      isDeleted: false,
-      $or: [],
-    };
-    if (cleanRollNo) query.$or.push({ rollNo: cleanRollNo });
-    if (cleanRfidUid) query.$or.push({ rfidUid: cleanRfidUid });
-
-    let existing = await TechnozianRegistration.findOne(query);
-
     if (existing) {
       const wasAlreadyAttended = Boolean(existing.attended);
 
@@ -185,15 +188,13 @@ export async function POST(req) {
       existing.attended = true;
       if (cleanDeviceId) existing.deviceId = cleanDeviceId;
       if (cleanRfidUid && !existing.rfidUid) existing.rfidUid = cleanRfidUid;
-      if (cleanRollNo && (!existing.rollNo || existing.rollNo === "")) existing.rollNo = cleanRollNo;
-      // Update name if we have one and existing record doesn't
-      if (participantName && (!existing.name || existing.name === "" || existing.name === "Walk-in Participant")) {
-        existing.name = participantName;
+      if (resolvedName && (!existing.name || existing.name === "" || existing.name === "Walk-in Participant")) {
+        existing.name = resolvedName;
       }
 
       await existing.save();
 
-      const studentType = isNitwStudent ? "NITW" : "Non-NITW";
+      const studentType = isNitw ? "NITW" : "Non-NITW";
 
       // Case 1: Student was ALREADY registered / attended before this tap
       if (wasAlreadyAttended) {
@@ -201,22 +202,22 @@ export async function POST(req) {
           {
             success: true,
             status: "already_registered",
-            name: existing.name || "Student",
+            name: existing.name || resolvedName,
             rollNo: existing.rollNo,
             isRepeat: true,
-            isNitwStudent,
+            isNitwStudent: isNitw,
             studentType,
             message: `Already registered! Attendance was already recorded for ${existing.name || existing.rollNo}`,
             data: {
               id: existing._id,
               rollNo: existing.rollNo,
               rfidUid: existing.rfidUid,
-              name: existing.name || "Student",
+              name: existing.name || resolvedName,
               collegeName: existing.collegeName || existing.branch || "",
               scanCount: existing.scanCount,
               lastScannedAt: existing.lastScannedAt,
               deviceId: existing.deviceId,
-              isNitwStudent,
+              isNitwStudent: isNitw,
               studentType,
             },
           },
@@ -229,22 +230,22 @@ export async function POST(req) {
         {
           success: true,
           status: "success",
-          name: existing.name || "Student",
+          name: existing.name || resolvedName,
           rollNo: existing.rollNo,
           isRepeat: false,
-          isNitwStudent,
+          isNitwStudent: isNitw,
           studentType,
           message: `Registered successfully: ${existing.name || existing.rollNo} (${studentType})`,
           data: {
             id: existing._id,
             rollNo: existing.rollNo,
             rfidUid: existing.rfidUid,
-            name: existing.name || "Student",
+            name: existing.name || resolvedName,
             collegeName: existing.collegeName || existing.branch || "",
             scanCount: existing.scanCount,
             lastScannedAt: existing.lastScannedAt,
             deviceId: existing.deviceId,
-            isNitwStudent,
+            isNitwStudent: isNitw,
             studentType,
           },
         },
@@ -252,21 +253,20 @@ export async function POST(req) {
       );
     }
 
-    // Case 3: Student NOT found in database — auto-register for both NITW and Non-NITW
-    // Non-NITW students are always auto-registered since they won't be pre-loaded in the database
+    // Case 3: Student NOT found in database — auto-register
     const allowAutoRegister =
-      !isNitwStudent || body.autoRegister === true || body.isWalkIn === true;
+      !isNitw || body.autoRegister === true || body.isWalkIn === true;
 
     if (!allowAutoRegister) {
       return NextResponse.json(
         {
           success: false,
           status: "not_found",
-          name: null,
-          rollNo: cleanRollNo || cleanRfidUid,
-          isNitwStudent,
+          name: resolvedName,
+          rollNo: resolvedRollNo,
+          isNitwStudent: isNitw,
           studentType: "NITW",
-          message: `NITW student not found in database: ${cleanRollNo || cleanRfidUid}`,
+          message: `NITW student not found in database: ${resolvedRollNo}`,
         },
         { status: 404 }
       );
@@ -274,15 +274,15 @@ export async function POST(req) {
 
     // Auto-create registration
     const newRecord = await TechnozianRegistration.create({
-      rollNo: cleanRollNo || `RFID_${cleanRfidUid}`,
+      rollNo: resolvedRollNo,
       rfidUid: cleanRfidUid,
       deviceId: cleanDeviceId,
-      name: participantName || (isNitwStudent ? "Walk-in Participant" : rawRollNo),
+      name: resolvedName,
       branch: (branch || "").trim(),
       year: (year || "").trim(),
       contactNo: (contactNo || "").trim(),
       email: (email || "").trim(),
-      notes: isNitwStudent
+      notes: isNitw
         ? (notes || "").trim()
         : (notes || "").trim() || "Non-NITW Participant",
       scanCount: 1,
@@ -292,28 +292,28 @@ export async function POST(req) {
       eventName: "Smash Karts",
     });
 
-    const studentType = isNitwStudent ? "NITW" : "Non-NITW";
+    const studentType = isNitw ? "NITW" : "Non-NITW";
 
     return NextResponse.json(
       {
         success: true,
         status: "success",
-        name: newRecord.name || "Student",
+        name: newRecord.name || resolvedName,
         rollNo: newRecord.rollNo,
         isRepeat: false,
-        isNitwStudent,
+        isNitwStudent: isNitw,
         studentType,
         message: `Registered successfully: ${newRecord.name || newRecord.rollNo} (${studentType})`,
         data: {
           id: newRecord._id,
           rollNo: newRecord.rollNo,
           rfidUid: newRecord.rfidUid,
-          name: newRecord.name || "Student",
+          name: newRecord.name || resolvedName,
           collegeName: newRecord.collegeName || newRecord.branch || "",
           scanCount: 1,
           lastScannedAt: newRecord.lastScannedAt,
           deviceId: newRecord.deviceId,
-          isNitwStudent,
+          isNitwStudent: isNitw,
           studentType,
         },
       },

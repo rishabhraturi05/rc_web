@@ -119,6 +119,7 @@ export async function forwardRfidScan(scanData) {
   const basePayload = {
     rollNo: scanData.rollNo || "",
     rollNumber: scanData.rollNo || "",
+    name: scanData.name || "",
     rfid: scanData.rfidUid || "",
     rfidUid: scanData.rfidUid || "",
     deviceId: scanData.deviceId || "BOX_1",
